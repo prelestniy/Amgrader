@@ -1,0 +1,597 @@
+[
+ {
+  "id": 1,
+  "name": "Земля",
+  "nameEn": "Dirt",
+  "rarity": "common",
+  "price": 8
+ },
+ {
+  "id": 2,
+  "name": "Песок",
+  "nameEn": "Sand",
+  "rarity": "common",
+  "price": 9
+ },
+ {
+  "id": 3,
+  "name": "Гравий",
+  "nameEn": "Gravel",
+  "rarity": "common",
+  "price": 10
+ },
+ {
+  "id": 4,
+  "name": "Глина",
+  "nameEn": "Clay",
+  "rarity": "common",
+  "price": 11
+ },
+ {
+  "id": 5,
+  "name": "Красный песок",
+  "nameEn": "Red Sand",
+  "rarity": "common",
+  "price": 12
+ },
+ {
+  "id": 6,
+  "name": "Снежный блок",
+  "nameEn": "Snow Block",
+  "rarity": "common",
+  "price": 13
+ },
+ {
+  "id": 7,
+  "name": "Булыжник",
+  "nameEn": "Cobblestone",
+  "rarity": "common",
+  "price": 14
+ },
+ {
+  "id": 8,
+  "name": "Незерак",
+  "nameEn": "Netherrack",
+  "rarity": "common",
+  "price": 15
+ },
+ {
+  "id": 9,
+  "name": "Камень",
+  "nameEn": "Stone",
+  "rarity": "common",
+  "price": 16
+ },
+ {
+  "id": 10,
+  "name": "Песок душ",
+  "nameEn": "Soul Sand",
+  "rarity": "common",
+  "price": 17
+ },
+ {
+  "id": 11,
+  "name": "Травяной блок",
+  "nameEn": "Grass Block",
+  "rarity": "common",
+  "price": 18
+ },
+ {
+  "id": 12,
+  "name": "Лёд",
+  "nameEn": "Ice",
+  "rarity": "common",
+  "price": 19
+ },
+ {
+  "id": 13,
+  "name": "Факел",
+  "nameEn": "Torch",
+  "rarity": "common",
+  "price": 12
+ },
+ {
+  "id": 14,
+  "name": "Лестница",
+  "nameEn": "Ladder",
+  "rarity": "common",
+  "price": 14
+ },
+ {
+  "id": 15,
+  "name": "Дубовые доски",
+  "nameEn": "Oak Planks",
+  "rarity": "common",
+  "price": 16
+ },
+ {
+  "id": 16,
+  "name": "Берёзовые доски",
+  "nameEn": "Birch Planks",
+  "rarity": "common",
+  "price": 17
+ },
+ {
+  "id": 17,
+  "name": "Еловые доски",
+  "nameEn": "Spruce Planks",
+  "rarity": "common",
+  "price": 18
+ },
+ {
+  "id": 18,
+  "name": "Глубинный сланец",
+  "nameEn": "Deepslate",
+  "rarity": "common",
+  "price": 20
+ },
+ {
+  "id": 19,
+  "name": "Дубовое бревно",
+  "nameEn": "Oak Log",
+  "rarity": "common",
+  "price": 22
+ },
+ {
+  "id": 20,
+  "name": "Стекло",
+  "nameEn": "Glass",
+  "rarity": "common",
+  "price": 20
+ },
+ {
+  "id": 21,
+  "name": "Кирпичи",
+  "nameEn": "Bricks",
+  "rarity": "rare",
+  "price": 35
+ },
+ {
+  "id": 22,
+  "name": "Каменные кирпичи",
+  "nameEn": "Stone Bricks",
+  "rarity": "rare",
+  "price": 36
+ },
+ {
+  "id": 23,
+  "name": "Замшелый булыжник",
+  "nameEn": "Mossy Cobblestone",
+  "rarity": "rare",
+  "price": 40
+ },
+ {
+  "id": 24,
+  "name": "Плотный лёд",
+  "nameEn": "Packed Ice",
+  "rarity": "rare",
+  "price": 42
+ },
+ {
+  "id": 25,
+  "name": "Стеклянная панель",
+  "nameEn": "Glass Pane",
+  "rarity": "rare",
+  "price": 30
+ },
+ {
+  "id": 26,
+  "name": "Железные прутья",
+  "nameEn": "Iron Bars",
+  "rarity": "rare",
+  "price": 38
+ },
+ {
+  "id": 27,
+  "name": "Фонарь",
+  "nameEn": "Lantern",
+  "rarity": "rare",
+  "price": 34
+ },
+ {
+  "id": 28,
+  "name": "Губка",
+  "nameEn": "Sponge",
+  "rarity": "rare",
+  "price": 45
+ },
+ {
+  "id": 29,
+  "name": "Стог сена",
+  "nameEn": "Hay Bale",
+  "rarity": "rare",
+  "price": 33
+ },
+ {
+  "id": 30,
+  "name": "Кактус",
+  "nameEn": "Cactus",
+  "rarity": "rare",
+  "price": 28
+ },
+ {
+  "id": 31,
+  "name": "Арбуз",
+  "nameEn": "Melon",
+  "rarity": "rare",
+  "price": 30
+ },
+ {
+  "id": 32,
+  "name": "Тыква",
+  "nameEn": "Pumpkin",
+  "rarity": "rare",
+  "price": 32
+ },
+ {
+  "id": 33,
+  "name": "Светильник Джека",
+  "nameEn": "Jack o'Lantern",
+  "rarity": "rare",
+  "price": 40
+ },
+ {
+  "id": 34,
+  "name": "Строительные леса",
+  "nameEn": "Scaffolding",
+  "rarity": "rare",
+  "price": 30
+ },
+ {
+  "id": 35,
+  "name": "Рычаг",
+  "nameEn": "Lever",
+  "rarity": "rare",
+  "price": 26
+ },
+ {
+  "id": 36,
+  "name": "Каменная кнопка",
+  "nameEn": "Stone Button",
+  "rarity": "rare",
+  "price": 24
+ },
+ {
+  "id": 37,
+  "name": "Каменная нажимная плита",
+  "nameEn": "Stone Pressure Plate",
+  "rarity": "rare",
+  "price": 26
+ },
+ {
+  "id": 38,
+  "name": "Базальт",
+  "nameEn": "Basalt",
+  "rarity": "rare",
+  "price": 44
+ },
+ {
+  "id": 39,
+  "name": "Камень Края",
+  "nameEn": "End Stone",
+  "rarity": "rare",
+  "price": 48
+ },
+ {
+  "id": 40,
+  "name": "Сундук",
+  "nameEn": "Chest",
+  "rarity": "rare",
+  "price": 55
+ },
+ {
+  "id": 41,
+  "name": "Бочка",
+  "nameEn": "Barrel",
+  "rarity": "rare",
+  "price": 50
+ },
+ {
+  "id": 42,
+  "name": "Книжная полка",
+  "nameEn": "Bookshelf",
+  "rarity": "rare",
+  "price": 60
+ },
+ {
+  "id": 43,
+  "name": "Верстак",
+  "nameEn": "Crafting Table",
+  "rarity": "rare",
+  "price": 45
+ },
+ {
+  "id": 44,
+  "name": "Печь",
+  "nameEn": "Furnace",
+  "rarity": "rare",
+  "price": 50
+ },
+ {
+  "id": 45,
+  "name": "Динамит",
+  "nameEn": "TNT",
+  "rarity": "rare",
+  "price": 70
+ },
+ {
+  "id": 46,
+  "name": "Угольная руда",
+  "nameEn": "Coal Ore",
+  "rarity": "epic",
+  "price": 100
+ },
+ {
+  "id": 47,
+  "name": "Медная руда",
+  "nameEn": "Copper Ore",
+  "rarity": "epic",
+  "price": 110
+ },
+ {
+  "id": 48,
+  "name": "Железная руда",
+  "nameEn": "Iron Ore",
+  "rarity": "epic",
+  "price": 130
+ },
+ {
+  "id": 49,
+  "name": "Лазуритовая руда",
+  "nameEn": "Lapis Lazuli Ore",
+  "rarity": "epic",
+  "price": 140
+ },
+ {
+  "id": 50,
+  "name": "Редстоуновая руда",
+  "nameEn": "Redstone Ore",
+  "rarity": "epic",
+  "price": 150
+ },
+ {
+  "id": 51,
+  "name": "Кварцевая руда Незера",
+  "nameEn": "Nether Quartz Ore",
+  "rarity": "epic",
+  "price": 120
+ },
+ {
+  "id": 52,
+  "name": "Воронка",
+  "nameEn": "Hopper",
+  "rarity": "epic",
+  "price": 160
+ },
+ {
+  "id": 53,
+  "name": "Выбрасыватель",
+  "nameEn": "Dropper",
+  "rarity": "epic",
+  "price": 140
+ },
+ {
+  "id": 54,
+  "name": "Раздатчик",
+  "nameEn": "Dispenser",
+  "rarity": "epic",
+  "price": 150
+ },
+ {
+  "id": 55,
+  "name": "Поршень",
+  "nameEn": "Piston",
+  "rarity": "epic",
+  "price": 145
+ },
+ {
+  "id": 56,
+  "name": "Липкий поршень",
+  "nameEn": "Sticky Piston",
+  "rarity": "epic",
+  "price": 165
+ },
+ {
+  "id": 57,
+  "name": "Редстоуновая лампа",
+  "nameEn": "Redstone Lamp",
+  "rarity": "epic",
+  "price": 155
+ },
+ {
+  "id": 58,
+  "name": "Коптильня",
+  "nameEn": "Smoker",
+  "rarity": "epic",
+  "price": 160
+ },
+ {
+  "id": 59,
+  "name": "Плавильная печь",
+  "nameEn": "Blast Furnace",
+  "rarity": "epic",
+  "price": 175
+ },
+ {
+  "id": 60,
+  "name": "Наковальня",
+  "nameEn": "Anvil",
+  "rarity": "epic",
+  "price": 190
+ },
+ {
+  "id": 61,
+  "name": "Призмарин",
+  "nameEn": "Prismarine",
+  "rarity": "epic",
+  "price": 130
+ },
+ {
+  "id": 62,
+  "name": "Морской фонарь",
+  "nameEn": "Sea Lantern",
+  "rarity": "epic",
+  "price": 200
+ },
+ {
+  "id": 63,
+  "name": "Светокамень",
+  "nameEn": "Glowstone",
+  "rarity": "epic",
+  "price": 120
+ },
+ {
+  "id": 64,
+  "name": "Чернокамень",
+  "nameEn": "Blackstone",
+  "rarity": "epic",
+  "price": 135
+ },
+ {
+  "id": 65,
+  "name": "Обсидиан",
+  "nameEn": "Obsidian",
+  "rarity": "epic",
+  "price": 210
+ },
+ {
+  "id": 66,
+  "name": "Золотая руда",
+  "nameEn": "Gold Ore",
+  "rarity": "legendary",
+  "price": 320
+ },
+ {
+  "id": 67,
+  "name": "Медный блок",
+  "nameEn": "Copper Block",
+  "rarity": "legendary",
+  "price": 350
+ },
+ {
+  "id": 68,
+  "name": "Железный блок",
+  "nameEn": "Iron Block",
+  "rarity": "legendary",
+  "price": 420
+ },
+ {
+  "id": 69,
+  "name": "Золотой блок",
+  "nameEn": "Gold Block",
+  "rarity": "legendary",
+  "price": 600
+ },
+ {
+  "id": 70,
+  "name": "Блок редстоуна",
+  "nameEn": "Redstone Block",
+  "rarity": "legendary",
+  "price": 380
+ },
+ {
+  "id": 71,
+  "name": "Пурпурный блок",
+  "nameEn": "Purpur Block",
+  "rarity": "legendary",
+  "price": 340
+ },
+ {
+  "id": 72,
+  "name": "Магмовый блок",
+  "nameEn": "Magma Block",
+  "rarity": "legendary",
+  "price": 400
+ },
+ {
+  "id": 73,
+  "name": "Стол зачарований",
+  "nameEn": "Enchanting Table",
+  "rarity": "legendary",
+  "price": 700
+ },
+ {
+  "id": 74,
+  "name": "Варочная стойка",
+  "nameEn": "Brewing Stand",
+  "rarity": "legendary",
+  "price": 450
+ },
+ {
+  "id": 75,
+  "name": "Маяк",
+  "nameEn": "Beacon",
+  "rarity": "legendary",
+  "price": 850
+ },
+ {
+  "id": 76,
+  "name": "Аметистовый блок",
+  "nameEn": "Amethyst Block",
+  "rarity": "legendary",
+  "price": 500
+ },
+ {
+  "id": 77,
+  "name": "Медовый блок",
+  "nameEn": "Honey Block",
+  "rarity": "legendary",
+  "price": 360
+ },
+ {
+  "id": 78,
+  "name": "Слаймовый блок",
+  "nameEn": "Slime Block",
+  "rarity": "legendary",
+  "price": 380
+ },
+ {
+  "id": 79,
+  "name": "Изумрудная руда",
+  "nameEn": "Emerald Ore",
+  "rarity": "legendary",
+  "price": 550
+ },
+ {
+  "id": 80,
+  "name": "Алмазная руда",
+  "nameEn": "Diamond Ore",
+  "rarity": "mythic",
+  "price": 1300
+ },
+ {
+  "id": 81,
+  "name": "Алмазный блок",
+  "nameEn": "Diamond Block",
+  "rarity": "mythic",
+  "price": 2500
+ },
+ {
+  "id": 82,
+  "name": "Изумрудный блок",
+  "nameEn": "Emerald Block",
+  "rarity": "mythic",
+  "price": 2800
+ },
+ {
+  "id": 83,
+  "name": "Блок незерита",
+  "nameEn": "Netherite Block",
+  "rarity": "mythic",
+  "price": 5000
+ },
+ {
+  "id": 84,
+  "name": "Древние обломки",
+  "nameEn": "Ancient Debris",
+  "rarity": "mythic",
+  "price": 4200
+ },
+ {
+  "id": 85,
+  "name": "Бедрок",
+  "nameEn": "Bedrock",
+  "rarity": "mythic",
+  "price": 6000
+ }
+]
