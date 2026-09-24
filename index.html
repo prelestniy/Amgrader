@@ -332,6 +332,13 @@ button, input { font-family:inherit; font-synthesis:none; }
 .misc-msg { font-size:12.5px; min-height:16px; text-align:center; color:var(--danger); }
 .misc-msg.ok { color:var(--accent); }
 
+/* ===== ВИДЕО-РЕАКЦИИ ===== */
+#sfxStage { position:fixed; inset:0; z-index:180; pointer-events:none; display:flex; align-items:flex-end; justify-content:center;
+  opacity:0; transition:opacity .12s linear; }
+#sfxStage.show { opacity:1; }
+#sfxStage canvas { width:100%; height:70vh; object-fit:contain; object-position:bottom; }
+#sfxVideo { position:fixed; left:0; top:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1; }
+
 /* ===== ЗАГЛУШКА "КЕЙСЫ" ===== */
 .soon-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; gap:12px; padding:70px 24px; background:var(--surface-1); border:1px solid var(--border);
@@ -572,6 +579,9 @@ button, input { font-family:inherit; font-synthesis:none; }
       </div>
       <div class="profile-row" onclick="showScreen('cases')">
         <span class="row-label">📦 Кейсы</span><span class="row-arrow">›</span>
+      </div>
+      <div class="profile-row" onclick="toggleSfx()">
+        <span class="row-label" id="sfxRowLabel">🔊 Звуки и видео: вкл</span><span class="row-arrow">›</span>
       </div>
       <div class="profile-row" id="rowLogout" onclick="logoutAccount()" style="display:none">
         <span class="row-label">⇥ Выйти из аккаунта</span><span class="row-arrow">›</span>
@@ -1405,9 +1415,11 @@ async function spin() {
   const stakeTotal = getTotalStake();
   const finalAngle = normalizeAngle(randomCrypto() * 360 - 180);
   const win = isWin(finalAngle, chance);
+  try { mediaPrepare(win, tgt, stakeTotal, chance); } catch (e) {}
 
   await animatePointerTo(finalAngle, 3400);
   showBubble(win, tgt, stakeTotal);          // сразу, как только указатель остановился
+  try { mediaPlay(); } catch (e) {}
 
   await new Promise(r => setTimeout(r, 700));
   await returnPointerToStart(500);
@@ -2092,6 +2104,123 @@ async function init() {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) syncFromServer(); });
 }
 init();
+
+/* ============================================================
+   ВИДЕО-РЕАКЦИИ НА РЕЗУЛЬТАТ (зелёный фон вырезается на лету)
+   Файлы лежат в папке videos/ рядом с app.py (можно и в корне).
+   ============================================================ */
+const SFX = {
+  dir: "/videos/",
+  // победа: (шанс до N %) -> файл. 21–29% отдельного видео нет — идёт «30-50%».
+  win: [[5, "0-5%.mp4"], [10, "6-10%.mp4"], [20, "11-20%.mp4"], [50, "30-50%.mp4"], [100, "50-100%.mp4"]],
+  bigWin: "крупная победа.mp4",   // выигранный предмет стоит >= bigPrice
+  lose: "проигрыш.mp4",
+  bigLose: "крупный проигрыш.mp4", // сгоревшая ставка >= bigPrice
+  bigPrice: 1000
+};
+const sfx = { on: true, blobs: {}, video: null, stage: null, canvas: null, ctx: null, work: null, wctx: null,
+  pending: null, playing: false, raf: 0, guard: 0 };
+try { sfx.on = localStorage.getItem("amg_sfx") !== "0"; } catch (e) {}
+
+function sfxName(win, chance, tgtPrice, stake) {
+  if (win) {
+    if (tgtPrice >= SFX.bigPrice) return SFX.bigWin;
+    for (const [max, file] of SFX.win) if (chance <= max) return file;
+    return SFX.win[SFX.win.length - 1][1];
+  }
+  return stake >= SFX.bigPrice ? SFX.bigLose : SFX.lose;
+}
+function sfxAllNames() { return [...SFX.win.map(w => w[1]), SFX.bigWin, SFX.lose, SFX.bigLose]; }
+
+/* качаем целиком в память: так работает и на iOS (там нужны Range-запросы) */
+async function sfxLoad(name) {
+  if (sfx.blobs[name]) return sfx.blobs[name];
+  try {
+    const r = await fetch(SFX.dir + encodeURIComponent(name));
+    if (!r.ok) return null;
+    return (sfx.blobs[name] = URL.createObjectURL(await r.blob()));
+  } catch (e) { return null; }
+}
+async function sfxPreloadAll() { for (const n of sfxAllNames()) await sfxLoad(n); }
+
+function sfxEnsureDom() {
+  if (sfx.video) return;
+  const st = document.createElement("div"); st.id = "sfxStage";
+  const cv = document.createElement("canvas"); st.appendChild(cv);
+  const v = document.createElement("video");
+  v.id = "sfxVideo"; v.setAttribute("playsinline", ""); v.setAttribute("webkit-playsinline", ""); v.preload = "auto";
+  v.addEventListener("ended", sfxStop);
+  document.body.appendChild(st); document.body.appendChild(v);
+  sfx.stage = st; sfx.canvas = cv; sfx.ctx = cv.getContext("2d");
+  sfx.work = document.createElement("canvas"); sfx.wctx = sfx.work.getContext("2d", { willReadFrequently: true });
+  sfx.video = v;
+}
+
+/* Вызывается в момент нажатия «Апгрейд» (жест пользователя) — «разблокирует» звук */
+function mediaPrepare(win, tgt, stake, chance) {
+  sfxStop(); sfx.pending = null;
+  if (!sfx.on) return;
+  const name = sfxName(win, chance, tgt.price, stake);
+  sfxEnsureDom();
+  const v = sfx.video; sfx.pending = name;
+  v.muted = false; v.volume = 1;
+  v.src = sfx.blobs[name] || (SFX.dir + encodeURIComponent(name));
+  v.load();
+  const p = v.play();
+  if (p && p.then) p.then(() => { if (!sfx.playing) { v.pause(); v.currentTime = 0; } }).catch(() => {});
+  if (!sfx.blobs[name]) sfxLoad(name);
+}
+
+/* Вызывается, когда указатель остановился */
+function mediaPlay() {
+  const v = sfx.video;
+  if (!sfx.pending || !sfx.on || !v) return;
+  sfx.playing = true;
+  v.currentTime = 0; v.muted = false; v.volume = 1;
+  const go = () => {
+    const p = v.play();
+    if (p && p.catch) p.catch(() => { v.muted = true; v.play().catch(sfxStop); }); // звук заблокирован — хотя бы картинка
+  };
+  go();
+  sfx.stage.classList.add("show");
+  sfx.guard = setTimeout(sfxStop, 12000);
+  sfxFrame();
+}
+function sfxStop() {
+  sfx.playing = false; sfx.pending = null;
+  cancelAnimationFrame(sfx.raf); clearTimeout(sfx.guard);
+  if (sfx.stage) sfx.stage.classList.remove("show");
+  if (sfx.video) { try { sfx.video.pause(); } catch (e) {} }
+}
+function sfxFrame() {
+  if (!sfx.playing) return;
+  const v = sfx.video;
+  if (v.videoWidth && v.readyState >= 2) {
+    const k = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight));
+    const w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
+    if (sfx.canvas.width !== w) { sfx.canvas.width = sfx.work.width = w; sfx.canvas.height = sfx.work.height = h; }
+    sfx.wctx.drawImage(v, 0, 0, w, h);
+    const img = sfx.wctx.getImageData(0, 0, w, h), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2], m = r > b ? r : b, diff = g - m;
+      if (diff > 22) {
+        const a = diff >= 85 ? 0 : 1 - (diff - 22) / 63;   // плавный край
+        d[i + 3] = a * 255; d[i + 1] = m;                   // убираем зелёный ореол
+      }
+    }
+    sfx.ctx.putImageData(img, 0, 0);
+  }
+  sfx.raf = requestAnimationFrame(sfxFrame);
+}
+
+function sfxLabel() { const el = document.getElementById("sfxRowLabel"); if (el) el.textContent = "🔊 Звуки и видео: " + (sfx.on ? "вкл" : "выкл"); }
+function toggleSfx() {
+  sfx.on = !sfx.on; try { localStorage.setItem("amg_sfx", sfx.on ? "1" : "0"); } catch (e) {}
+  if (!sfx.on) sfxStop();
+  sfxLabel();
+}
+sfxLabel();
+setTimeout(sfxPreloadAll, 2500);
 
 </script>
 </body>
