@@ -50,7 +50,13 @@ async def start(message: Message):
         "/promos — список всех промокодов\n"
         "/delpromo КОД — деактивировать промокод\n"
         "/grant логин сумма — начислить баланс пользователю напрямую\n"
-        "/find текст — найти пользователя по логину/нику\n\n"
+        "/find текст — найти пользователя по логину/нику\n"
+        "/top — богатейшие игроки и общий баланс\n"
+        "/setbal логин сумма — установить баланс (логин или #id)\n"
+        "/grantall сумма — прибавить ВСЕМ (минус — списать)\n"
+        "/setall сумма — установить баланс ВСЕМ\n"
+        "/chance — бонус к шансу для всех (кнопки ±), /chance 5 — задать числом\n"
+        "/uchance логин 10 — личный бонус к шансу\n\n"
         "Пример: /newpromo WELCOME2026 500 100\n"
         "→ 100 человек смогут получить по 500 G по коду WELCOME2026"
     )
@@ -305,6 +311,127 @@ async def new_uses(message: Message, state: FSMContext):
         await message.answer(f"✅ Готово! Промокод {d['code']}: {what}, активаций: {message.text.strip() or '∞'}")
     else:
         await message.answer(f"❌ Ошибка: {err_text(r)}")
+
+
+# ---------------- баланс и шансы ----------------
+async def post(path, payload):
+    async with httpx.AsyncClient() as client:
+        return await client.post(f"{BACKEND_URL}{path}", headers=HEADERS, json=payload)
+
+
+def to_int(s):
+    try:
+        return int(s.replace(" ", "").replace("+", ""))
+    except ValueError:
+        return None
+
+
+@dp.message(Command("top"))
+async def top(message: Message):
+    if not is_admin(message):
+        return
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{BACKEND_URL}/admin/top", headers=HEADERS)
+    d = r.json()
+    lines = [f"#{u['id']} {u['login'] or u['nickname']} — {u['balance']} G" + (f" (шанс {u['chance_bonus']:+d}%)" if u["chance_bonus"] else "") for u in d["users"]]
+    await message.answer(f"Игроков: {d['count']}, всего на балансах: {d['sum']} G\n\n" + "\n".join(lines))
+
+
+@dp.message(Command("setbal"))
+async def setbal(message: Message):
+    if not is_admin(message):
+        return
+    p = message.text.split()
+    amount = to_int(p[2]) if len(p) > 2 else None
+    if amount is None:
+        await message.answer("Использование: /setbal логин сумма")
+        return
+    r = await post("/admin/balance", {"login": p[1], "amount": amount, "mode": "set"})
+    await message.answer(f"✅ Баланс {p[1]} = {amount} G" if r.status_code == 200 else f"❌ {err_text(r)}")
+
+
+def confirm_kb(mode, amount):
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"all:{mode}:{amount}"),
+        InlineKeyboardButton(text="Отмена", callback_data="all:no:0")]])
+
+
+@dp.message(Command("grantall", "setall"))
+async def all_balance(message: Message):
+    if not is_admin(message):
+        return
+    p = message.text.split()
+    amount = to_int(p[1]) if len(p) > 1 else None
+    if amount is None:
+        await message.answer("Использование: /grantall сумма  или  /setall сумма")
+        return
+    mode = "add" if p[0].startswith("/grantall") else "set"
+    what = f"прибавить {amount} G ВСЕМ игрокам" if mode == "add" else f"установить баланс {amount} G ВСЕМ игрокам"
+    await message.answer(f"Точно {what}?", reply_markup=confirm_kb(mode, amount))
+
+
+@dp.callback_query(F.data.startswith("all:"))
+async def all_confirm(cb: CallbackQuery):
+    if cb.from_user.id not in ADMIN_IDS:
+        return
+    _, mode, amount = cb.data.split(":")
+    if mode == "no":
+        await cb.message.edit_text("Отменено.")
+    else:
+        r = await post("/admin/balance", {"login": "", "amount": int(amount), "mode": mode})
+        await cb.message.edit_text(f"✅ Готово, затронуто игроков: {r.json().get('affected')}" if r.status_code == 200 else f"❌ {err_text(r)}")
+    await cb.answer()
+
+
+def chance_kb():
+    row = lambda *v: [InlineKeyboardButton(text=f"{x:+d}" if x else "Сброс", callback_data=f"c:{x}") for x in v]
+    return InlineKeyboardMarkup(inline_keyboard=[row(-10, -5, -1), row(1, 5, 10), row(0)])
+
+
+async def chance_text():
+    async with httpx.AsyncClient() as client:
+        g = (await client.get(f"{BACKEND_URL}/admin/chance", headers=HEADERS)).json()["global"]
+    return f"🎯 Бонус к шансу для всех: {g:+d}%\nДобавляется к шансу каждого апгрейда (в процентных пунктах). Применится у игроков за ~10 секунд."
+
+
+@dp.message(Command("chance"))
+async def chance(message: Message):
+    if not is_admin(message):
+        return
+    p = message.text.split()
+    if len(p) > 1:
+        v = to_int(p[1])
+        if v is None:
+            await message.answer("Использование: /chance 5  (или без числа — кнопки)")
+            return
+        await post("/admin/chance", {"login": "", "bonus": v})
+    await message.answer(await chance_text(), reply_markup=chance_kb())
+
+
+@dp.callback_query(F.data.startswith("c:"))
+async def chance_btn(cb: CallbackQuery):
+    if cb.from_user.id not in ADMIN_IDS:
+        return
+    v = int(cb.data[2:])
+    await post("/admin/chance", {"login": "", "bonus": 0} if v == 0 else {"login": "", "delta": v})
+    try:
+        await cb.message.edit_text(await chance_text(), reply_markup=chance_kb())
+    except Exception:
+        pass
+    await cb.answer()
+
+
+@dp.message(Command("uchance"))
+async def uchance(message: Message):
+    if not is_admin(message):
+        return
+    p = message.text.split()
+    v = to_int(p[2]) if len(p) > 2 else None
+    if v is None:
+        await message.answer("Использование: /uchance логин 10  (0 — убрать)")
+        return
+    r = await post("/admin/chance", {"login": p[1], "bonus": v})
+    await message.answer(f"✅ Личный бонус к шансу {p[1]}: {r.json()['bonus']:+d}%" if r.status_code == 200 else f"❌ {err_text(r)}")
 
 
 async def run():
