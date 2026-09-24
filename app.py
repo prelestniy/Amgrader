@@ -87,6 +87,12 @@ def init_db():
             token TEXT UNIQUE,
             created_at INTEGER
         )""")
+        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0"):
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN " + col)
+            except sqlite3.OperationalError:
+                pass
+        conn.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)")
         conn.execute("""CREATE TABLE IF NOT EXISTS promo_codes(
             code TEXT PRIMARY KEY,
             reward_type TEXT,
@@ -121,8 +127,16 @@ def gen_referral_code() -> str:
     return secrets.token_hex(3).upper()
 
 
+def global_bonus() -> int:
+    with closing(db()) as conn:
+        r = conn.execute("SELECT value FROM settings WHERE key='chance_bonus'").fetchone()
+    return int(r["value"]) if r else 0
+
+
 def user_public(row) -> dict:
     return {
+        "chanceBonus": global_bonus() + (row["chance_bonus"] or 0),
+        "rev": row["rev"] or 0,
         "id": row["id"],
         "login": row["login"],
         "nickname": row["nickname"],
@@ -178,8 +192,8 @@ def create_user(login=None, password_hash=None, telegram_id=None, nickname="Иг
         )
         uid = cur.lastrowid
         if referred_by:
-            conn.execute("UPDATE users SET balance = balance + ? WHERE id=?", (REFERRAL_REFERRER_BONUS, referred_by))
-            conn.execute("UPDATE users SET balance = balance + ? WHERE id=?", (REFERRAL_REFEREE_BONUS, uid))
+            conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFERRER_BONUS, referred_by))
+            conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFEREE_BONUS, uid))
         row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
         return row
 
@@ -206,6 +220,7 @@ class TelegramBody(BaseModel):
 class StateBody(BaseModel):
     balance: int
     inventory: List[int]
+    rev: Optional[int] = None
 
 
 class PromoRedeemBody(BaseModel):
@@ -316,6 +331,11 @@ def save_state(body: StateBody, user=Depends(auth_user)):
     if body.balance < 0 or any(i not in ITEM_IDS for i in body.inventory):
         raise HTTPException(400, "bad state")
     with closing(db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+        if body.rev is not None and body.rev != (cur["rev"] or 0):
+            # админ/промокод изменили данные, пока клиент был со старой версией
+            return {"ok": False, "stale": True, "user": user_public(cur)}
         conn.execute("UPDATE users SET balance=?, inventory=? WHERE id=?",
                      (body.balance, json.dumps(body.inventory), user["id"]))
     return {"ok": True}
@@ -347,12 +367,12 @@ def redeem_promo(body: PromoRedeemBody, user=Depends(auth_user)):
         conn.execute("UPDATE promo_codes SET used_count = used_count + 1 WHERE code=?", (code,))
 
         if promo["reward_type"] == "balance":
-            conn.execute("UPDATE users SET balance = balance + ? WHERE id=?", (promo["reward_value"], user["id"]))
+            conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (promo["reward_value"], user["id"]))
         else:
             row = conn.execute("SELECT inventory FROM users WHERE id=?", (user["id"],)).fetchone()
             inv = json.loads(row["inventory"] or "[]")
             inv.append(promo["reward_value"])
-            conn.execute("UPDATE users SET inventory=? WHERE id=?", (json.dumps(inv), user["id"]))
+            conn.execute("UPDATE users SET inventory=?, rev = rev + 1 WHERE id=?", (json.dumps(inv), user["id"]))
 
         newrow = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
     out = user_public(newrow)
@@ -375,8 +395,8 @@ def apply_referral(body: ReferralApplyBody, user=Depends(auth_user)):
         if not ref:
             raise HTTPException(404, "Такой код не найден")
         conn.execute("UPDATE users SET referred_by=? WHERE id=?", (ref["id"], user["id"]))
-        conn.execute("UPDATE users SET balance = balance + ? WHERE id=?", (REFERRAL_REFEREE_BONUS, user["id"]))
-        conn.execute("UPDATE users SET balance = balance + ? WHERE id=?", (REFERRAL_REFERRER_BONUS, ref["id"]))
+        conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFEREE_BONUS, user["id"]))
+        conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFERRER_BONUS, ref["id"]))
         newrow = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
     return user_public(newrow)
 
@@ -428,8 +448,71 @@ def admin_grant(body: GrantBody, _=Depends(check_admin)):
         row = conn.execute("SELECT * FROM users WHERE login=? OR CAST(id AS TEXT)=?", (who, who)).fetchone()
         if not row:
             raise HTTPException(404, "Пользователь не найден")
-        conn.execute("UPDATE users SET balance = balance + ? WHERE id=?", (body.amount, row["id"]))
+        conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (body.amount, row["id"]))
     return {"ok": True}
+
+
+class BalanceBody(BaseModel):
+    login: str = ""          # пусто = все пользователи
+    amount: int
+    mode: str = "add"        # add — прибавить (можно минус), set — установить
+
+
+def find_user(conn, who: str):
+    who = who.strip().lstrip("#").lower()
+    row = conn.execute("SELECT * FROM users WHERE login=? OR CAST(id AS TEXT)=?", (who, who)).fetchone()
+    if not row:
+        raise HTTPException(404, "Пользователь не найден")
+    return row
+
+
+@app.post("/admin/balance")
+def admin_balance(body: BalanceBody, _=Depends(check_admin)):
+    if body.mode not in ("add", "set"):
+        raise HTTPException(400, "mode: add или set")
+    expr = "MAX(0, balance + ?)" if body.mode == "add" else "MAX(0, ?)"
+    with closing(db()) as conn, conn:
+        if body.login.strip():
+            row = find_user(conn, body.login)
+            conn.execute(f"UPDATE users SET balance = {expr}, rev = rev + 1 WHERE id=?", (body.amount, row["id"]))
+            n = 1
+        else:
+            n = conn.execute(f"UPDATE users SET balance = {expr}, rev = rev + 1", (body.amount,)).rowcount
+    return {"ok": True, "affected": n}
+
+
+class ChanceBody(BaseModel):
+    login: str = ""          # пусто = глобально для всех
+    bonus: Optional[int] = None
+    delta: int = 0
+
+
+@app.get("/admin/chance")
+def admin_chance_get(_=Depends(check_admin)):
+    return {"global": global_bonus()}
+
+
+@app.post("/admin/chance")
+def admin_chance_set(body: ChanceBody, _=Depends(check_admin)):
+    clamp = lambda v: max(-90, min(90, v))
+    with closing(db()) as conn, conn:
+        if body.login.strip():
+            row = find_user(conn, body.login)
+            new = clamp(body.bonus if body.bonus is not None else (row["chance_bonus"] or 0) + body.delta)
+            conn.execute("UPDATE users SET chance_bonus=? WHERE id=?", (new, row["id"]))
+        else:
+            r = conn.execute("SELECT value FROM settings WHERE key='chance_bonus'").fetchone()
+            new = clamp(body.bonus if body.bonus is not None else (int(r["value"]) if r else 0) + body.delta)
+            conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('chance_bonus', ?)", (str(new),))
+    return {"ok": True, "bonus": new}
+
+
+@app.get("/admin/top")
+def admin_top(_=Depends(check_admin)):
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT id, login, nickname, balance, chance_bonus FROM users ORDER BY balance DESC LIMIT 15").fetchall()
+        total = conn.execute("SELECT COUNT(*) c, COALESCE(SUM(balance),0) s FROM users").fetchone()
+    return {"users": [dict(r) for r in rows], "count": total["c"], "sum": total["s"]}
 
 
 @app.get("/admin/items")
