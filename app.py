@@ -452,6 +452,18 @@ def admin_search_users(q: str = "", _=Depends(check_admin)):
 
 # Мини-апп (index.html лежит рядом с app.py)
 # ---------------------------------------------------------------------------
+@app.get("/videos/{name}")
+def video(name: str):
+    """Видео-реакции: лежат в папке videos/ (или прямо в корне рядом с app.py)."""
+    if "/" in name or "\\" in name or not name.lower().endswith(".mp4"):
+        raise HTTPException(404)
+    for folder in (BASE_DIR / "videos", BASE_DIR):
+        f = folder / name
+        if f.is_file():
+            return FileResponse(f, media_type="video/mp4", headers={"Cache-Control": "public, max-age=86400"})
+    raise HTTPException(404)
+
+
 @app.get("/")
 def index():
     return FileResponse(BASE_DIR / "index.html", headers={"Cache-Control": "no-cache"})
