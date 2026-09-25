@@ -198,6 +198,17 @@ button, input { font-family:inherit; font-synthesis:none; }
 .sell-cart-btn:active { background:#9fdb3f; transform:scale(0.93); }
 .sell-cart-ic-wrap { width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; }
 .sell-cart-btn .ic { flex-shrink:0; }
+
+/* КНОПКА "ВЫБРАТЬ ВСЕ" — рядом с сортировкой, видна во вкладке "Инвентарь" */
+.select-all-btn { flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  width:0; height:44px; padding:0; margin-left:0; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:var(--surface-2); color:var(--text-dim); opacity:0; overflow:hidden; cursor:pointer;
+  transition:width .3s cubic-bezier(.34,1.42,.64,1), margin-left .3s cubic-bezier(.34,1.42,.64,1),
+    opacity .2s ease, background .15s ease, color .15s ease, border-color .15s ease; }
+.select-all-btn.show { width:44px; margin-left:8px; opacity:1; }
+.select-all-btn.all { background:var(--accent); color:#0A0A0B; border-color:var(--accent); }
+.select-all-btn:active { background:var(--surface-3); }
+.select-all-btn.all:active { background:#9fdb3f; }
 .sell-cart-badge { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px;
   border-radius:9px; background:#0A0A0B; color:var(--accent); border:1.5px solid var(--accent);
   font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center;
@@ -663,6 +674,7 @@ button, input { font-family:inherit; font-synthesis:none; }
         <div class="search-row top" id="searchRowMine">
           <label class="search"><span>⌕</span><input id="searchMine" type="text" placeholder="Поиск..." oninput="onFilter()"></label>
           <button class="sort-btn" id="sortMine" onclick="toggleSort()">Цена ↓</button>
+          <button class="select-all-btn" id="selectAllBtn" onclick="selectAllSell()" aria-label="Выбрать все"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M7.5 12.5l3 3 6-6.5"/></svg></button>
           <button class="sell-cart-btn" id="sellCartBtn" onclick="openSellCart()" aria-label="Продать выбранные"><span class="sell-cart-ic-wrap"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg></span><span class="sell-cart-badge" id="sellCartBadge">0</span></button>
         </div>
       </div>
@@ -1244,10 +1256,7 @@ function _renderGrid() {
     if (!state.inventory.length) { el.innerHTML = '<div class="empty-state">Инвентарь пуст — загляни в магазин</div>'; return; }
     const list = applyFilters(state.inventory, "inventory");
     el.innerHTML = list.length
-      ? list.map(m => {
-          const sel = state.selectedMemeUids.includes(m.uid);
-          return cardHTML(m, { selected: sel, check: true, sell: true, disabled: !sel && state.selectedMemeUids.length >= 5, onclick: `toggleMeme('${m.uid}')` });
-        }).join("")
+      ? list.map(m => cardHTML(m, { selected: state.selectedMemeUids.includes(m.uid), check: true, sell: true, onclick: `toggleMeme('${m.uid}')` })).join("")
       : '<div class="empty-state">Ничего не найдено</div>';
   }
 }
@@ -1260,7 +1269,7 @@ function updateSortLabels() {
 }
 
 function renderAll() {
-  renderSlots(); renderGrid(); updateWheel(); updateButton(); updateHeader(); updateSortLabels(); updateCartBar(); updateSellCartBtn();
+  renderSlots(); renderGrid(); updateWheel(); updateButton(); updateHeader(); updateSortLabels(); updateCartBar(); updateSellCartBtn(); updateSelectAllBtn();
 }
 
 function plural(n, one, few, many) {
@@ -1333,7 +1342,7 @@ function toggleMeme(uid) {
   if (state.spinning) return;
   const idx = state.selectedMemeUids.indexOf(uid);
   if (idx >= 0) state.selectedMemeUids.splice(idx, 1);
-  else { if (state.selectedMemeUids.length >= 5) return; state.selectedMemeUids.push(uid); }
+  else state.selectedMemeUids.push(uid);
   const tgt = getTarget();
   if (tgt && (getTotalStake() === 0 || tgt.price <= getTotalStake())) state.targetMemeId = null;
   renderAll();
@@ -1341,6 +1350,16 @@ function toggleMeme(uid) {
 function selectTarget(uid) {
   if (state.spinning) return;
   state.targetMemeId = state.targetMemeId === uid ? null : uid;
+  renderAll();
+}
+function selectAllSell() {
+  if (state.spinning) return;
+  const list = applyFilters(state.inventory, "inventory");
+  if (!list.length) return;
+  const allSelected = list.every(m => state.selectedMemeUids.includes(m.uid));
+  state.selectedMemeUids = allSelected ? [] : list.map(m => m.uid);
+  const tgt = getTarget();
+  if (tgt && (getTotalStake() === 0 || tgt.price <= getTotalStake())) state.targetMemeId = null;
   renderAll();
 }
 
@@ -1459,6 +1478,17 @@ function sellCartEntries() {
   return state.selectedMemeUids.map(uid => state.inventory.find(i => i.uid === uid)).filter(Boolean);
 }
 function sellCartTotal() { return sellCartEntries().reduce((s, m) => s + sellPrice(m), 0); }
+
+function updateSelectAllBtn() {
+  const btn = document.getElementById("selectAllBtn");
+  if (!btn) return;
+  const list = applyFilters(state.inventory, "inventory");
+  const show = state.mainTab === "mine" && state.subTab === "inventory" && !state.spinning && list.length > 0;
+  btn.classList.toggle("show", show);
+  const allSelected = show && list.every(m => state.selectedMemeUids.includes(m.uid));
+  btn.classList.toggle("all", allSelected);
+  btn.setAttribute("aria-label", allSelected ? "Снять выбор" : "Выбрать все");
+}
 
 function updateSellCartBtn() {
   const btn = document.getElementById("sellCartBtn");
