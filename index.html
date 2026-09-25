@@ -657,7 +657,7 @@ button, input { font-family:inherit; font-synthesis:none; }
   </div>
 
   <div class="screen" id="screenCases" hidden>
-    <div class="pg-title">Кейсы</div>
+    <div class="pg-title" id="casesTitle">Кейсы</div>
     <div class="case-list" id="caseList"></div>
     <div class="case-qty" id="caseQty"></div>
     <div class="case-stage h" id="caseStage"></div>
@@ -1048,7 +1048,8 @@ const state = {
   chance: 0, spinning: false,
   mainTab: "mine", subTab: "inventory", cart: {}, balance: 0,
   sortDir: { inventory: "desc", shop: "desc", wish: "desc" },
-  profile: null, screen: "upgrade"
+  profile: null, screen: "upgrade",
+  freeCaseSpins: 0
 };
 
 function getMemeById(id) { return MEMES.find(m => m.id === id); }
@@ -2566,10 +2567,10 @@ function showScreen(name) {
 
 /* ---------- КЕЙСЫ ---------- */
 const CASES = [
-  { id: "c1", name: "Обычный", tone: "#9AA0A6", w: { common: 75, rare: 22, epic: 3 } },
-  { id: "c2", name: "Редкий", tone: "#4DA3FF", w: { rare: 55, epic: 35, legendary: 10 } },
-  { id: "c3", name: "Эпический", tone: "#B26BFF", w: { epic: 55, legendary: 35, mythic: 10 } },
-  { id: "c4", name: "Мифический", tone: "#FFB020", w: { legendary: 55, mythic: 45 } }
+  { id: "c1", name: "Обычный", tone: "#9AA0A6", w: { common: 60, rare: 32, epic: 8 } },
+  { id: "c2", name: "Редкий", tone: "#4DA3FF", w: { rare: 45, epic: 40, legendary: 15 } },
+  { id: "c3", name: "Эпический", tone: "#B26BFF", w: { epic: 42, legendary: 42, mythic: 16 } },
+  { id: "c4", name: "Мифический", tone: "#FFB020", w: { legendary: 45, mythic: 55 } }
 ];
 /* Внутри одной редкости шанс обратно пропорционален цене: дешёвые предметы тира
    выпадают чаще дорогих. Так проценты выглядят «по-настоящему», а не одинаковыми
@@ -2581,7 +2582,7 @@ CASES.forEach(c => {
     const items = byR[r], invSum = items.reduce((s, m) => s + 1 / m.price, 0);
     items.forEach(m => { const w = c.w[r] * (1 / m.price) / invSum; c.pool.push({ m, w }); c.tot += w; ev += w * m.price; });
   });
-  c.price = Math.max(10, Math.round(ev / c.tot * 1.12 / 5) * 5);        // цена = средняя награда + 12%
+  c.price = Math.max(10, Math.round(ev / c.tot * 0.98 / 5) * 5);        // цена = средняя награда − 2% (кейсы выгоднее)
   c.pool.sort((a, b) => b.m.price - a.m.price);
 });
 function pickFromCase(c) {
@@ -2598,11 +2599,14 @@ function pickQty(n) { if (state.spinning) return; cs.qty = n; renderCases(); }
 function updateCaseBtn() {
   const b = $("caseBtn"), c = CASES[cs.sel];
   b.disabled = !!state.spinning;
-  b.textContent = state.spinning ? "Открываем…" : isLoggedIn() ? "Открыть за " + fmt(c.price * cs.qty) : "Войти, чтобы открывать";
+  const hasFree = state.freeCaseSpins > 0 && cs.qty === 1;
+  b.textContent = state.spinning ? "Открываем…" : !isLoggedIn() ? "Войти, чтобы открывать" : hasFree ? "Открыть бесплатно 🎁" : "Открыть за " + fmt(c.price * cs.qty);
 }
 function renderCases() {
   const c = CASES[cs.sel];
   $("caseList").innerHTML = CASES.map((k, i) => `<button class="case-card ${i === cs.sel ? "on" : ""}" style="--tone:${k.tone}" onclick="pickCase(${i})">${ic("box", 32)}<b>${k.name}</b><span>${fmt(k.price)}</span></button>`).join("");
+  const capEl = $("casesTitle");
+  if (capEl) capEl.innerHTML = "Кейсы" + (state.freeCaseSpins > 0 ? ` <span class="soon-badge" style="margin-left:6px;">🎁 бесплатных: ${state.freeCaseSpins}</span>` : "");
   $("caseQty").innerHTML = [1, 2, 3, 4, 5].map(n => `<button class="qty-chip ${n === cs.qty ? "on" : ""}" onclick="pickQty(${n})">${n}</button>`).join("");
   $("casePool").innerHTML = c.pool.map(p => `<div class="pool-item" style="--rc:${getRarityHex(p.m.rarity)}">${renderIcon(p.m, 44)}<div class="pi-n">${esc(p.m.name)}</div><div class="pi-p">${fmtCasePct(p.w / c.tot * 100)}%</div></div>`).join("");
   updateCaseBtn();
@@ -2683,13 +2687,21 @@ let lastCaseResults = null, lastCaseCost = 0;
 async function openCases() {
   if (state.spinning) return;
   if (!isLoggedIn()) { openAuth("Войдите, чтобы открывать кейсы"); return; }
-  const c = CASES[cs.sel], n = cs.qty, cost = c.price * n;
-  if (state.balance < cost) { const b = $("caseBtn"); b.textContent = "Не хватает G"; setTimeout(updateCaseBtn, 1400); return; }
+  const c = CASES[cs.sel], n = cs.qty;
+  const useFree = state.freeCaseSpins > 0 && n === 1;
+  const cost = useFree ? 0 : c.price * n;
+  if (!useFree && state.balance < cost) { const b = $("caseBtn"); b.textContent = "Не хватает G"; setTimeout(updateCaseBtn, 1400); return; }
   audioEnsure(); state.spinning = true; spinReset();
+  if (useFree) state.freeCaseSpins--;
   const token = ++caseRunToken;
   const results = Array.from({ length: n }, () => pickFromCase(c));
   state.balance -= cost;                                                   // итог фиксируем сразу, анимация — только показ
   results.forEach(m => state.inventory.push({ ...m, uid: makeUid("u") }));
+  /* Бонус: 3+ одинаковых предмета за один спин — бесплатный кейс на будущее */
+  const dupCounts = {};
+  results.forEach(m => dupCounts[m.id] = (dupCounts[m.id] || 0) + 1);
+  const gotFreeSpin = Object.values(dupCounts).some(k => k >= 3);
+  if (gotFreeSpin) state.freeCaseSpins = (state.freeCaseSpins || 0) + 1;
   saveGame(); updateHeader(); pulseBalance(); updateCaseBtn(); $("caseResult").innerHTML = "";
   const cols = buildStage(n, results);
   const top = results.reduce((a, b) => a.price > b.price ? a : b);
@@ -2707,7 +2719,8 @@ async function openCases() {
   lastCaseResults = results; lastCaseCost = cost;
   $("caseResult").innerHTML = results.map(m => `<div class="res-chip">${renderIcon(m, 34)}<div><div>${esc(m.name)}</div><div style="color:var(--accent)">${fmt(m.price)}</div></div></div>`).join("")
     + `<button class="ghost-btn case-sell-btn" onclick="sellCaseResults()">Продать всё за ${fmt(Math.round(worth * SELL_RATE))}</button>`;
-  notify(worth >= cost ? "win" : "lose", n > 1 ? "Открыто кейсов: " + n : results[0].name, "Ценность наград " + fmt(worth), (worth >= cost ? "+" : "") + fmt(worth - cost), results[0]);
+  const subText = "Ценность наград " + fmt(worth) + (gotFreeSpin ? " · +1 бесплатный кейс 🎁" : "");
+  notify(worth >= cost ? "win" : "lose", n > 1 ? "Открыто кейсов: " + n : results[0].name, subText, (worth >= cost ? "+" : "") + fmt(worth - cost), results[0]);
   state.spinning = false; renderAll(); renderProfile(); updateCaseBtn();
 }
 function sellCaseResults() {
@@ -2747,12 +2760,16 @@ function toggleCraft(uid) {
   renderCraft();
 }
 /* Как и в кейсах: внутри следующего тира дешёвые предметы выпадают чаще —
-   поэтому исход не гарантирует прибыль, и это видно по процентам. */
+   поэтому исход не гарантирует прибыль, и это видно по процентам.
+   У крафта отдельная (более высокая) комиссия — иначе вложение большого
+   числа предметов почти гарантированно давало прибыль («дюп»). */
+const CRAFT_EDGE = 0.35;      // комиссия крафта: 35% (была общая HOUSE_EDGE = 5%)
+const CRAFT_MAX_W = 0.7;      // потолок шанса на самый дорогой предмет тира
 function craftPool(next, stake) {
   // вес предмета — как шанс апгрейда на колесе (stake/price): чем больше вложено (штук и ценой),
   // тем выше шанс получить дорогой предмет тира; для маленькой ставки почти весь вес у дешёвых вещей.
   const items = MEMES.filter(m => m.rarity === next);
-  const raw = items.map(m => ({ m, w: Math.max(0.015, Math.min(0.97, (stake / m.price) * (1 - HOUSE_EDGE))) }));
+  const raw = items.map(m => ({ m, w: Math.max(0.01, Math.min(CRAFT_MAX_W, (stake / m.price) * (1 - CRAFT_EDGE))) }));
   const tot = raw.reduce((s, p) => s + p.w, 0);
   return raw.map(p => ({ m: p.m, w: p.w / tot })).sort((a, b) => b.m.price - a.m.price);
 }
