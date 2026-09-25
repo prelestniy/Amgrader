@@ -190,12 +190,13 @@ button, input { font-family:inherit; font-synthesis:none; }
 /* КНОПКА "ПРОДАТЬ ВЫБРАННОЕ" — появляется при выборе 2+ предметов в инвентаре */
 .sell-cart-btn { position:relative; flex-shrink:0; display:flex; align-items:center; justify-content:center;
   width:0; height:44px; padding:0; margin-left:0; border:1px solid var(--border-hi); border-radius:var(--r-btn);
-  background:var(--accent); color:#0A0A0B; opacity:0; overflow:hidden; cursor:pointer;
+  background:var(--accent); color:#0A0A0B; opacity:0; cursor:pointer;
   transform:scale(0.6) rotate(-8deg); pointer-events:none;
   transition:width .42s cubic-bezier(.34,1.42,.64,1), margin-left .42s cubic-bezier(.34,1.42,.64,1),
     opacity .28s ease, transform .42s cubic-bezier(.34,1.42,.64,1), background .15s ease; }
 .sell-cart-btn.show { width:44px; margin-left:8px; opacity:1; transform:scale(1) rotate(0deg); pointer-events:auto; }
 .sell-cart-btn:active { background:#9fdb3f; transform:scale(0.93); }
+.sell-cart-ic-wrap { width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; }
 .sell-cart-btn .ic { flex-shrink:0; }
 .sell-cart-badge { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px;
   border-radius:9px; background:#0A0A0B; color:var(--accent); border:1.5px solid var(--accent);
@@ -662,7 +663,7 @@ button, input { font-family:inherit; font-synthesis:none; }
         <div class="search-row top" id="searchRowMine">
           <label class="search"><span>⌕</span><input id="searchMine" type="text" placeholder="Поиск..." oninput="onFilter()"></label>
           <button class="sort-btn" id="sortMine" onclick="toggleSort()">Цена ↓</button>
-          <button class="sell-cart-btn" id="sellCartBtn" onclick="openSellCart()" aria-label="Продать выбранные"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg><span class="sell-cart-badge" id="sellCartBadge">0</span></button>
+          <button class="sell-cart-btn" id="sellCartBtn" onclick="openSellCart()" aria-label="Продать выбранные"><span class="sell-cart-ic-wrap"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg></span><span class="sell-cart-badge" id="sellCartBadge">0</span></button>
         </div>
       </div>
       <div class="cart-bar" id="cartBar">
