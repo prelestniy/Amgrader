@@ -2648,7 +2648,11 @@ let caseRunToken = 0;
 /* Указатель неподвижен по центру: едет лента, и выигрышный блок точно
    останавливается по её центру — «предметы стягиваются к указателю». */
 function runCol(col, dur, tickOn, token) {
-  // едем от начала ленты (0) и докручиваем до точки, где выигрышный блок точно по центру указателя
+  // 1) едем от начала ленты и тормозим где-то ВНУТРИ выигрышного блока (не строго по центру) —
+  //    предмет «выпадает» естественно, как будто лента правда остановилась там сама.
+  // 2) отдельным плавным движением дотягиваем блок точно до центра указателя («стягивание»).
+  const cellOffset = (0.14 + randomCrypto() * 0.72) * col.cell;
+  const roughTotal = col.WIN * col.step + cellOffset - col.view / 2;
   const total = col.WIN * col.step + col.cell / 2 - col.view / 2;
   let lastK = -1;
   return new Promise(res => {
@@ -2657,12 +2661,22 @@ function runCol(col, dur, tickOn, token) {
       if (token !== caseRunToken) return res();
       const t = spinSkip ? 1 : Math.min((now - s) / dur, 1);
       const ease = 1 - Math.pow(1 - t, 4);
-      const off = total * ease;
+      const off = roughTotal * ease;
       setTrack(col, col.vert, off);
       const k = Math.floor((off + col.view / 2) / col.step);
       if (k !== lastK) { lastK = k; if (tickOn) caseTick(); }
-      if (t < 1) requestAnimationFrame(f); else { setTrack(col, col.vert, total); res(); }
+      if (t < 1) requestAnimationFrame(f); else settle();
     })(s);
+    function settle() {
+      const s2 = performance.now(), dur2 = spinSkip ? 90 : 340;
+      (function g(now) {
+        if (token !== caseRunToken) return res();
+        const t = spinSkip ? 1 : Math.min((now - s2) / dur2, 1);
+        const e = 1 - Math.pow(1 - t, 3);
+        setTrack(col, col.vert, roughTotal + (total - roughTotal) * e);
+        if (t < 1) requestAnimationFrame(g); else { setTrack(col, col.vert, total); res(); }
+      })(s2);
+    }
   });
 }
 let lastCaseResults = null, lastCaseCost = 0;
