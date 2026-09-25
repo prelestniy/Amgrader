@@ -16,6 +16,7 @@ from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import sqlite3
+import httpx
 
 # ---------------------------------------------------------------------------
 # Настройки (задаются переменными окружения в Railway)
@@ -87,12 +88,18 @@ def init_db():
             token TEXT UNIQUE,
             created_at INTEGER
         )""")
-        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0"):
+        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0", "luck_rules TEXT DEFAULT '[]'", "last_daily INTEGER DEFAULT 0"):
             try:
                 conn.execute("ALTER TABLE users ADD COLUMN " + col)
             except sqlite3.OperationalError:
                 pass
         conn.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS tasks(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, kind TEXT, url TEXT, chat TEXT,
+            reward INTEGER, active INTEGER DEFAULT 1)""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS task_claims(
+            user_id INTEGER, task_id INTEGER, started_at INTEGER, claimed_at INTEGER,
+            PRIMARY KEY(user_id, task_id))""")
         conn.execute("""CREATE TABLE IF NOT EXISTS promo_codes(
             code TEXT PRIMARY KEY,
             reward_type TEXT,
@@ -133,9 +140,26 @@ def global_bonus() -> int:
     return int(r["value"]) if r else 0
 
 
+def parse_rules(s):
+    try:
+        return [[float(a), int(b)] for a, b in json.loads(s or "[]")]
+    except Exception:
+        return []
+
+
+def global_rules():
+    with closing(db()) as conn:
+        r = conn.execute("SELECT value FROM settings WHERE key='luck_rules'").fetchone()
+    return parse_rules(r["value"]) if r else []
+
+
+def luck_list(row):
+    return [r + ["u"] for r in parse_rules(row["luck_rules"])] + [r + ["g"] for r in global_rules()]
+
+
 def user_public(row) -> dict:
     return {
-        "chanceBonus": global_bonus() + (row["chance_bonus"] or 0),
+        "luck": luck_list(row),
         "rev": row["rev"] or 0,
         "id": row["id"],
         "login": row["login"],
@@ -481,38 +505,190 @@ def admin_balance(body: BalanceBody, _=Depends(check_admin)):
     return {"ok": True, "affected": n}
 
 
-class ChanceBody(BaseModel):
-    login: str = ""          # пусто = глобально для всех
-    bonus: Optional[int] = None
-    delta: int = 0
+class LuckBody(BaseModel):
+    login: str = ""          # пусто = правило для всех игроков
+    at: float = 0            # правило действует, когда ПОКАЗАННЫЙ шанс <= at (%)
+    bonus: int = 0           # сколько % добавить к реальному шансу (0 = убрать правило)
 
 
-@app.get("/admin/chance")
-def admin_chance_get(_=Depends(check_admin)):
-    return {"global": global_bonus()}
+def luck_conn_rules(conn, login):
+    if login.strip():
+        row = find_user(conn, login)
+        return row, parse_rules(row["luck_rules"])
+    r = conn.execute("SELECT value FROM settings WHERE key='luck_rules'").fetchone()
+    return None, parse_rules(r["value"]) if r else []
 
 
-@app.post("/admin/chance")
-def admin_chance_set(body: ChanceBody, _=Depends(check_admin)):
-    clamp = lambda v: max(-90, min(90, v))
+def luck_save(conn, row, rules):
+    dump = json.dumps(sorted(rules))
+    if row:
+        conn.execute("UPDATE users SET luck_rules=? WHERE id=?", (dump, row["id"]))
+    else:
+        conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('luck_rules', ?)", (dump,))
+
+
+@app.post("/admin/luck")
+def admin_luck_set(body: LuckBody, _=Depends(check_admin)):
+    if not (0 < body.at <= 100) or not (-100 <= body.bonus <= 100):
+        raise HTTPException(400, "шанс 0–100, бонус -100…100")
     with closing(db()) as conn, conn:
-        if body.login.strip():
-            row = find_user(conn, body.login)
-            new = clamp(body.bonus if body.bonus is not None else (row["chance_bonus"] or 0) + body.delta)
-            conn.execute("UPDATE users SET chance_bonus=? WHERE id=?", (new, row["id"]))
-        else:
-            r = conn.execute("SELECT value FROM settings WHERE key='chance_bonus'").fetchone()
-            new = clamp(body.bonus if body.bonus is not None else (int(r["value"]) if r else 0) + body.delta)
-            conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('chance_bonus', ?)", (str(new),))
-    return {"ok": True, "bonus": new}
+        row, rules = luck_conn_rules(conn, body.login)
+        rules = [r for r in rules if abs(r[0] - body.at) > 1e-9]
+        if body.bonus:
+            rules.append([body.at, body.bonus])
+        luck_save(conn, row, rules)
+    return {"ok": True, "rules": sorted(rules)}
+
+
+@app.get("/admin/luck")
+def admin_luck_get(login: str = "", _=Depends(check_admin)):
+    with closing(db()) as conn:
+        _row, rules = luck_conn_rules(conn, login)
+    return {"rules": rules}
+
+
+@app.post("/admin/luck/clear")
+def admin_luck_clear(body: LuckBody, _=Depends(check_admin)):
+    with closing(db()) as conn, conn:
+        row, _rules = luck_conn_rules(conn, body.login)
+        luck_save(conn, row, [])
+    return {"ok": True}
 
 
 @app.get("/admin/top")
 def admin_top(_=Depends(check_admin)):
     with closing(db()) as conn:
-        rows = conn.execute("SELECT id, login, nickname, balance, chance_bonus FROM users ORDER BY balance DESC LIMIT 15").fetchall()
+        rows = conn.execute("SELECT id, login, nickname, balance, luck_rules FROM users ORDER BY balance DESC LIMIT 15").fetchall()
         total = conn.execute("SELECT COUNT(*) c, COALESCE(SUM(balance),0) s FROM users").fetchone()
     return {"users": [dict(r) for r in rows], "count": total["c"], "sum": total["s"]}
+
+
+# ---------------------------------------------------------------------------
+# Бонусы: ежедневная награда и задания
+# ---------------------------------------------------------------------------
+DAILY_AMOUNT = int(os.environ.get("DAILY_BONUS", "50"))
+TASK_WAIT = 12   # сек. между «Перейти» и «Проверить» для заданий-ссылок
+
+
+def today() -> int:
+    return int((time.time() + 10800) // 86400)      # сутки по Москве
+
+
+def secs_left() -> int:
+    return int((today() + 1) * 86400 - 10800 - time.time())
+
+
+@app.get("/api/bonus")
+def bonus_info(user=Depends(auth_user)):
+    with closing(db()) as conn:
+        tasks = conn.execute("SELECT * FROM tasks WHERE active=1 ORDER BY id").fetchall()
+        cl = {r["task_id"]: r for r in conn.execute("SELECT * FROM task_claims WHERE user_id=?", (user["id"],)).fetchall()}
+        row = conn.execute("SELECT last_daily FROM users WHERE id=?", (user["id"],)).fetchone()
+    return {
+        "daily": {"amount": DAILY_AMOUNT, "available": (row["last_daily"] or 0) < today(), "secondsLeft": secs_left()},
+        "tasks": [{"id": t["id"], "title": t["title"], "kind": t["kind"], "url": t["url"], "reward": t["reward"],
+                   "done": bool(cl.get(t["id"]) and cl[t["id"]]["claimed_at"]), "started": t["id"] in cl} for t in tasks],
+    }
+
+
+@app.post("/api/bonus/daily")
+def bonus_daily(user=Depends(auth_user)):
+    with closing(db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+        if (row["last_daily"] or 0) >= today():
+            raise HTTPException(400, "Бонус уже получен — приходите завтра")
+        conn.execute("UPDATE users SET balance=balance+?, last_daily=?, rev=rev+1 WHERE id=?", (DAILY_AMOUNT, today(), row["id"]))
+        new = conn.execute("SELECT * FROM users WHERE id=?", (row["id"],)).fetchone()
+    return user_public(new)
+
+
+class TaskClaim(BaseModel):
+    initData: Optional[str] = None
+
+
+@app.post("/api/tasks/{task_id}/start")
+def task_start(task_id: int, user=Depends(auth_user)):
+    with closing(db()) as conn, conn:
+        if not conn.execute("SELECT 1 FROM tasks WHERE id=? AND active=1", (task_id,)).fetchone():
+            raise HTTPException(404, "Задание не найдено")
+        conn.execute("INSERT OR IGNORE INTO task_claims(user_id, task_id, started_at) VALUES(?,?,?)", (user["id"], task_id, int(time.time())))
+    return {"ok": True}
+
+
+@app.post("/api/tasks/{task_id}/claim")
+def task_claim(task_id: int, body: TaskClaim, user=Depends(auth_user)):
+    with closing(db()) as conn:
+        t = conn.execute("SELECT * FROM tasks WHERE id=? AND active=1", (task_id,)).fetchone()
+        c = conn.execute("SELECT * FROM task_claims WHERE user_id=? AND task_id=?", (user["id"], task_id)).fetchone()
+    if not t:
+        raise HTTPException(404, "Задание не найдено")
+    if c and c["claimed_at"]:
+        raise HTTPException(400, "Уже выполнено")
+    if t["kind"] == "tg":
+        tg_id = user["telegram_id"]
+        if not tg_id and body.initData:
+            tg_id = check_telegram_auth(body.initData).get("id")
+        if not tg_id:
+            raise HTTPException(400, "Откройте игру внутри Telegram, чтобы проверить подписку")
+        try:
+            r = httpx.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember", params={"chat_id": t["chat"], "user_id": tg_id}, timeout=8).json()
+        except Exception:
+            raise HTTPException(502, "Telegram не ответил, попробуйте ещё раз")
+        if not r.get("ok"):
+            raise HTTPException(400, "Не удалось проверить подписку (бот должен быть админом канала)")
+        if r["result"]["status"] not in ("member", "administrator", "creator"):
+            raise HTTPException(400, "Подписка не найдена — подпишитесь и нажмите «Проверить» ещё раз")
+    elif not c or time.time() - (c["started_at"] or 0) < TASK_WAIT:
+        raise HTTPException(400, "Сначала выполните задание по ссылке, затем нажмите «Проверить»")
+    with closing(db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cl = conn.execute("SELECT * FROM task_claims WHERE user_id=? AND task_id=?", (user["id"], task_id)).fetchone()
+        if cl and cl["claimed_at"]:
+            raise HTTPException(400, "Уже выполнено")
+        conn.execute("""INSERT INTO task_claims(user_id, task_id, started_at, claimed_at) VALUES(?,?,?,?)
+                        ON CONFLICT(user_id, task_id) DO UPDATE SET claimed_at=excluded.claimed_at""",
+                     (user["id"], task_id, int(time.time()), int(time.time())))
+        conn.execute("UPDATE users SET balance=balance+?, rev=rev+1 WHERE id=?", (t["reward"], user["id"]))
+        new = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+    return user_public(new)
+
+
+class TaskBody(BaseModel):
+    title: str
+    kind: str                # "tg" — проверяем подписку; "link" — по ссылке (TikTok и т.п.)
+    url: str
+    chat: str = ""
+    reward: int
+
+
+@app.post("/admin/task")
+def admin_task_add(body: TaskBody, _=Depends(check_admin)):
+    if body.kind not in ("tg", "link") or body.reward <= 0 or (body.kind == "tg" and not body.chat):
+        raise HTTPException(400, "Неверные параметры задания")
+    with closing(db()) as conn, conn:
+        cur = conn.execute("INSERT INTO tasks(title, kind, url, chat, reward) VALUES(?,?,?,?,?)",
+                           (body.title.strip(), body.kind, body.url.strip(), body.chat.strip(), body.reward))
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@app.get("/admin/task")
+def admin_task_list(_=Depends(check_admin)):
+    with closing(db()) as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM tasks WHERE active=1 ORDER BY id").fetchall()]
+
+
+class TaskDel(BaseModel):
+    id: int
+
+
+@app.post("/admin/task/delete")
+def admin_task_del(body: TaskDel, _=Depends(check_admin)):
+    with closing(db()) as conn, conn:
+        n = conn.execute("UPDATE tasks SET active=0 WHERE id=?", (body.id,)).rowcount
+    if not n:
+        raise HTTPException(404, "Нет такого задания")
+    return {"ok": True}
 
 
 @app.get("/admin/items")
