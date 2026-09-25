@@ -2566,10 +2566,10 @@ function showScreen(name) {
 
 /* ---------- КЕЙСЫ ---------- */
 const CASES = [
-  { id: "c1", name: "Обычный", tone: "#9AA0A6", w: { common: 70, rare: 25, epic: 4.5, legendary: 0.5 } },
-  { id: "c2", name: "Редкий", tone: "#4DA3FF", w: { common: 30, rare: 45, epic: 20, legendary: 5 } },
-  { id: "c3", name: "Эпический", tone: "#B26BFF", w: { rare: 30, epic: 50, legendary: 18, mythic: 2 } },
-  { id: "c4", name: "Мифический", tone: "#FFB020", w: { epic: 35, legendary: 55, mythic: 10 } }
+  { id: "c1", name: "Обычный", tone: "#9AA0A6", w: { common: 75, rare: 22, epic: 3 } },
+  { id: "c2", name: "Редкий", tone: "#4DA3FF", w: { rare: 55, epic: 35, legendary: 10 } },
+  { id: "c3", name: "Эпический", tone: "#B26BFF", w: { epic: 55, legendary: 35, mythic: 10 } },
+  { id: "c4", name: "Мифический", tone: "#FFB020", w: { legendary: 55, mythic: 45 } }
 ];
 /* Внутри одной редкости шанс обратно пропорционален цене: дешёвые предметы тира
    выпадают чаще дорогих. Так проценты выглядят «по-настоящему», а не одинаковыми
@@ -2635,11 +2635,8 @@ function buildStage(n, results) {
     st.appendChild(strip);
     cols.push({ strip, vp: strip.firstChild, track: strip.firstChild.firstChild, ptr: strip.lastChild, step, cell, LEN, WIN, vert });
   }
-  // измеряем РЕАЛЬНЫЙ размер окна просмотра (после вставки в DOM) — без этого центр указателя мог отличаться на пару-другую px
-  cols.forEach(col => {
-    col.view = col.vert ? col.vp.clientHeight : col.vp.clientWidth;
-    setTrack(col, col.vert, col.WIN * col.step + col.cell / 2 - col.view / 2);   // выигрышный блок сразу по центру указателя
-  });
+  // измеряем РЕАЛЬНЫЙ размер окна просмотра (после вставки в DOM) — нужен для точного расчёта дистанции прокрутки
+  cols.forEach(col => { col.view = col.vert ? col.vp.clientHeight : col.vp.clientWidth; setTrack(col, col.vert, 0); });
   return cols;
 }
 function caseTick() {
@@ -2651,8 +2648,8 @@ let caseRunToken = 0;
 /* Указатель неподвижен по центру: едет лента, и выигрышный блок точно
    останавливается по её центру — «предметы стягиваются к указателю». */
 function runCol(col, dur, tickOn, token) {
-  const land = col.WIN * col.step + col.cell / 2, total = land - col.view / 2;
-  const jitter = (randomCrypto() * 2 - 1) * (col.cell * 0.16);            // лёгкая органика, финиш всё равно точно по центру
+  // едем от начала ленты (0) и докручиваем до точки, где выигрышный блок точно по центру указателя
+  const total = col.WIN * col.step + col.cell / 2 - col.view / 2;
   let lastK = -1;
   return new Promise(res => {
     const s = performance.now();
@@ -2660,11 +2657,11 @@ function runCol(col, dur, tickOn, token) {
       if (token !== caseRunToken) return res();
       const t = spinSkip ? 1 : Math.min((now - s) / dur, 1);
       const ease = 1 - Math.pow(1 - t, 4);
-      const off = t < 1 ? total - jitter * (1 - ease) : total;
+      const off = total * ease;
       setTrack(col, col.vert, off);
       const k = Math.floor((off + col.view / 2) / col.step);
       if (k !== lastK) { lastK = k; if (tickOn) caseTick(); }
-      if (t < 1) requestAnimationFrame(f); else res();
+      if (t < 1) requestAnimationFrame(f); else { setTrack(col, col.vert, total); res(); }
     })(s);
   });
 }
@@ -2737,10 +2734,13 @@ function toggleCraft(uid) {
 }
 /* Как и в кейсах: внутри следующего тира дешёвые предметы выпадают чаще —
    поэтому исход не гарантирует прибыль, и это видно по процентам. */
-function craftPool(next) {
+function craftPool(next, stake) {
+  // вес предмета — как шанс апгрейда на колесе (stake/price): чем больше вложено (штук и ценой),
+  // тем выше шанс получить дорогой предмет тира; для маленькой ставки почти весь вес у дешёвых вещей.
   const items = MEMES.filter(m => m.rarity === next);
-  const invSum = items.reduce((s, m) => s + 1 / m.price, 0);
-  return items.map(m => ({ m, w: (1 / m.price) / invSum })).sort((a, b) => b.m.price - a.m.price);
+  const raw = items.map(m => ({ m, w: Math.max(0.015, Math.min(0.97, (stake / m.price) * (1 - HOUSE_EDGE))) }));
+  const tot = raw.reduce((s, p) => s + p.w, 0);
+  return raw.map(p => ({ m: p.m, w: p.w / tot })).sort((a, b) => b.m.price - a.m.price);
 }
 function craftPick(pool) {
   let r = randomCrypto();
@@ -2763,7 +2763,7 @@ function renderCraft(keepOut) {
   $("craftCount").textContent = "Выбрано: " + picked.length + " / 10" + (picked.length ? " · стоимость " + fmt(cost) : "");
   if (next) {
     $("craftOddsLabel").style.display = "";
-    const pool = craftPool(next);
+    const pool = craftPool(next, cost || 1);
     $("craftOdds").innerHTML = pool.map(p => `<div class="pool-item" style="--rc:${getRarityHex(p.m.rarity)}">${renderIcon(p.m, 40)}<div class="pi-n">${esc(p.m.name)}</div><div class="pi-p">${fmtCasePct(p.w * 100)}%</div></div>`).join("");
   } else { $("craftOddsLabel").style.display = "none"; $("craftOdds").innerHTML = ""; }
   const inv = state.inventory.slice().sort((a, b) => RAR_ORDER.indexOf(a.rarity) - RAR_ORDER.indexOf(b.rarity) || a.price - b.price);
@@ -2775,7 +2775,8 @@ function renderCraft(keepOut) {
 async function doCraft() {
   if (state.spinning || !craft.sel.length) return;
   const r = craftRarity(), next = RAR_ORDER[RAR_ORDER.indexOf(r) + 1]; if (!next) return;
-  const pool = craftPool(next), win = craftPick(pool);
+  const stake = craft.sel.reduce((s, u) => { const it = state.inventory.find(i => i.uid === u); return s + (it ? it.price : 0); }, 0);
+  const pool = craftPool(next, stake), win = craftPick(pool);
   audioEnsure(); state.spinning = true; spinReset();
   const used = craft.sel.slice();
   state.inventory = state.inventory.filter(i => !used.includes(i.uid));
