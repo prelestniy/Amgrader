@@ -55,8 +55,13 @@ async def start(message: Message):
         "/setbal логин сумма — установить баланс (логин или #id)\n"
         "/grantall сумма — прибавить ВСЕМ (минус — списать)\n"
         "/setall сумма — установить баланс ВСЕМ\n"
-        "/chance — бонус к шансу для всех (кнопки ±), /chance 5 — задать числом\n"
-        "/uchance логин 10 — личный бонус к шансу\n\n"
+        "/luck логин шанс бонус — скрытая удача игроку: пока ПОКАЗАННЫЙ шанс ≤ «шанс»%, реальный = показанный + «бонус»%\n"
+        "   пример: /luck matvey 5 65 → при шансе 5% реально выпадет с 70%, а на экране останется 5%\n"
+        "/luck логин — показать правила, /luckoff логин [шанс] — убрать\n"
+        "/gluck шанс бонус — то же для ВСЕХ, /gluckoff — убрать у всех\n"
+        "/addtask tg @канал награда Название — задание-подписка (проверяется, бот должен быть админом канала)\n"
+        "/addtask link https://… награда Название — задание по ссылке (TikTok и др.)\n"
+        "/tasks — список заданий, /deltask id — удалить\n\n"
         "Пример: /newpromo WELCOME2026 500 100\n"
         "→ 100 человек смогут получить по 500 G по коду WELCOME2026"
     )
@@ -333,7 +338,7 @@ async def top(message: Message):
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{BACKEND_URL}/admin/top", headers=HEADERS)
     d = r.json()
-    lines = [f"#{u['id']} {u['login'] or u['nickname']} — {u['balance']} G" + (f" (шанс {u['chance_bonus']:+d}%)" if u["chance_bonus"] else "") for u in d["users"]]
+    lines = [f"#{u['id']} {u['login'] or u['nickname']} — {u['balance']} G" + (" 🎯" if u["luck_rules"] not in (None, "", "[]") else "") for u in d["users"]]
     await message.answer(f"Игроков: {d['count']}, всего на балансах: {d['sum']} G\n\n" + "\n".join(lines))
 
 
@@ -383,55 +388,98 @@ async def all_confirm(cb: CallbackQuery):
     await cb.answer()
 
 
-def chance_kb():
-    row = lambda *v: [InlineKeyboardButton(text=f"{x:+d}" if x else "Сброс", callback_data=f"c:{x}") for x in v]
-    return InlineKeyboardMarkup(inline_keyboard=[row(-10, -5, -1), row(1, 5, 10), row(0)])
+def fmt_rules(rules):
+    return "\n".join(f"• показанный шанс ≤ {r[0]:g}% → +{r[1]}%" for r in rules) or "правил нет"
 
 
-async def chance_text():
-    async with httpx.AsyncClient() as client:
-        g = (await client.get(f"{BACKEND_URL}/admin/chance", headers=HEADERS)).json()["global"]
-    return f"🎯 Бонус к шансу для всех: {g:+d}%\nДобавляется к шансу каждого апгрейда (в процентных пунктах). Применится у игроков за ~10 секунд."
-
-
-@dp.message(Command("chance"))
-async def chance(message: Message):
-    if not is_admin(message):
+async def luck_cmd(message: Message, login: str, args: list):
+    if not args:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{BACKEND_URL}/admin/luck", headers=HEADERS, params={"login": login})
+        await message.answer(f"Правила ({login or 'все игроки'}):\n" + fmt_rules(r.json()["rules"]))
         return
-    p = message.text.split()
-    if len(p) > 1:
-        v = to_int(p[1])
-        if v is None:
-            await message.answer("Использование: /chance 5  (или без числа — кнопки)")
-            return
-        await post("/admin/chance", {"login": "", "bonus": v})
-    await message.answer(await chance_text(), reply_markup=chance_kb())
-
-
-@dp.callback_query(F.data.startswith("c:"))
-async def chance_btn(cb: CallbackQuery):
-    if cb.from_user.id not in ADMIN_IDS:
-        return
-    v = int(cb.data[2:])
-    await post("/admin/chance", {"login": "", "bonus": 0} if v == 0 else {"login": "", "delta": v})
     try:
-        await cb.message.edit_text(await chance_text(), reply_markup=chance_kb())
-    except Exception:
-        pass
-    await cb.answer()
+        at, bonus = float(args[0].replace(",", ".")), int(args[1].replace("+", ""))
+    except (ValueError, IndexError):
+        await message.answer("Формат: шанс бонус, например 5 65")
+        return
+    r = await post("/admin/luck", {"login": login, "at": at, "bonus": bonus})
+    await message.answer(("✅ Правила:\n" + fmt_rules(r.json()["rules"])) if r.status_code == 200 else f"❌ {err_text(r)}")
 
 
-@dp.message(Command("uchance"))
-async def uchance(message: Message):
+@dp.message(Command("luck"))
+async def luck(message: Message):
     if not is_admin(message):
         return
     p = message.text.split()
-    v = to_int(p[2]) if len(p) > 2 else None
-    if v is None:
-        await message.answer("Использование: /uchance логин 10  (0 — убрать)")
+    if len(p) < 2:
+        await message.answer("Использование: /luck логин шанс бонус  (например /luck matvey 5 65)")
         return
-    r = await post("/admin/chance", {"login": p[1], "bonus": v})
-    await message.answer(f"✅ Личный бонус к шансу {p[1]}: {r.json()['bonus']:+d}%" if r.status_code == 200 else f"❌ {err_text(r)}")
+    await luck_cmd(message, p[1], p[2:])
+
+
+@dp.message(Command("gluck"))
+async def gluck(message: Message):
+    if not is_admin(message):
+        return
+    await luck_cmd(message, "", message.text.split()[1:])
+
+
+@dp.message(Command("luckoff", "gluckoff"))
+async def luckoff(message: Message):
+    if not is_admin(message):
+        return
+    p = message.text.split()
+    glob = p[0].startswith("/gluckoff")
+    login = "" if glob else (p[1] if len(p) > 1 else None)
+    if login is None:
+        await message.answer("Использование: /luckoff логин [шанс]")
+        return
+    rest = p[1:] if glob else p[2:]
+    if rest:
+        r = await post("/admin/luck", {"login": login, "at": float(rest[0].replace(",", ".")), "bonus": 0})
+    else:
+        r = await post("/admin/luck/clear", {"login": login})
+    await message.answer("✅ Убрано" if r.status_code == 200 else f"❌ {err_text(r)}")
+
+
+@dp.message(Command("addtask"))
+async def addtask(message: Message):
+    if not is_admin(message):
+        return
+    p = message.text.split(maxsplit=4)
+    if len(p) < 5 or p[1] not in ("tg", "link") or to_int(p[3]) is None:
+        await message.answer("Использование:\n/addtask tg @канал 100 Подписаться на наш канал\n/addtask link https://tiktok.com/@акк 50 Подписаться в TikTok")
+        return
+    kind, target, reward, title = p[1], p[2], to_int(p[3]), p[4]
+    if kind == "tg":
+        chat = target if target.startswith("@") else "@" + target.split("/")[-1]
+        payload = {"title": title, "kind": "tg", "url": "https://t.me/" + chat.lstrip("@"), "chat": chat, "reward": reward}
+    else:
+        payload = {"title": title, "kind": "link", "url": target, "reward": reward}
+    r = await post("/admin/task", payload)
+    await message.answer(f"✅ Задание #{r.json()['id']} добавлено" if r.status_code == 200 else f"❌ {err_text(r)}")
+
+
+@dp.message(Command("tasks"))
+async def tasks_cmd(message: Message):
+    if not is_admin(message):
+        return
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{BACKEND_URL}/admin/task", headers=HEADERS)
+    await message.answer("\n".join(f"#{x['id']} [{x['kind']}] +{x['reward']} G — {x['title']}" for x in r.json()) or "Заданий нет")
+
+
+@dp.message(Command("deltask"))
+async def deltask(message: Message):
+    if not is_admin(message):
+        return
+    p = message.text.split()
+    if len(p) < 2 or not p[1].isdigit():
+        await message.answer("Использование: /deltask id")
+        return
+    r = await post("/admin/task/delete", {"id": int(p[1])})
+    await message.answer("✅ Удалено" if r.status_code == 200 else f"❌ {err_text(r)}")
 
 
 async def run():
