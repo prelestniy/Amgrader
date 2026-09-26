@@ -2381,7 +2381,7 @@ function applyServerUser(u) {
   state.cart = {};
   setInventoryFromIds(u.inventory || []);
 }
-const OK_ITEM = { name: "✓", rarity: "common", icon: ic("check", 20) };
+const OK_ITEM = { name: "✓", rarity: "common", icon: '<svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' };
 
 function saveGame() {
   const tk = getToken();
