@@ -9,7 +9,7 @@ import hmac
 import hashlib
 import secrets
 from contextlib import closing
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, Header, HTTPException, Depends
@@ -88,7 +88,7 @@ def init_db():
             token TEXT UNIQUE,
             created_at INTEGER
         )""")
-        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0", "luck_rules TEXT DEFAULT '[]'", "last_daily INTEGER DEFAULT 0"):
+        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0", "luck_rules TEXT DEFAULT '[]'", "last_daily INTEGER DEFAULT 0", "history TEXT DEFAULT '[]'"):
             try:
                 conn.execute("ALTER TABLE users ADD COLUMN " + col)
             except sqlite3.OperationalError:
@@ -267,6 +267,15 @@ class PromoCodeOnly(BaseModel):
     code: str
 
 
+class PromoUserCreateBody(BaseModel):
+    amount: int
+    count: int = 1
+
+
+class HistoryAddBody(BaseModel):
+    entry: Dict[str, Any]
+
+
 class GrantBody(BaseModel):
     login: str
     amount: int
@@ -402,6 +411,71 @@ def redeem_promo(body: PromoRedeemBody, user=Depends(auth_user)):
     out = user_public(newrow)
     out["reward"] = {"type": promo["reward_type"], "value": promo["reward_value"]}
     return out
+
+
+@app.post("/api/promo/create")
+def create_user_promo(body: PromoUserCreateBody, user=Depends(auth_user)):
+    if body.amount <= 0:
+        raise HTTPException(400, "Сумма должна быть больше 0")
+    if body.count < 1 or body.count > 10:
+        raise HTTPException(400, "От 1 до 10 промокодов за раз")
+    total = body.amount * body.count
+    with closing(db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+        if cur["balance"] < total:
+            raise HTTPException(400, "Недостаточно баланса")
+        codes = []
+        for _ in range(body.count):
+            while True:
+                code = "P" + secrets.token_hex(4).upper()
+                exists = conn.execute("SELECT 1 FROM promo_codes WHERE code=?", (code,)).fetchone()
+                if not exists:
+                    break
+            conn.execute(
+                """INSERT INTO promo_codes(code, reward_type, reward_value, max_uses, used_count, active, created_by, created_at)
+                   VALUES(?,'balance',?,1,0,1,?,?)""",
+                (code, body.amount, f"user:{cur['login'] or cur['id']}", int(time.time())),
+            )
+            codes.append(code)
+        conn.execute("UPDATE users SET balance = balance - ?, rev = rev + 1 WHERE id=?", (total, user["id"]))
+        newrow = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+    out = user_public(newrow)
+    out["codes"] = codes
+    out["amount"] = body.amount
+    return out
+
+
+# ---------------------------------------------------------------------------
+# История амгрейдов (для отображения в профиле на любом устройстве)
+# ---------------------------------------------------------------------------
+HISTORY_MAX = 50
+
+
+@app.get("/api/history")
+def get_history(user=Depends(auth_user)):
+    return {"history": json.loads(user["history"] or "[]")}
+
+
+@app.post("/api/history/add")
+def add_history(body: HistoryAddBody, user=Depends(auth_user)):
+    with closing(db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute("SELECT history FROM users WHERE id=?", (user["id"],)).fetchone()
+        hist = json.loads(cur["history"] or "[]")
+        entry = dict(body.entry)
+        entry["time"] = int(time.time() * 1000)  # время фиксируем на сервере, клиенту не доверяем
+        hist.insert(0, entry)
+        hist = hist[:HISTORY_MAX]
+        conn.execute("UPDATE users SET history=? WHERE id=?", (json.dumps(hist), user["id"]))
+    return {"ok": True, "history": hist}
+
+
+@app.post("/api/history/clear")
+def clear_history(user=Depends(auth_user)):
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE users SET history='[]' WHERE id=?", (user["id"],))
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
