@@ -80,9 +80,9 @@ button, input { font-family:inherit; font-synthesis:none; }
 .slot { position:relative; overflow:hidden; }
 .slot > * { position:relative; z-index:1; }
 .slot::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
-  background:linear-gradient(to top, rgba(182,242,74,0.24), rgba(182,242,74,0.05));
+  background:linear-gradient(to top, color-mix(in srgb, var(--rc, #B6F24A) 24%, transparent), color-mix(in srgb, var(--rc, #B6F24A) 5%, transparent));
   transform:scaleY(0); transform-origin:bottom; }
-.slot.filled { border-color:rgba(182,242,74,0.32); }
+.slot.filled { border-color:color-mix(in srgb, var(--rc, #B6F24A) 32%, transparent); }
 .slot.filled::before { transform:scaleY(1); animation:pour .85s cubic-bezier(.22,1,.36,1) both; }
 @keyframes pour { from { transform:scaleY(0); } to { transform:scaleY(1); } }
 
@@ -262,12 +262,11 @@ button, input { font-family:inherit; font-synthesis:none; }
 .meme-vid-wrap { display:flex; touch-action:manipulation; }
 .meme-vid-wrap.playing { box-shadow:0 0 0 2px var(--accent) inset; }
 .meme-vid { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
-.play-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  color:rgba(255,255,255,0.55); pointer-events:none; transition:opacity .15s; }
-.play-hint svg { width:32%; height:32%; }
+.play-hint { position:absolute; right:3px; bottom:3px; width:16px; height:16px; border-radius:50%; background:rgba(0,0,0,.5);
+  display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.85); pointer-events:none; transition:opacity .15s; }
+.play-hint svg { width:55%; height:55%; }
 .meme-vid-wrap.playing .play-hint { opacity:0; }
-.meme-vid-wrap.novideo .play-hint { color:rgba(255,255,255,0.25); }
-.meme-vid-wrap.novideo .play-hint svg { width:26%; height:26%; }
+.meme-vid-wrap.novideo .play-hint { display:none; }
 .card-name-en { font-size:10.5px; color:var(--text-mute); letter-spacing:.02em; margin-top:1px; }
 .buy-name-en { font-size:11px; color:var(--text-mute); margin-top:1px; }
 .card-name { font-size:13px; line-height:1.25; overflow:hidden; display:-webkit-box;
@@ -351,11 +350,11 @@ button, input { font-family:inherit; font-synthesis:none; }
 .profile-info { flex:1; min-width:0; }
 .profile-name { font-size:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .profile-sub { font-size:12px; color:var(--text-mute); margin-top:4px; }
-.profile-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.profile-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
 .stat-card { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-card); padding:16px; }
 .stat-value { font-size:22px; color:var(--accent); }
 .stat-label { font-size:12px; color:var(--text-mute); margin-top:4px; }
-.profile-list { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-card); overflow:hidden; }
+.profile-list { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-card); overflow:hidden; margin-top:12px; }
 .profile-row { display:flex; align-items:center; justify-content:space-between; padding:15px 16px;
   border-bottom:1px solid var(--border); font-size:14px; cursor:pointer; }
 .profile-row:last-child { border-bottom:none; }
@@ -364,7 +363,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 .profile-row.danger { color:var(--danger); }
 
 /* ===== ПЛАШКИ ПРОМОКОД / РЕФЕРАЛКА ===== */
-.profile-tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.profile-tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
 .tile { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-card); padding:16px;
   display:flex; flex-direction:column; gap:6px; cursor:pointer; text-align:left; color:var(--text); font-size:14px;
   transition:transform .15s var(--ease-out), border-color .15s var(--ease-out); }
@@ -376,12 +375,31 @@ button, input { font-family:inherit; font-synthesis:none; }
 .code-box b { font-size:22px; letter-spacing:.12em; color:var(--accent); user-select:text; }
 .misc-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .misc-hint { font-size:12px; color:var(--text-mute); line-height:1.4; }
+.misc-hint.bad { color:var(--danger); }
+.hist-row { display:flex; align-items:center; gap:12px; background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-card); padding:12px 14px; animation:barIn .35s var(--ease-out) both; }
+.hist-mid { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.hist-mid b { font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hist-mid span { font-size:11.5px; color:var(--text-mute); }
+.hist-right { text-align:right; flex:none; }
+.hist-right b { font-size:14px; display:block; }
+.hist-right span { font-size:10.5px; color:var(--text-mute); }
+.hist-right.win b { color:var(--accent); }
+.hist-right.lose b { color:var(--danger); }
+.hist-empty { text-align:center; color:var(--text-mute); font-size:13px; padding:40px 10px; }
+.code-list { display:flex; flex-direction:column; gap:8px; }
+.code-list .code-box { padding:12px 14px; }
+.code-list .code-box b { font-size:16px; }
+.count-row { display:flex; align-items:center; justify-content:center; gap:16px; }
+.count-row button { width:38px; height:38px; border-radius:12px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-size:18px; cursor:pointer; }
+.count-row button:active { background:var(--surface-3); }
+.count-row b { font-size:20px; min-width:24px; text-align:center; }
 .misc-msg { font-size:12.5px; min-height:16px; text-align:center; color:var(--danger); }
 .misc-msg.ok { color:var(--accent); }
 
 /* ===== БЫСТРАЯ АНИМАЦИЯ / ГРОМКОСТЬ ===== */
 .spin-row { display:flex; gap:10px; align-items:stretch; }
 .spin-row .primary-btn { flex:1; width:auto; }
+.spin-balance { text-align:center; font-size:13px; font-weight:600; color:var(--text); opacity:.65; margin-top:6px; letter-spacing:.2px; }
 .fast-btn { flex:none; width:60px; border:1px solid var(--border-hi); border-radius:var(--r-btn); background:var(--surface-2);
   color:var(--text-dim); font-size:22px; cursor:pointer; transition:transform .15s var(--ease-out), background .2s; }
 .fast-btn:active { transform:scale(0.96); }
@@ -667,6 +685,7 @@ button, input { font-family:inherit; font-synthesis:none; }
       <button class="primary-btn" id="spinBtn">Амгрейд</button>
       <button class="fast-btn" id="fastBtn" onclick="toggleFast()" aria-label="Быстрая анимация"><svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
     </div>
+    <div class="spin-balance" id="spinBalance">0 G</div>
   </section>
 
   <section id="browser">
@@ -771,6 +790,8 @@ button, input { font-family:inherit; font-synthesis:none; }
     <div class="profile-tiles">
       <button class="tile" onclick="openPromo()"><span class="tile-ico"><svg class="ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 1 1 0 5"/></svg></span><span>Промокод</span><small>Ввести код и получить награду</small></button>
       <button class="tile" onclick="openReferral()"><span class="tile-ico"><svg class="ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></span><span>Реферальный код</span><small id="tileRefSub">Приглашайте друзей</small></button>
+      <button class="tile" onclick="openCreatePromo()"><span class="tile-ico"><svg class="ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 15l6-6M9.5 10h.01M14.5 14h.01"/></svg></span><span>Свой промокод</span><small>Подарите часть баланса</small></button>
+      <button class="tile" onclick="openHistory()"><span class="tile-ico"><svg class="ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l4 2"/></svg></span><span>История амгрейдов</span><small>Последние ставки и результаты</small></button>
     </div>
 
     <div class="profile-list">
@@ -1055,10 +1076,30 @@ const __vidIO = new IntersectionObserver((entries) => {
     if (!en.isIntersecting && en.target === __loudVideo) __stopLoud();
   });
 }, { rootMargin: "80px" });
+/* Показываем первый кадр вместо пустого фона с кнопкой: как только иконка
+   с видео попадает в область видимости (с запасом), тихо подгружаем ролик
+   и сразу ставим на паузу на первом кадре — сам ролик при этом не играет
+   и звука нет, только статичная превью-картинка. Дальше грузим один раз. */
+const __vidThumbIO = new IntersectionObserver((entries) => {
+  entries.forEach(en => {
+    const v = en.target;
+    if (en.isIntersecting) {
+      if (!v.src && v.dataset.src) { v.src = v.dataset.src; __paintFirstFrame(v); }
+      __vidThumbIO.unobserve(v);
+    }
+  });
+}, { rootMargin: "200px" });
+function __paintFirstFrame(v) {
+  if (v.dataset.painted) return;
+  v.dataset.painted = "1";
+  const settle = () => { try { v.pause(); v.currentTime = 0; } catch (e) {} };
+  let p; try { p = v.play(); } catch (e) {}
+  if (p && p.then) p.then(settle).catch(() => {}); else settle();
+}
 function __observeMemeVideos(root) {
   if (!root || !root.querySelectorAll) return;
   (root.matches && root.matches(".meme-vid") ? [root] : []).concat([...root.querySelectorAll(".meme-vid")])
-    .forEach(v => __vidIO.observe(v));
+    .forEach(v => { __vidIO.observe(v); __vidThumbIO.observe(v); });
 }
 new MutationObserver(muts => {
   for (const m of muts) m.addedNodes.forEach(n => { if (n.nodeType === 1) __observeMemeVideos(n); });
@@ -1073,7 +1114,7 @@ function renderIconRaw(item, sizePx) {
 
   if (item.video) {
     return `<div class="icon meme-vid-wrap" style="${box}position:relative;overflow:hidden;padding:0;" onclick="memeTap(event,this)">` +
-      `<video class="meme-vid" data-src="/videos/${encodeURIComponent(item.video)}" loop muted playsinline webkit-playsinline preload="none" onplay="this.closest('.meme-vid-wrap').classList.add('playing')" onpause="this.closest('.meme-vid-wrap').classList.remove('playing')" onended="this.closest('.meme-vid-wrap').classList.remove('playing')" onerror="this.closest('.meme-vid-wrap').classList.add('novideo')"></video>` +
+      `<video class="meme-vid" data-src="/videos/${encodeURIComponent(item.video)}" loop muted playsinline webkit-playsinline preload="metadata" onplay="this.closest('.meme-vid-wrap').classList.add('playing')" onpause="this.closest('.meme-vid-wrap').classList.remove('playing')" onended="this.closest('.meme-vid-wrap').classList.remove('playing')" onerror="this.closest('.meme-vid-wrap').classList.add('novideo')"></video>` +
       `<span class="play-hint">${ICON_PLAY}</span>` +
       `</div>`;
   }
@@ -1090,9 +1131,12 @@ function renderIconRaw(item, sizePx) {
 /* ============================================================
    ШАНС
    ============================================================ */
-/* Шанс = доля ставки от цены с небольшой комиссией (5%).
-   Ставка 50 G на цель 100 G → 47%. Чем дороже цель, тем ниже шанс — плавно. */
-const HOUSE_EDGE = 0.05;
+/* Шанс = доля ставки от цены с комиссией (15%), потолок 75%.
+   Раньше комиссия была 5%, а потолок 95% — при ставке ≈ цене цели шанс
+   получался почти гарантированным (95%), апгрейд ощущался как бесплатный
+   дюп предмета. Теперь даже при равной ставке шанс не выше 75%, и House Edge
+   выше, так что апгрейд остаётся рискованной игрой, а не гарантией. */
+const HOUSE_EDGE = 0.15;
 function fmtPct(c) {
   c = c >= 10 ? Math.round(c) : c >= 1 ? Math.round(c * 10) / 10 : Math.round(c * 100) / 100;
   return String(c).replace(".", ",");
@@ -1100,7 +1144,7 @@ function fmtPct(c) {
 function calcChance(totalStake, tgt) {
   if (!totalStake || !tgt || tgt.price <= 0) return 0;
   const raw = (totalStake / tgt.price) * (1 - HOUSE_EDGE) * 100;
-  return Math.max(0.1, Math.min(95, Math.round(raw * 10) / 10));
+  return Math.max(0.1, Math.min(75, Math.round(raw * 10) / 10));
 }
 
 function randomCrypto() {
@@ -1227,10 +1271,12 @@ function slotHTML(label, item, price, extra) {
       <div style="min-width:0;"><div class="slot-name">${esc(item.name)}${extra || ""}</div>
       <div class="slot-price">${fmt(price)}</div></div></div>`;
 }
-function setSlot(el, sig, filled, html) {
+function setSlot(el, sig, filled, html, rarityColor) {
   const changed = el.dataset.sig !== sig;
   el.dataset.sig = sig;
   el.className = filled ? "slot filled" : "slot empty";
+  if (rarityColor) el.style.setProperty("--rc", rarityColor);
+  else el.style.removeProperty("--rc");
   el.innerHTML = html;
   if (filled && changed) {                 // перезапуск анимации «наливания»
     el.classList.remove("filled");
@@ -1242,9 +1288,9 @@ function renderSlots() {
   const s = document.getElementById("slotStake"), t = document.getElementById("slotTarget");
   const sel = getSelectedMemes(), tgt = getTarget();
   const empty = label => `<div class="slot-plus">+</div><div class="slot-empty-label">${label}</div>`;
-  if (sel.length) setSlot(s, state.selectedMemeUids.join(","), true, slotHTML("Ставка", sel[0], getTotalStake(), sel.length > 1 ? ` +${sel.length - 1}` : ""));
+  if (sel.length) setSlot(s, state.selectedMemeUids.join(","), true, slotHTML("Ставка", sel[0], getTotalStake(), sel.length > 1 ? ` +${sel.length - 1}` : ""), getRarityHex(sel[0].rarity));
   else setSlot(s, "", false, empty("Ставка"));
-  if (tgt) setSlot(t, tgt.uid, true, slotHTML("Цель", tgt, tgt.price));
+  if (tgt) setSlot(t, tgt.uid, true, slotHTML("Цель", tgt, tgt.price), getRarityHex(tgt.rarity));
   else setSlot(t, "", false, empty("Цель"));
 }
 
@@ -1335,14 +1381,16 @@ function plural(n, one, few, many) {
 let shownBalance = 0, balanceAnim = 0;
 function updateHeader() {
   const el = document.getElementById("headerMeta");
+  const el2 = document.getElementById("spinBalance");
   const from = shownBalance, to = state.balance;
-  if (from === to) { el.textContent = fmt(to); return; }
+  if (from === to) { el.textContent = fmt(to); if (el2) el2.textContent = fmt(to); return; }
   const id = ++balanceAnim, start = performance.now(), dur = 600;
   (function frame(now) {
     if (id !== balanceAnim) return;
     const t = Math.min((now - start) / dur, 1);
     shownBalance = Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)));
     el.textContent = fmt(shownBalance);
+    if (el2) el2.textContent = fmt(shownBalance);
     if (t < 1) requestAnimationFrame(frame);
   })(start);
 }
@@ -1521,6 +1569,8 @@ function finishSell() {
   renderAll();
   renderProfile();
   pulseBalance();
+  const invOverlay = document.getElementById("invFullOverlay");
+  if (invOverlay && !invOverlay.hidden) renderProfileInventoryGrid();
   notify("win", "Продано", m.name, "+ " + fmt(price), m);
 }
 
@@ -1846,6 +1896,9 @@ async function spin() {
   const used = state.selectedMemeUids.slice();
   state.inventory = state.inventory.filter(i => !used.includes(i.uid));
   if (win) state.inventory.push({ ...tgt, uid: makeUid("u") });
+
+  pushHistory({ time: Date.now(), stake: selected.map(m => ({ id: m.id, name: m.name, rarity: m.rarity, price: m.price })),
+    stakeTotal, target: { id: tgt.id, name: tgt.name, rarity: tgt.rarity, price: tgt.price }, chance, win });
 
   state.selectedMemeUids = [];
   state.targetMemeId = null;
@@ -2273,7 +2326,7 @@ function renderProfileInventoryGrid() {
   const el = document.getElementById("invFullGrid");
   const list = state.inventory;
   el.innerHTML = list.length
-    ? list.map(m => cardHTML(m, {})).join("")
+    ? list.map(m => cardHTML(m, { sell: true })).join("")
     : '<div class="empty-state">Инвентарь пуст</div>';
 }
 function openProfileInventory() {
@@ -2407,6 +2460,37 @@ function saveGame() {
 }
 function resetGuestState() {
   state.rev = 0; state.luck = []; state.balance = 0; state.inventory = []; state.selectedMemeUids = []; state.targetMemeId = null; state.cart = {}; shownBalance = 0;
+}
+
+/* ---------- история амгрейдов (хранится на сервере, видна с любого устройства) ---------- */
+function pushHistory(entry) {
+  if (!isLoggedIn()) return;
+  api("/api/history/add", { method: "POST", body: { entry } }).catch(() => {});
+}
+function clearHistory() {
+  api("/api/history/clear", { method: "POST" }).catch(() => {});
+  openHistory();
+}
+function historyRow(h) {
+  const stakeLabel = h.stake.length === 1 ? h.stake[0].name : `${h.stake.length} ${plural(h.stake.length, "предмет", "предмета", "предметов")}`;
+  const time = new Date(h.time).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const cls = h.win ? "win" : "lose";
+  const sum = h.win ? "+" + fmt(h.target.price) : "−" + fmt(h.stakeTotal);
+  return `<div class="hist-row">${renderIcon(h.target, 40)}
+    <div class="hist-mid"><b>${esc(stakeLabel)} → ${esc(h.target.name)}</b><span>${fmtPct(h.chance)}% шанс · ${time}</span></div>
+    <div class="hist-right ${cls}"><b>${sum}</b><span>${h.win ? "успех" : "неудача"}</span></div>
+  </div>`;
+}
+async function openHistory() {
+  if (!isLoggedIn()) { openAuth("Войдите, чтобы увидеть историю амгрейдов"); return; }
+  openMisc(miscHead(ic("history", 24), "История амгрейдов", "Загрузка…") + `<div class="sheet-list"><div class="hist-empty">Загрузка…</div></div>`);
+  let list = [];
+  try { const r = await api("/api/history"); list = r.history || []; } catch (e) {}
+  const body = list.length
+    ? `<div class="sheet-list">${list.map(historyRow).join("")}</div>`
+    : `<div class="hist-empty">Пока пусто — сделайте первый амгрейд</div>`;
+  openMisc(miscHead(ic("history", 24), "История амгрейдов", `Последние ${list.length ? list.length : ""} результатов`) + body +
+    (list.length ? `<div class="sheet-foot"><button class="ghost-btn" onclick="clearHistory()">Очистить историю</button></div>` : ""));
 }
 
 async function syncFromServer() {
@@ -2546,6 +2630,59 @@ async function applyReferral() {
     const u = await api("/api/referral/apply", { method: "POST", body: { code } });
     mergeServerUser(u); openReferral(); miscMsg("Код применён — бонус начислен!", true);
   } catch (e) { miscMsg(e.message); }
+}
+let cpCount = 2;
+function openCreatePromo() {
+  if (!isLoggedIn()) { openAuth("Войдите, чтобы создать промокод"); return; }
+  cpCount = 2;
+  openMisc(miscHead(ic("gift", 24), "Свой промокод", "Разделите баланс на промокоды для друзей") + `
+    <div class="reg-body">
+      <div class="reg-field"><label>Сумма на один промокод</label>
+        <input id="cpAmount" type="number" inputmode="numeric" min="1" placeholder="Например, 5000"></div>
+      <div class="reg-field"><label>Количество промокодов</label>
+        <div class="count-row">
+          <button onclick="cpStep(-1)">−</button><b id="cpCountVal">${cpCount}</b><button onclick="cpStep(1)">+</button>
+        </div></div>
+      <div class="misc-hint" id="cpTotal">Спишется 0 G с вашего баланса (${fmt(state.balance)} доступно)</div>
+      <div class="misc-msg" id="miscError"></div>
+    </div>
+    <div class="sheet-foot"><button class="primary-btn" id="miscBtn" onclick="submitCreatePromo()">Создать</button></div>`);
+  const inp = document.getElementById("cpAmount");
+  inp.addEventListener("input", cpUpdateTotal);
+  setTimeout(() => inp.focus(), 350);
+}
+function cpStep(d) {
+  cpCount = Math.min(10, Math.max(1, cpCount + d));
+  const el = document.getElementById("cpCountVal"); if (el) el.textContent = cpCount;
+  cpUpdateTotal();
+}
+function cpUpdateTotal() {
+  const amount = parseInt(document.getElementById("cpAmount").value, 10) || 0;
+  const total = amount * cpCount;
+  const el = document.getElementById("cpTotal"); if (!el) return;
+  el.textContent = `Спишется ${fmt(total)} с вашего баланса (${fmt(state.balance)} доступно)`;
+  el.classList.toggle("bad", total > state.balance || amount <= 0);
+}
+async function submitCreatePromo() {
+  const amount = parseInt(document.getElementById("cpAmount").value, 10) || 0;
+  if (amount <= 0) return miscMsg("Укажите сумму на промокод");
+  if (amount * cpCount > state.balance) return miscMsg("Недостаточно баланса");
+  const btn = document.getElementById("miscBtn"); btn.disabled = true; miscMsg("");
+  try {
+    const u = await api("/api/promo/create", { method: "POST", body: { amount, count: cpCount } });
+    mergeServerUser(u); closeMisc();
+    renderCreatedPromoCodes(u.codes || [], u.amount || amount);
+  } catch (e) { btn.disabled = false; miscMsg(e.message); }
+}
+function renderCreatedPromoCodes(codes, amount) {
+  const rows = codes.map(c => `<div class="code-box"><b>${esc(c)}</b><button class="ghost-btn" style="padding:8px 12px" onclick="copyText('${esc(c)}','Код скопирован')">Копировать</button></div>`).join("");
+  openMisc(miscHead(ic("gift", 24), "Готово!", `По ${fmt(amount)} на каждом коде`) + `
+    <div class="reg-body">
+      <div class="code-list">${rows}</div>
+      <div class="misc-hint">Отправьте код другу — он введёт его в разделе «Промокод» и получит ${fmt(amount)}. Каждый код можно использовать один раз.</div>
+    </div>
+    <div class="sheet-foot"><button class="primary-btn" onclick="copyText('${codes.join(", ")}','Коды скопированы')">Копировать все</button></div>`);
+  notify("win", "Промокоды созданы", `${codes.length} × ${fmt(amount)}`, "готово к отправке", OK_ITEM);
 }
 document.getElementById("miscOverlay").addEventListener("click", e => { if (e.target === e.currentTarget) closeMisc(); });
 
@@ -2811,7 +2948,7 @@ refreshFastUI();
 
 </script>
 <script>
-const ICO = {"gift": "<rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/><path d=\"M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 1 1 0 5\"/>", "users": "<path d=\"M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9.5\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8\"/>", "bag": "<path d=\"M6 8a6 6 0 0 1 12 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z\"/><path d=\"M9 21v-6h6v6M9 8h6\"/>", "box": "<path d=\"M21 8l-9-5-9 5v8l9 5 9-5z\"/><path d=\"M3 8l9 5 9-5M12 13v8\"/>", "layers": "<path d=\"M12 3l9 5-9 5-9-5z\"/><path d=\"M3 13l9 5 9-5M3 17.5l9 5 9-5\"/>", "volume": "<path d=\"M11 5L6 9H2v6h4l5 4z\"/><path d=\"M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14\"/>", "bolt": "<path d=\"M13 2L4 14h7l-1 8 9-12h-7z\"/>", "logout": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>", "trash": "<path d=\"M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6\"/>", "check": "<path d=\"M5 12.5l4.5 4.5L19 7\"/>", "x": "<path d=\"M6 6l12 12M18 6L6 18\"/>", "cart": "<circle cx=\"9\" cy=\"20\" r=\"1.4\"/><circle cx=\"18\" cy=\"20\" r=\"1.4\"/><path d=\"M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6\"/>", "calendar": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M8 3v4M16 3v4M3 10h18\"/>", "telegram": "<path d=\"M21 4L3 11l6 2.5L11.5 20l3-4.5L19 19z\"/><path d=\"M9 13.5L21 4\"/>", "tiktok": "<path d=\"M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5\"/><path d=\"M14 3c.3 2.6 2 4.4 5 4.6\"/>", "link": "<path d=\"M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1\"/>"};
+const ICO = {"gift": "<rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/><path d=\"M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 1 1 0 5\"/>", "users": "<path d=\"M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9.5\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8\"/>", "bag": "<path d=\"M6 8a6 6 0 0 1 12 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z\"/><path d=\"M9 21v-6h6v6M9 8h6\"/>", "box": "<path d=\"M21 8l-9-5-9 5v8l9 5 9-5z\"/><path d=\"M3 8l9 5 9-5M12 13v8\"/>", "layers": "<path d=\"M12 3l9 5-9 5-9-5z\"/><path d=\"M3 13l9 5 9-5M3 17.5l9 5 9-5\"/>", "volume": "<path d=\"M11 5L6 9H2v6h4l5 4z\"/><path d=\"M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14\"/>", "bolt": "<path d=\"M13 2L4 14h7l-1 8 9-12h-7z\"/>", "logout": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>", "trash": "<path d=\"M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6\"/>", "check": "<path d=\"M5 12.5l4.5 4.5L19 7\"/>", "x": "<path d=\"M6 6l12 12M18 6L6 18\"/>", "cart": "<circle cx=\"9\" cy=\"20\" r=\"1.4\"/><circle cx=\"18\" cy=\"20\" r=\"1.4\"/><path d=\"M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6\"/>", "calendar": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M8 3v4M16 3v4M3 10h18\"/>", "telegram": "<path d=\"M21 4L3 11l6 2.5L11.5 20l3-4.5L19 19z\"/><path d=\"M9 13.5L21 4\"/>", "tiktok": "<path d=\"M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5\"/><path d=\"M14 3c.3 2.6 2 4.4 5 4.6\"/>", "link": "<path d=\"M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1\"/>", "history": "<path d=\"M3 12a9 9 0 1 0 3-6.7\"/><path d=\"M3 4v5h5\"/><path d=\"M12 7v5l4 2\"/>"};
 /* ============================================================
    V6: экраны и переходы, кейсы, крафт, бонусы, скрытая удача
    ============================================================ */
@@ -2961,7 +3098,7 @@ CASES.forEach(c => {
     const items = byR[r], invSum = items.reduce((s, m) => s + 1 / m.price, 0);
     items.forEach(m => { const w = c.w[r] * (1 / m.price) / invSum; c.pool.push({ m, w }); c.tot += w; ev += w * m.price; });
   });
-  c.price = Math.max(10, Math.round(ev / c.tot * 0.98 / 5) * 5);        // цена = средняя награда − 2% (кейсы выгоднее)
+  c.price = Math.max(10, Math.round(ev / c.tot * 0.80 / 5) * 5);        // цена = средняя награда − 20% (комиссия кейса, раньше была 2% — почти без риска, ощущалось как дюп)
   c.pool.sort((a, b) => b.m.price - a.m.price);
 });
 function pickFromCase(c) {
