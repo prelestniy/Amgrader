@@ -1666,12 +1666,12 @@ function renderBuySheet() {
         <div class="buy-rarity">${RARITY_RU[m.rarity] || ""}</div>
         <div class="buy-price">${fmt(m.price * qty)}</div>
       </div>
-      ${cartMode ? `<div class="buy-side">
-        <div class="stepper">
+      <div class="buy-side">
+        ${cartMode ? `<div class="stepper">
           <button onclick="changeQty(${m.id},-1)">−</button><span>${qty}</span><button onclick="changeQty(${m.id},1)">+</button>
-        </div>
+        </div>` : ""}
         <button class="remove-btn" onclick="removeFromCart(${m.id})">Удалить</button>
-      </div>` : ""}
+      </div>
     </div>`).join("");
 
   sheet.innerHTML = `
@@ -3163,7 +3163,7 @@ function renderBonus() {
       let btn;
       if (t.done) btn = `<button class="b-btn" disabled>${ic("check", 16)}</button>`;
       else if (t.started || bonus.go[t.id]) btn = `<button class="b-btn" id="tb${t.id}" onclick="taskClaim(${t.id})">Проверить</button>`;
-      else btn = `<button class="b-btn" onclick="taskGo(${t.id})">Перейти</button>`;
+      else btn = `<button class="b-btn" onclick="taskGo(${t.id})">Выполнить</button>`;
       return `<div class="bcard"><div class="b-ico">${ic(taskIcon(t), 22)}</div><div class="b-txt"><b>${esc(t.title)}</b><span><em>+${fmt(t.reward)}</em></span></div>${btn}</div>`;
     }).join("") : `<div class="pg-hint">Заданий пока нет — загляните позже.</div>`);
 }
