@@ -1021,6 +1021,38 @@ function renderIcon(item, sizePx) {
   __iconCache.set(key, html);
   return html;
 }
+
+/* ---------- ленивое видео: играет только то, что реально видно ----------
+   Раньше все видео-иконки (мемы в кейсах/инвентаре/ленте открытия) стартовали
+   autoplay сразу — в ленте открытия кейса это до сотни видео одновременно,
+   почти все за пределами экрана, но браузер всё равно их декодировал → лаги.
+   Теперь src подгружается и play() вызывается только когда элемент виден. */
+const __vidIO = new IntersectionObserver((entries) => {
+  entries.forEach(en => {
+    const v = en.target;
+    if (en.isIntersecting) {
+      if (!v.src && v.dataset.src) v.src = v.dataset.src;
+      if (document.visibilityState === "visible") {
+        const p = v.play(); if (p && p.catch) p.catch(() => {});
+      }
+    } else {
+      v.pause();
+    }
+  });
+}, { rootMargin: "80px" });
+function __observeMemeVideos(root) {
+  if (!root || !root.querySelectorAll) return;
+  (root.matches && root.matches(".meme-vid") ? [root] : []).concat([...root.querySelectorAll(".meme-vid")])
+    .forEach(v => __vidIO.observe(v));
+}
+new MutationObserver(muts => {
+  for (const m of muts) m.addedNodes.forEach(n => { if (n.nodeType === 1) __observeMemeVideos(n); });
+}).observe(document.body, { childList: true, subtree: true });
+document.addEventListener("visibilitychange", () => {
+  document.querySelectorAll(".meme-vid").forEach(v => {
+    if (document.visibilityState === "hidden") v.pause();
+  });
+});
 function renderIconRaw(item, sizePx) {
   const size = sizePx ? (typeof sizePx === "number" ? sizePx + "px" : sizePx) : "var(--icon-size)";
   const color = getRarityHex(item.rarity);
@@ -1028,7 +1060,7 @@ function renderIconRaw(item, sizePx) {
 
   if (item.video) {
     return `<div class="icon meme-vid-wrap" style="${box}position:relative;overflow:hidden;padding:0;">` +
-      `<video class="meme-vid" src="/videos/${encodeURIComponent(item.video)}" autoplay loop muted playsinline webkit-playsinline preload="metadata"></video>` +
+      `<video class="meme-vid" data-src="/videos/${encodeURIComponent(item.video)}" loop muted playsinline webkit-playsinline preload="none"></video>` +
       `<button class="snd-btn" onclick="toggleMemeSound(event,this)" aria-label="Звук">${ICON_SND_OFF}</button>` +
       `</div>`;
   }
@@ -2266,9 +2298,38 @@ const TOKEN_KEY = "amg_token";
 let apiCfg = { botUsername: "", referrerBonus: 0, refereeBonus: 0 };
 let lastSaveAt = 0;
 
-function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
-function setToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 function tgApp() { return window.Telegram && window.Telegram.WebApp; }
+
+/* Telegram Mini Apps: localStorage может НЕ переживать перезапуск приложения
+   (особенно на iOS) — Telegram для этого даёт CloudStorage. Дублируем токен
+   туда, чтобы вход не слетал при каждом новом открытии мини-аппа. */
+function tgCloudSet(key, value) {
+  return new Promise(resolve => {
+    const tg = tgApp();
+    if (tg && tg.CloudStorage && tg.CloudStorage.setItem) { try { tg.CloudStorage.setItem(key, value, () => resolve()); } catch (e) { resolve(); } }
+    else resolve();
+  });
+}
+function tgCloudGet(key) {
+  return new Promise(resolve => {
+    const tg = tgApp();
+    if (tg && tg.CloudStorage && tg.CloudStorage.getItem) { try { tg.CloudStorage.getItem(key, (err, value) => resolve(err ? "" : (value || ""))); } catch (e) { resolve(""); } }
+    else resolve("");
+  });
+}
+function tgCloudRemove(key) {
+  return new Promise(resolve => {
+    const tg = tgApp();
+    if (tg && tg.CloudStorage && tg.CloudStorage.removeItem) { try { tg.CloudStorage.removeItem(key, () => resolve()); } catch (e) { resolve(); } }
+    else resolve();
+  });
+}
+
+function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
+function setToken(t) {
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+  if (t) tgCloudSet(TOKEN_KEY, t); else tgCloudRemove(TOKEN_KEY);
+}
 function getRefFromUrl() {
   let r = "";
   try { r = new URLSearchParams(location.search).get("ref") || ""; } catch (e) {}
@@ -2486,9 +2547,14 @@ async function init() {
   if (!apiCfg.botUsername) setTimeout(async () => { try { apiCfg = await api("/api/config"); } catch (e) {} }, 4000);
   try {
     let done = false;
-    if (getToken()) {
+    let tk = getToken();
+    if (!tk && tg) { tk = await tgCloudGet(TOKEN_KEY); if (tk) { try { localStorage.setItem(TOKEN_KEY, tk); } catch (e) {} } }
+    if (tk) {
       try { applyServerUser(await api("/api/me")); done = true; }
-      catch (e) { if (e.status === 401) setToken(""); }
+      catch (e) {
+        if (e.status === 401) setToken("");
+        else { try { applyServerUser(await api("/api/me")); done = true; } catch (e2) { /* сеть недоступна — токен не трогаем, попробуем в след. раз */ } }
+      }
     }
     if (!done && tg && tg.initData) await telegramLoginRequest();
   } catch (e) { /* остаёмся гостем */ }
