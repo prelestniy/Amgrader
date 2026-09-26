@@ -259,13 +259,9 @@ button, input { font-family:inherit; font-synthesis:none; }
 .inv-full { position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
 .inv-full-head { display:flex; align-items:center; gap:10px; padding:12px 12px 0; }
-.meme-vid-wrap { display:flex; }
+.meme-vid-wrap { display:flex; touch-action:manipulation; }
+.meme-vid-wrap.playing { box-shadow:0 0 0 2px var(--accent) inset; }
 .meme-vid { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
-.snd-btn { position:absolute; right:3px; bottom:3px; width:20px; height:20px; border:none; border-radius:50%;
-  background:rgba(0,0,0,0.55); color:#fff; font-size:11px; padding:0; cursor:pointer; z-index:2;
-  display:flex; align-items:center; justify-content:center; touch-action:manipulation; }
-.snd-btn svg { display:block; }
-.snd-btn:active { transform:scale(0.9); }
 .card-name-en { font-size:10.5px; color:var(--text-mute); letter-spacing:.02em; margin-top:1px; }
 .buy-name-en { font-size:11px; color:var(--text-mute); margin-top:1px; }
 .card-name { font-size:13px; line-height:1.25; overflow:hidden; display:-webkit-box;
@@ -989,28 +985,31 @@ function getRarityHex(rarity) {
   }
 }
 
-const ICON_SND_OFF = '<svg class="ic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
-const ICON_SND_ON = '<svg class="ic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>';
-
-let __loudVideo = null, __loudBtn = null;
-function toggleMemeSound(e, btn) {
+/* Двойной тап по предмету: запускает его видео со звуком (никакого автоплея —
+   ролик грузится и играет только по явному действию пользователя). Повторный
+   двойной тап останавливает. Одновременно громко может играть только один. */
+let __loudVideo = null, __loudWrap = null;
+function __stopLoud() {
+  if (!__loudVideo) return;
+  __loudVideo.pause();
+  __loudVideo.muted = true;
+  __loudVideo.currentTime = 0;
+  if (__loudWrap) __loudWrap.classList.remove("playing");
+  __loudVideo = null; __loudWrap = null;
+}
+function toggleMemeSound(e, wrap) {
   e.stopPropagation();
-  const wrap = btn.closest(".meme-vid-wrap");
   const vid = wrap && wrap.querySelector("video");
   if (!vid) return;
-  if (__loudVideo && __loudVideo !== vid) {
-    __loudVideo.muted = true;
-    if (__loudBtn) __loudBtn.innerHTML = ICON_SND_OFF;
-  }
-  if (vid.muted) {
-    vid.muted = false;
-    __loudVideo = vid; __loudBtn = btn;
-    btn.innerHTML = ICON_SND_ON;
-  } else {
-    vid.muted = true;
-    __loudVideo = null; __loudBtn = null;
-    btn.innerHTML = ICON_SND_OFF;
-  }
+  if (__loudVideo === vid) { __stopLoud(); return; }
+  __stopLoud();
+  if (!vid.src && vid.dataset.src) vid.src = vid.dataset.src;
+  vid.muted = false;
+  vid.currentTime = 0;
+  const p = vid.play();
+  if (p && p.catch) p.catch(() => { vid.muted = true; });
+  __loudVideo = vid; __loudWrap = wrap;
+  wrap.classList.add("playing");
 }
 
 const __iconCache = new Map();
@@ -1022,22 +1021,18 @@ function renderIcon(item, sizePx) {
   return html;
 }
 
-/* ---------- ленивое видео: играет только то, что реально видно ----------
-   Раньше все видео-иконки (мемы в кейсах/инвентаре/ленте открытия) стартовали
-   autoplay сразу — в ленте открытия кейса это до сотни видео одновременно,
-   почти все за пределами экрана, но браузер всё равно их декодировал → лаги.
-   Теперь src подгружается и play() вызывается только когда элемент виден. */
+/* ---------- видео предметов: без автоплея ----------
+   Раньше видео-иконки (мемы в кейсах/инвентаре/ленте открытия) стартовали
+   autoplay сразу, как только попадали в кадр — в ленте открытия кейса это
+   до сотни видео одновременно, браузер их декодировал → лаги, и был виден
+   сырой первый кадр ролика вместо фона предмета.
+   Теперь видео не грузится и не играет само по себе: пользователь запускает
+   его сам двойным тапом (сразу со звуком), а пока ролик не запущен — виден
+   просто фон предмета, окрашенный в цвет редкости. Наблюдатель ниже только
+   останавливает уже играющее видео, если оно уходит за пределы экрана. */
 const __vidIO = new IntersectionObserver((entries) => {
   entries.forEach(en => {
-    const v = en.target;
-    if (en.isIntersecting) {
-      if (!v.src && v.dataset.src) v.src = v.dataset.src;
-      if (document.visibilityState === "visible") {
-        const p = v.play(); if (p && p.catch) p.catch(() => {});
-      }
-    } else {
-      v.pause();
-    }
+    if (!en.isIntersecting && en.target === __loudVideo) __stopLoud();
   });
 }, { rootMargin: "80px" });
 function __observeMemeVideos(root) {
@@ -1049,19 +1044,16 @@ new MutationObserver(muts => {
   for (const m of muts) m.addedNodes.forEach(n => { if (n.nodeType === 1) __observeMemeVideos(n); });
 }).observe(document.body, { childList: true, subtree: true });
 document.addEventListener("visibilitychange", () => {
-  document.querySelectorAll(".meme-vid").forEach(v => {
-    if (document.visibilityState === "hidden") v.pause();
-  });
+  if (document.visibilityState === "hidden") __stopLoud();
 });
 function renderIconRaw(item, sizePx) {
   const size = sizePx ? (typeof sizePx === "number" ? sizePx + "px" : sizePx) : "var(--icon-size)";
   const color = getRarityHex(item.rarity);
-  const box = `width:${size};height:${size};background:${color}1f;border:1px solid ${color}4d;`;
+  const box = `width:${size};height:${size};background:${color}2e;border:1px solid ${color}4d;`;
 
   if (item.video) {
-    return `<div class="icon meme-vid-wrap" style="${box}position:relative;overflow:hidden;padding:0;">` +
+    return `<div class="icon meme-vid-wrap" style="${box}position:relative;overflow:hidden;padding:0;" ondblclick="toggleMemeSound(event,this)">` +
       `<video class="meme-vid" data-src="/videos/${encodeURIComponent(item.video)}" loop muted playsinline webkit-playsinline preload="none"></video>` +
-      `<button class="snd-btn" ondblclick="toggleMemeSound(event,this)" onclick="event.stopPropagation()" aria-label="Звук (двойной тап)">${ICON_SND_OFF}</button>` +
       `</div>`;
   }
   if (item.icon && typeof item.icon === "string") {
