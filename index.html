@@ -260,6 +260,7 @@ button, input { font-family:inherit; font-synthesis:none; }
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
 .inv-full-head { display:flex; align-items:center; gap:10px; padding:12px 12px 0; }
 .meme-vid-wrap { display:flex; touch-action:manipulation; }
+.meme-vid-canvas { position:absolute; inset:0; width:100%; height:100%; display:none; pointer-events:none; }
 .meme-vid-wrap.playing { box-shadow:0 0 0 2px var(--accent) inset; }
 .meme-vid { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
 .play-hint { position:absolute; right:3px; bottom:3px; width:16px; height:16px; border-radius:50%; background:rgba(0,0,0,.5);
@@ -1016,9 +1017,56 @@ function getRarityHex(rarity) {
    ролик грузится и играет только по явному действию пользователя). Повторный
    двойной тап останавливает. Одновременно громко может играть только один. */
 const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+/* Вырезание зелёного фона у РЕАЛЬНО играющего видео мема: тот же алгоритм,
+   что и у праздничного оверлея (#sfxStage) — сам <video> прячется (opacity:0),
+   а поверх него каждый кадр рисуется на canvas с прозрачным фоном там, где
+   был зелёный. Работает только для видео, которое сейчас реально играет —
+   не для превью, чтобы не грузить телефон десятками одновременных canvas. */
+function __startVideoKey(wrap, video) {
+  __stopVideoKey(wrap);
+  let canvas = wrap.querySelector(".meme-vid-canvas");
+  if (!canvas) { canvas = document.createElement("canvas"); canvas.className = "meme-vid-canvas"; wrap.appendChild(canvas); }
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  video.style.opacity = "0"; canvas.style.display = "block";
+  let raf;
+  function frame() {
+    if (video.paused || video.ended) { __stopVideoKey(wrap); return; }
+    const cw = wrap.clientWidth || 1, ch = wrap.clientHeight || 1;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (vw && vh) {
+      const scale = Math.max(cw / vw, ch / vh);
+      const sw = cw / scale, sh = ch / scale, sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
+      const img = ctx.getImageData(0, 0, cw, ch), d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2], m = r > b ? r : b, diff = g - m;
+        const dominant = g > 25 && r < g * 0.9 && b < g * 0.9;
+        if (diff > 12 || dominant) {
+          const score = Math.max(diff, dominant ? (g - Math.max(r, b) * 0.9) : 0);
+          const a = score >= 55 ? 0 : 1 - Math.max(0, score - 12) / 43;
+          d[i + 3] = Math.max(0, Math.min(255, a * 255)); d[i + 1] = m;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  frame();
+  wrap.__keyRaf = () => cancelAnimationFrame(raf);
+}
+function __stopVideoKey(wrap) {
+  if (!wrap) return;
+  if (wrap.__keyRaf) { wrap.__keyRaf(); wrap.__keyRaf = null; }
+  const canvas = wrap.querySelector(".meme-vid-canvas");
+  if (canvas) canvas.style.display = "none";
+  const v = wrap.querySelector(".meme-vid");
+  if (v) v.style.opacity = "";
+}
 let __loudVideo = null, __loudWrap = null;
 function __stopLoud() {
   if (!__loudVideo) return;
+  __stopVideoKey(__loudWrap);
   __loudVideo.pause();
   __loudVideo.muted = true;
   __loudVideo.currentTime = 0;
@@ -1036,6 +1084,7 @@ function toggleMemeSound(e, wrap) {
   const p = vid.play();
   if (p && p.catch) p.catch(() => { vid.muted = true; });
   __loudVideo = vid; __loudWrap = wrap;
+  __startVideoKey(wrap, vid);
 }
 /* Нативный dblclick на тачскринах срабатывает не всегда (особенно с
    touch-action:manipulation, которое как раз нужно для быстрого отклика на тап),
@@ -2800,11 +2849,19 @@ function sfxFrame() {
     if (sfx.canvas.width !== w) { sfx.canvas.width = sfx.work.width = w; sfx.canvas.height = sfx.work.height = h; }
     sfx.wctx.drawImage(v, 0, 0, w, h);
     const img = sfx.wctx.getImageData(0, 0, w, h), d = img.data;
+    /* Раньше зелёный считался только по разнице «G минус макс(R,B)» с порогом 22 —
+       это ловит яркий сочный хромакей, но пропускает тёмный/приглушённый зелёный
+       (студийный свет, компрессия видео). Добавлена вторая проверка — «зелёный
+       доминирует над обоими каналами хотя бы на 10%» — она ловит более тусклые
+       оттенки, а порог полной прозрачности и сама «зона» смягчения снижены,
+       чтобы съедать фон агрессивнее. */
     for (let i = 0; i < d.length; i += 4) {
       const r = d[i], g = d[i + 1], b = d[i + 2], m = r > b ? r : b, diff = g - m;
-      if (diff > 22) {
-        const a = diff >= 85 ? 0 : 1 - (diff - 22) / 63;   // плавный край
-        d[i + 3] = a * 255; d[i + 1] = m;                   // убираем зелёный ореол
+      const dominant = g > 25 && r < g * 0.9 && b < g * 0.9;
+      if (diff > 12 || dominant) {
+        const score = Math.max(diff, dominant ? (g - Math.max(r, b) * 0.9) : 0);
+        const a = score >= 55 ? 0 : 1 - Math.max(0, score - 12) / 43;   // плавный край
+        d[i + 3] = Math.max(0, Math.min(255, a * 255)); d[i + 1] = m;   // убираем зелёный ореол
       }
     }
     sfx.ctx.putImageData(img, 0, 0);
