@@ -1076,30 +1076,15 @@ const __vidIO = new IntersectionObserver((entries) => {
     if (!en.isIntersecting && en.target === __loudVideo) __stopLoud();
   });
 }, { rootMargin: "80px" });
-/* Показываем первый кадр вместо пустого фона с кнопкой: как только иконка
-   с видео попадает в область видимости (с запасом), тихо подгружаем ролик
-   и сразу ставим на паузу на первом кадре — сам ролик при этом не играет
-   и звука нет, только статичная превью-картинка. Дальше грузим один раз. */
-const __vidThumbIO = new IntersectionObserver((entries) => {
-  entries.forEach(en => {
-    const v = en.target;
-    if (en.isIntersecting) {
-      if (!v.src && v.dataset.src) { v.src = v.dataset.src; __paintFirstFrame(v); }
-      __vidThumbIO.unobserve(v);
-    }
-  });
-}, { rootMargin: "200px" });
-function __paintFirstFrame(v) {
-  if (v.dataset.painted) return;
-  v.dataset.painted = "1";
-  const settle = () => { try { v.pause(); v.currentTime = 0; } catch (e) {} };
-  let p; try { p = v.play(); } catch (e) {}
-  if (p && p.then) p.then(settle).catch(() => {}); else settle();
-}
+/* Раньше тут подгружался и рисовался первый кадр видео заранее (превью).
+   Убрано: у многих роликов на первом кадре — зелёный хромакей-фон самой
+   съёмки, и его перекрыть цветом редкости через CSS нельзя, это пиксели
+   видео. Теперь до тапа видно только цветную плашку редкости с иконкой
+   play, а кадр/звук подгружается и стартует именно по двойному тапу. */
 function __observeMemeVideos(root) {
   if (!root || !root.querySelectorAll) return;
   (root.matches && root.matches(".meme-vid") ? [root] : []).concat([...root.querySelectorAll(".meme-vid")])
-    .forEach(v => { __vidIO.observe(v); __vidThumbIO.observe(v); });
+    .forEach(v => { __vidIO.observe(v); });
 }
 new MutationObserver(muts => {
   for (const m of muts) m.addedNodes.forEach(n => { if (n.nodeType === 1) __observeMemeVideos(n); });
