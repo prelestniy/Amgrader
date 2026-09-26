@@ -994,7 +994,6 @@ function __stopLoud() {
   __loudVideo.pause();
   __loudVideo.muted = true;
   __loudVideo.currentTime = 0;
-  if (__loudWrap) __loudWrap.classList.remove("playing");
   __loudVideo = null; __loudWrap = null;
 }
 function toggleMemeSound(e, wrap) {
@@ -1009,7 +1008,21 @@ function toggleMemeSound(e, wrap) {
   const p = vid.play();
   if (p && p.catch) p.catch(() => { vid.muted = true; });
   __loudVideo = vid; __loudWrap = wrap;
-  wrap.classList.add("playing");
+}
+/* Нативный dblclick на тачскринах срабатывает не всегда (особенно с
+   touch-action:manipulation, которое как раз нужно для быстрого отклика на тап),
+   поэтому двойной тап считаем сами по времени между двумя click. Работает
+   одинаково и с мышью, и с пальцем. */
+const __tapAt = new WeakMap();
+function memeTap(e, wrap) {
+  const now = Date.now();
+  const last = __tapAt.get(wrap) || 0;
+  if (now - last < 400) {
+    __tapAt.set(wrap, 0);
+    toggleMemeSound(e, wrap);
+  } else {
+    __tapAt.set(wrap, now);
+  }
 }
 
 const __iconCache = new Map();
@@ -1052,8 +1065,8 @@ function renderIconRaw(item, sizePx) {
   const box = `width:${size};height:${size};background:${color}2e;border:1px solid ${color}4d;`;
 
   if (item.video) {
-    return `<div class="icon meme-vid-wrap" style="${box}position:relative;overflow:hidden;padding:0;" ondblclick="toggleMemeSound(event,this)">` +
-      `<video class="meme-vid" data-src="/videos/${encodeURIComponent(item.video)}" loop muted playsinline webkit-playsinline preload="none"></video>` +
+    return `<div class="icon meme-vid-wrap" style="${box}position:relative;overflow:hidden;padding:0;" onclick="memeTap(event,this)">` +
+      `<video class="meme-vid" data-src="/videos/${encodeURIComponent(item.video)}" loop muted playsinline webkit-playsinline preload="none" onplay="this.closest('.meme-vid-wrap').classList.add('playing')" onpause="this.closest('.meme-vid-wrap').classList.remove('playing')" onended="this.closest('.meme-vid-wrap').classList.remove('playing')"></video>` +
       `</div>`;
   }
   if (item.icon && typeof item.icon === "string") {
