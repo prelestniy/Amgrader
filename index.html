@@ -672,6 +672,8 @@ button, input { font-family:inherit; font-synthesis:none; }
 .card-btns .buy-btn { flex:1; margin-top:0; padding:9px 4px; min-width:0; }
 .buy-btn.on { background:var(--accent); color:#0A0A0B; border-color:var(--accent); }
 .card[data-cardplay] { cursor:default; touch-action:manipulation; }
+.card-check { cursor:pointer; }
+.card-check::after { content:""; position:absolute; inset:-10px; }
 </style>
 </head>
 <body>
@@ -1438,7 +1440,7 @@ function cardHTML(m, opts) {
     (opts.sell ? `<button class="buy-btn" onclick="event.stopPropagation(); openSell('${m.uid}')">Продать</button>` : "");
   return `<div class="card ${sel ? "selected" : ""} ${opts.disabled ? "disabled" : ""}"${cardAttr}>
     <div class="card-price">${fmt(m.price)}</div>
-    ${opts.check ? `<div class="card-check">${ic("check", 14)}</div>` : ""}
+    ${opts.check ? `<div class="card-check"${opts.select ? ` onclick="event.stopPropagation(); ${opts.select}"` : ""}>${ic("check", 14)}</div>` : ""}
     ${opts.qty > 0 ? `<div class="card-qty">×${opts.qty}</div>` : ""}
     <div class="card-art">${renderIcon(m, 72)}</div>
     <div>
@@ -1500,7 +1502,7 @@ function _renderGrid() {
     if (!state.inventory.length) { el.innerHTML = '<div class="empty-state">Инвентарь пуст — загляни в магазин</div>'; return; }
     const list = applyFilters(state.inventory, "inventory");
     el.innerHTML = list.length
-      ? list.map(m => cardHTML(m, { selected: state.selectedMemeUids.includes(m.uid), check: true, sell: true, select: `toggleMeme('${m.uid}')`, play: true })).join("")
+      ? list.map(m => cardHTML(m, { selected: state.selectedMemeUids.includes(m.uid), check: true, select: `toggleMeme('${m.uid}')`, play: true })).join("")
       : '<div class="empty-state">Ничего не найдено</div>';
   }
 }
@@ -1747,7 +1749,7 @@ function updateSellCartBtn() {
   const row = document.getElementById("searchRowMine");
   if (!btn || !row) return;
   const n = state.selectedMemeUids.length;
-  const show = n > 1 && state.mainTab === "mine" && state.subTab === "inventory" && !state.spinning;
+  const show = n >= 1 && state.mainTab === "mine" && state.subTab === "inventory" && !state.spinning;
   const wasShown = btn.classList.contains("show");
   btn.classList.toggle("show", show);
   row.classList.toggle("compact", show);
@@ -1761,7 +1763,7 @@ function updateSellCartBtn() {
 function openSellCart() {
   if (state.spinning || paying) return;
   const n = state.selectedMemeUids.length;
-  if (n < 2) return;
+  if (n < 1) return;
   if (!isLoggedIn()) { openAuth("Войдите, чтобы продавать предметы"); return; }
   buyMode = "sellCart";
   renderSellCartSheet();
@@ -1814,7 +1816,7 @@ function removeFromSellCart(uid) {
   const idx = state.selectedMemeUids.indexOf(uid);
   if (idx >= 0) state.selectedMemeUids.splice(idx, 1);
   renderAll();
-  if (state.selectedMemeUids.length < 2) { closeBuy(); return; }
+  if (state.selectedMemeUids.length < 1) { closeBuy(); return; }
   renderSellCartSheet();
 }
 
@@ -2474,7 +2476,7 @@ function renderProfileInventoryGrid() {
   const el = document.getElementById("invFullGrid");
   const list = state.inventory;
   el.innerHTML = list.length
-    ? list.map(m => cardHTML(m, { sell: true, play: true })).join("")
+    ? list.map(m => cardHTML(m, { play: true })).join("")
     : '<div class="empty-state">Инвентарь пуст</div>';
 }
 function openProfileInventory() {
