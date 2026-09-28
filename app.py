@@ -117,6 +117,17 @@ def init_db():
             redeemed_at INTEGER,
             UNIQUE(user_id, code)
         )""")
+        # владелец пользовательского промокода (для списка «Мои промокоды»)
+        try:
+            conn.execute("ALTER TABLE promo_codes ADD COLUMN owner_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+        # старые пользовательские коды привязываем к их авторам (created_by = 'user:<логин или id>')
+        conn.execute("""UPDATE promo_codes SET owner_id = (
+                            SELECT u.id FROM users u
+                            WHERE u.login=substr(promo_codes.created_by,6)
+                               OR CAST(u.id AS TEXT)=substr(promo_codes.created_by,6))
+                        WHERE owner_id IS NULL AND created_by LIKE 'user:%'""")
 
 
 init_db()
@@ -418,32 +429,44 @@ def create_user_promo(body: PromoUserCreateBody, user=Depends(auth_user)):
     if body.amount <= 0:
         raise HTTPException(400, "Сумма должна быть больше 0")
     if body.count < 1 or body.count > 10:
-        raise HTTPException(400, "От 1 до 10 промокодов за раз")
+        raise HTTPException(400, "От 1 до 10 активаций")
     total = body.amount * body.count
     with closing(db()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
         cur = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
         if cur["balance"] < total:
             raise HTTPException(400, "Недостаточно баланса")
-        codes = []
-        for _ in range(body.count):
-            while True:
-                code = "P" + secrets.token_hex(4).upper()
-                exists = conn.execute("SELECT 1 FROM promo_codes WHERE code=?", (code,)).fetchone()
-                if not exists:
-                    break
-            conn.execute(
-                """INSERT INTO promo_codes(code, reward_type, reward_value, max_uses, used_count, active, created_by, created_at)
-                   VALUES(?,'balance',?,1,0,1,?,?)""",
-                (code, body.amount, f"user:{cur['login'] or cur['id']}", int(time.time())),
-            )
-            codes.append(code)
+        while True:
+            code = "P" + secrets.token_hex(4).upper()
+            if not conn.execute("SELECT 1 FROM promo_codes WHERE code=?", (code,)).fetchone():
+                break
+        conn.execute(
+            """INSERT INTO promo_codes(code, reward_type, reward_value, max_uses, used_count, active, created_by, created_at, owner_id)
+               VALUES(?,'balance',?,?,0,1,?,?,?)""",
+            (code, body.amount, body.count, f"user:{cur['login'] or cur['id']}", int(time.time()), cur["id"]),
+        )
         conn.execute("UPDATE users SET balance = balance - ?, rev = rev + 1 WHERE id=?", (total, user["id"]))
         newrow = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
     out = user_public(newrow)
-    out["codes"] = codes
+    out["codes"] = [code]
     out["amount"] = body.amount
+    out["count"] = body.count
     return out
+
+
+@app.get("/api/promo/mine")
+def my_promos(user=Depends(auth_user)):
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM promo_codes WHERE owner_id=? ORDER BY created_at DESC",
+                            (user["id"],)).fetchall()
+    out = []
+    for r in rows:
+        exhausted = bool(r["max_uses"]) and r["used_count"] >= r["max_uses"]
+        status = "disabled" if not r["active"] else ("exhausted" if exhausted else "active")
+        out.append({"code": r["code"], "amount": r["reward_value"], "maxUses": r["max_uses"],
+                    "usedCount": r["used_count"], "active": status == "active",
+                    "status": status, "createdAt": r["created_at"]})
+    return {"promos": out}
 
 
 # ---------------------------------------------------------------------------
