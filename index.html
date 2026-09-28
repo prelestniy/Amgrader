@@ -662,6 +662,16 @@ button, input { font-family:inherit; font-synthesis:none; }
 .promo-badge { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; }
 .promo-badge.on { background:rgba(182,242,74,.15); color:var(--accent); }
 .promo-badge.off { background:var(--surface-3); color:var(--text-mute); }
+.search span { display:flex; align-items:center; }
+.sort-btn { display:flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
+.slot.empty .slot-plus { display:flex; justify-content:center; }
+.row-arrow { display:flex; align-items:center; }
+.sheet-close, .case-back-btn { color:var(--text-dim); }
+.stepper button, .count-row button { display:flex; align-items:center; justify-content:center; padding:0; }
+.card-btns { display:flex; gap:6px; margin-top:2px; }
+.card-btns .buy-btn { flex:1; margin-top:0; padding:9px 4px; min-width:0; }
+.buy-btn.on { background:var(--accent); color:#0A0A0B; border-color:var(--accent); }
+.card[data-cardplay] { cursor:default; touch-action:manipulation; }
 </style>
 </head>
 <body>
@@ -695,7 +705,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 
     <div class="slots-row">
       <div class="slot empty" id="slotStake" onclick="slotTap(event,'mine')"></div>
-      <div class="slot-arrow">→</div>
+      <div class="slot-arrow"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
       <div class="slot empty" id="slotTarget" onclick="slotTap(event,'wish')"></div>
     </div>
 
@@ -720,8 +730,8 @@ button, input { font-family:inherit; font-synthesis:none; }
       </div>
       <div class="panel-head">
         <div class="search-row top" id="searchRowMine">
-          <label class="search"><span>⌕</span><input id="searchMine" type="text" placeholder="Поиск..." oninput="onFilter()"></label>
-          <button class="sort-btn" id="sortMine" onclick="toggleSort()">Цена ↓</button>
+          <label class="search"><span><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span><input id="searchMine" type="text" placeholder="Поиск..." oninput="onFilter()"></label>
+          <button class="sort-btn" id="sortMine" onclick="toggleSort()">Цена <svg class="ic" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
           <button class="select-all-btn" id="selectAllBtn" onclick="selectAllSell()" aria-label="Выбрать все"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M7.5 12.5l3 3 6-6.5"/></svg></button>
           <button class="sell-cart-btn" id="sellCartBtn" onclick="openSellCart()" aria-label="Продать выбранные"><span class="sell-cart-ic-wrap"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg></span><span class="sell-cart-badge" id="sellCartBadge">0</span></button>
         </div>
@@ -745,13 +755,13 @@ button, input { font-family:inherit; font-synthesis:none; }
           <button class="chance-chip" onclick="pickByChance(70, this)">70%</button>
         </div>
         <div class="search-row">
-          <label class="search"><span>⌕</span><input id="searchWish" type="text" placeholder="Поиск..." oninput="onFilter()"></label>
-          <button class="sort-btn" id="sortWish" onclick="toggleSort()">Цена ↓</button>
+          <label class="search"><span><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span><input id="searchWish" type="text" placeholder="Поиск..." oninput="onFilter()"></label>
+          <button class="sort-btn" id="sortWish" onclick="toggleSort()">Цена <svg class="ic" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
         </div>
         <div class="range-row">
           <div class="range-field"><label>От</label><input id="priceFrom" type="text" inputmode="numeric" placeholder="0" oninput="onFilter()"></div>
           <div class="range-dash">–</div>
-          <div class="range-field"><label>До</label><input id="priceTo" type="text" inputmode="numeric" placeholder="∞" oninput="onFilter()"></div>
+          <div class="range-field"><label>До</label><input id="priceTo" type="text" inputmode="numeric" placeholder="макс" oninput="onFilter()"></div>
         </div>
       </div>
       <div class="grid" id="gridWish"></div>
@@ -767,7 +777,7 @@ button, input { font-family:inherit; font-synthesis:none; }
     </div>
     <div id="caseOpenView" class="case-subview" hidden>
       <div class="case-open-head">
-        <button class="case-back-btn" onclick="showCaseLobby()" aria-label="Назад">‹</button>
+        <button class="case-back-btn" onclick="showCaseLobby()" aria-label="Назад"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <div class="pg-title" id="casesTitle">Кейсы</div>
       </div>
       <div class="case-qty" id="caseQty"></div>
@@ -813,25 +823,25 @@ button, input { font-family:inherit; font-synthesis:none; }
 
     <div class="profile-list">
       <div class="profile-row" onclick="openProfileInventory()">
-        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z"/><path d="M9 21v-6h6v6M9 8h6"/></svg> Мой инвентарь</span><span class="row-arrow">›</span>
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z"/><path d="M9 21v-6h6v6M9 8h6"/></svg> Мой инвентарь</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
       <div class="profile-row" onclick="showScreen('cases')">
-        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg> Кейсы</span><span class="row-arrow">›</span>
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg> Кейсы</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
       <div class="profile-row" onclick="showScreen('craft')">
-        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5M3 17.5l9 5 9-5"/></svg> Крафт</span><span class="row-arrow">›</span>
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5M3 17.5l9 5 9-5"/></svg> Крафт</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
       <div class="profile-row" onclick="showScreen('bonus')">
-        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 1 1 0 5"/></svg> Бонусы</span><span class="row-arrow">›</span>
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 1 1 0 5"/></svg> Бонусы</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
       <div class="profile-row" onclick="openSoundSettings()">
-        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg> Звук и анимация</span><span class="row-arrow">›</span>
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg> Звук и анимация</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
       <div class="profile-row" id="rowLogout" onclick="logoutAccount()" style="display:none">
-        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Выйти из аккаунта</span><span class="row-arrow">›</span>
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Выйти из аккаунта</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
       <div class="profile-row danger" onclick="resetProfile()">
-        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> Удалить профиль</span><span class="row-arrow">›</span>
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> Удалить профиль</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
     </div>
   </div>
@@ -839,7 +849,7 @@ button, input { font-family:inherit; font-synthesis:none; }
   <div class="screen" id="screenCraft" hidden>
     <div class="pg-title">Крафт</div>
     <div class="pg-hint">Выберите от 1 до 10 предметов одной редкости — они превратятся в случайный предмет следующей редкости.</div>
-    <div class="craft-box"><div class="craft-slot" id="craftIn"></div><div class="craft-arrow">→</div><div class="craft-slot" id="craftOut"></div></div>
+    <div class="craft-box"><div class="craft-slot" id="craftIn"></div><div class="craft-arrow"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="craft-slot" id="craftOut"></div></div>
     <div class="spin-row"><button class="primary-btn" id="craftBtn" onclick="doCraft()">Скрафтить</button>
       <button class="fast-btn" onclick="toggleFast()" aria-label="Быстрая анимация"><svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button></div>
     <div class="pg-sub" id="craftCount"></div>
@@ -936,7 +946,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 
 <div class="inv-full" id="invFullOverlay" hidden>
   <div class="inv-full-head">
-    <button class="case-back-btn" onclick="closeProfileInventory()" aria-label="Назад">‹</button>
+    <button class="case-back-btn" onclick="closeProfileInventory()" aria-label="Назад"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
     <div class="pg-title">Мой инвентарь</div>
   </div>
   <div class="grid" id="invFullGrid"></div>
@@ -1013,6 +1023,8 @@ const MEMES = [
    УТИЛИТЫ
    ============================================================ */
 const ICON_LOCK = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="10.5" width="14" height="9.5" rx="2.4" stroke="currentColor" stroke-width="1.8"/><path d="M8 10.5V7.5C8 5 9.8 3.3 12 3.3C14.2 3.3 16 5 16 7.5V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/></svg>';
+const SVGI = { search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>', chevL:'<path d="M15 5l-7 7 7 7"/>', chevR:'<path d="M9 5l7 7-7 7"/>', arrowR:'<path d="M5 12h14M13 6l6 6-6 6"/>', arrowUp:'<path d="M12 19V5M6 11l6-6 6 6"/>', arrowDown:'<path d="M12 5v14M6 13l6 6 6-6"/>', plus:'<path d="M12 5v14M5 12h14"/>', minus:'<path d="M5 12h14"/>', close:'<path d="M6 6l12 12M18 6L6 18"/>' };
+function svgi(n, s, inline) { s = s || 18; return '<svg class="ic" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (inline ? ' style="display:inline-block;vertical-align:-2px"' : '') + '>' + (SVGI[n] || '') + '</svg>'; }
 let __uidCounter = 0;
 function makeUid(prefix) {
   __uidCounter++;
@@ -1407,7 +1419,7 @@ function setSlot(el, sig, filled, html, rarityColor) {
 function renderSlots() {
   const s = document.getElementById("slotStake"), t = document.getElementById("slotTarget");
   const sel = getSelectedMemes(), tgt = getTarget();
-  const empty = label => `<div class="slot-plus">+</div><div class="slot-empty-label">${label}</div>`;
+  const empty = label => `<div class="slot-plus">${svgi("plus", 24)}</div><div class="slot-empty-label">${label}</div>`;
   if (sel.length) setSlot(s, state.selectedMemeUids.join(","), true, slotHTML("Ставка", sel[0], getTotalStake(), sel.length > 1 ? ` +${sel.length - 1}` : ""), getRarityHex(sel[0].rarity));
   else setSlot(s, "", false, empty("Ставка"));
   if (tgt) setSlot(t, tgt.uid, true, slotHTML("Цель", tgt, tgt.price), getRarityHex(tgt.rarity));
@@ -1420,7 +1432,11 @@ function renderSlots() {
 function cardHTML(m, opts) {
   const color = getRarityHex(m.rarity);
   const sel = opts.selected || opts.qty > 0;
-  return `<div class="card ${sel ? "selected" : ""} ${opts.disabled ? "disabled" : ""}" ${opts.onclick ? `onclick="${opts.onclick}"` : ""}>
+  const cardAttr = opts.play ? ` data-cardplay="1" onclick="cardTap(event,this)"` : (opts.onclick ? ` onclick="${opts.onclick}"` : "");
+  const btns = (opts.select ? `<button class="buy-btn ${sel ? "on" : ""}" onclick="event.stopPropagation(); ${opts.select}">${sel ? "Выбрано" : "Выбрать"}</button>` : "") +
+    (opts.buy ? `<button class="buy-btn" onclick="event.stopPropagation(); addToCart(${m.id})">Добавить</button>` : "") +
+    (opts.sell ? `<button class="buy-btn" onclick="event.stopPropagation(); openSell('${m.uid}')">Продать</button>` : "");
+  return `<div class="card ${sel ? "selected" : ""} ${opts.disabled ? "disabled" : ""}"${cardAttr}>
     <div class="card-price">${fmt(m.price)}</div>
     ${opts.check ? `<div class="card-check">${ic("check", 14)}</div>` : ""}
     ${opts.qty > 0 ? `<div class="card-qty">×${opts.qty}</div>` : ""}
@@ -1430,8 +1446,7 @@ function cardHTML(m, opts) {
       <div class="card-name">${esc(m.name)}</div>
       ${m.nameEn ? `<div class="card-name-en">${esc(m.nameEn)}</div>` : ""}
     </div>
-    ${opts.buy ? `<button class="buy-btn" onclick="event.stopPropagation(); addToCart(${m.id})">Добавить</button>` : ""}
-    ${opts.sell ? `<button class="buy-btn" onclick="event.stopPropagation(); openSell('${m.uid}')">Продать</button>` : ""}
+    ${btns ? `<div class="card-btns">${btns}</div>` : ""}
     <div class="card-line" style="background:${color}"></div>
   </div>`;
 }
@@ -1440,7 +1455,16 @@ function parseNum(v) { const n = parseInt(String(v).replace(/\D/g, ""), 10); ret
 
 function applyFilters(list, view) {
   const q = (document.getElementById(view === "wish" ? "searchWish" : "searchMine").value || "").trim().toLowerCase();
-  let out = list.filter(m => !q || m.name.toLowerCase().includes(q));
+  /* поиск по названию И по цене: "100" — цена содержит 100, "100-500" — диапазон цен */
+  const qd = q.replace(/[\s\u00a0g]/g, "").replace(/[–—]/g, "-");
+  const range = qd.match(/^(\d+)-(\d+)$/);
+  const isNum = /^\d+$/.test(qd);
+  let out = list.filter(m => {
+    if (!q) return true;
+    if (m.name.toLowerCase().includes(q)) return true;
+    if (range) { const a = +range[1], b = +range[2]; return m.price >= Math.min(a, b) && m.price <= Math.max(a, b); }
+    return isNum && String(m.price).includes(qd);
+  });
   if (view === "wish") {
     const from = parseNum(document.getElementById("priceFrom").value);
     const to = parseNum(document.getElementById("priceTo").value);
@@ -1464,28 +1488,28 @@ function _renderGrid() {
     if (stake === 0) { el.innerHTML = '<div class="empty-state">Сначала выбери ставку в инвентаре</div>'; return; }
     const list = applyFilters(state.targets.filter(m => m.price > stake), "wish");
     el.innerHTML = list.length
-      ? list.map(m => cardHTML(m, { selected: state.targetMemeId === m.uid, check: true, onclick: `selectTarget('${m.uid}')` })).join("")
+      ? list.map(m => cardHTML(m, { selected: state.targetMemeId === m.uid, check: true, select: `selectTarget('${m.uid}')`, play: true })).join("")
       : '<div class="empty-state">Ничего не найдено</div>';
     return;
   }
   const el = document.getElementById("gridMine");
   if (state.subTab === "shop") {
     const list = applyFilters(MEMES, "shop");
-    el.innerHTML = list.length ? list.map(m => cardHTML(m, { buy: true, qty: state.cart[m.id] || 0, onclick: `addToCart(${m.id})` })).join("") : '<div class="empty-state">Ничего не найдено</div>';
+    el.innerHTML = list.length ? list.map(m => cardHTML(m, { buy: true, qty: state.cart[m.id] || 0, play: true })).join("") : '<div class="empty-state">Ничего не найдено</div>';
   } else {
     if (!state.inventory.length) { el.innerHTML = '<div class="empty-state">Инвентарь пуст — загляни в магазин</div>'; return; }
     const list = applyFilters(state.inventory, "inventory");
     el.innerHTML = list.length
-      ? list.map(m => cardHTML(m, { selected: state.selectedMemeUids.includes(m.uid), check: true, sell: true, onclick: `toggleMeme('${m.uid}')` })).join("")
+      ? list.map(m => cardHTML(m, { selected: state.selectedMemeUids.includes(m.uid), check: true, sell: true, select: `toggleMeme('${m.uid}')`, play: true })).join("")
       : '<div class="empty-state">Ничего не найдено</div>';
   }
 }
 
 function updateSortLabels() {
   const v = currentView();
-  const label = "Цена " + (state.sortDir[v] === "asc" ? "↑" : "↓");
-  document.getElementById("sortMine").textContent = label;
-  document.getElementById("sortWish").textContent = label;
+  const label = "Цена " + svgi(state.sortDir[v] === "asc" ? "arrowUp" : "arrowDown", 13);
+  document.getElementById("sortMine").innerHTML = label;
+  document.getElementById("sortWish").innerHTML = label;
 }
 
 function renderAll() {
@@ -1646,7 +1670,7 @@ function renderSellSheet() {
         <div class="sheet-title">Продать предмет</div>
         <div class="sheet-sub">Предмет уйдёт из инвентаря</div>
       </div>
-      <button class="sheet-close" onclick="closeBuy()">×</button>
+      <button class="sheet-close" onclick="closeBuy()">${svgi("close", 20)}</button>
     </div>
     <div class="sheet-list">
       <div class="buy-row">
@@ -1771,7 +1795,7 @@ function renderSellCartSheet() {
         <div class="sheet-title">Продажа предметов</div>
         <div class="sheet-sub">${n} ${plural(n, "предмет", "предмета", "предметов")} · уйдут из инвентаря</div>
       </div>
-      <button class="sheet-close" onclick="closeBuy()">×</button>
+      <button class="sheet-close" onclick="closeBuy()">${svgi("close", 20)}</button>
     </div>
     <div class="sheet-list">${rows}</div>
     <div class="sheet-foot">
@@ -1896,7 +1920,7 @@ function renderBuySheet() {
       </div>
       <div class="buy-side">
         ${cartMode ? `<div class="stepper">
-          <button onclick="changeQty(${m.id},-1)">−</button><span>${qty}</span><button onclick="changeQty(${m.id},1)">+</button>
+          <button onclick="changeQty(${m.id},-1)">${svgi("minus", 16)}</button><span>${qty}</span><button onclick="changeQty(${m.id},1)">${svgi("plus", 16)}</button>
         </div>` : ""}
         <button class="remove-btn" onclick="removeFromCart(${m.id})">Удалить</button>
       </div>
@@ -1909,7 +1933,7 @@ function renderBuySheet() {
         <div class="sheet-title">${cartMode ? "Корзина покупок" : "Подтвердить покупку"}</div>
         <div class="sheet-sub">${n} ${plural(n, "предмет", "предмета", "предметов")}</div>
       </div>
-      <button class="sheet-close" onclick="closeBuy()">×</button>
+      <button class="sheet-close" onclick="closeBuy()">${svgi("close", 20)}</button>
     </div>
     <div class="sheet-list">${rows}</div>
     <div class="sheet-foot">
@@ -2450,7 +2474,7 @@ function renderProfileInventoryGrid() {
   const el = document.getElementById("invFullGrid");
   const list = state.inventory;
   el.innerHTML = list.length
-    ? list.map(m => cardHTML(m, { sell: true })).join("")
+    ? list.map(m => cardHTML(m, { sell: true, play: true })).join("")
     : '<div class="empty-state">Инвентарь пуст</div>';
 }
 function openProfileInventory() {
@@ -2571,7 +2595,7 @@ function applyServerUser(u) {
   state.cart = {};
   setInventoryFromIds(u.inventory || []);
 }
-const OK_ITEM = { name: "✓", rarity: "common", icon: '<svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' };
+const OK_ITEM = { name: "OK", rarity: "common", icon: '<svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' };
 
 function saveGame() {
   const tk = getToken();
@@ -2601,7 +2625,7 @@ function historyRow(h) {
   const cls = h.win ? "win" : "lose";
   const sum = h.win ? "+" + fmt(h.target.price) : "−" + fmt(h.stakeTotal);
   return `<div class="hist-row">${renderIcon(h.target, 40)}
-    <div class="hist-mid"><b>${esc(stakeLabel)} → ${esc(h.target.name)}</b><span>${fmtPct(h.chance)}% шанс · ${time}</span></div>
+    <div class="hist-mid"><b>${esc(stakeLabel)} ${svgi("arrowR", 13, true)} ${esc(h.target.name)}</b><span>${fmtPct(h.chance)}% шанс · ${time}</span></div>
     <div class="hist-right ${cls}"><b>${sum}</b><span>${h.win ? "успех" : "неудача"}</span></div>
   </div>`;
 }
@@ -2689,7 +2713,7 @@ function openMisc(html) { document.getElementById("miscSheet").innerHTML = html;
 function closeMisc() { document.getElementById("miscOverlay").classList.remove("open"); }
 function miscMsg(text, ok) { const el = document.getElementById("miscError"); if (!el) return; el.textContent = text || ""; el.className = "misc-msg" + (ok ? " ok" : ""); }
 function miscHead(ico, title, sub) {
-  return `<div class="sheet-head"><div class="sheet-badge">${ico}</div><div class="sheet-headtext"><div class="sheet-title">${title}</div><div class="sheet-sub">${sub}</div></div><button class="sheet-close" onclick="closeMisc()">×</button></div>`;
+  return `<div class="sheet-head"><div class="sheet-badge">${ico}</div><div class="sheet-headtext"><div class="sheet-title">${title}</div><div class="sheet-sub">${sub}</div></div><button class="sheet-close" onclick="closeMisc()">${svgi("close", 20)}</button></div>`;
 }
 
 function openPromo() {
@@ -2765,7 +2789,7 @@ function openCreatePromo() {
         <input id="cpAmount" type="number" inputmode="numeric" min="1" placeholder="Например, 5000"></div>
       <div class="reg-field"><label>Количество активаций</label>
         <div class="count-row">
-          <button onclick="cpStep(-1)">−</button><b id="cpCountVal">${cpCount}</b><button onclick="cpStep(1)">+</button>
+          <button onclick="cpStep(-1)">${svgi("minus", 18)}</button><b id="cpCountVal">${cpCount}</b><button onclick="cpStep(1)">${svgi("plus", 18)}</button>
         </div></div>
       <button class="ghost-btn" onclick="openMyPromos()">Мои промокоды</button>
       <div class="misc-hint" id="cpTotal">Спишется 0 G с вашего баланса (${fmt(state.balance)} доступно)</div>
@@ -3646,6 +3670,56 @@ async function taskClaim(id) {
   renderBonus();
 }
 
+</script>
+<script>
+/* фикс видео-мемов: карточки магазина/инвентаря/желаемых — тап по карточке только воспроизводит (двойной тап), действия — кнопками */
+(function () {
+  var key = "", at = 0, wrapRef = null, card = null, timer = 0;      // старый режим (крафт: тап по карточке = выбор)
+  var cKey = "", cAt = 0, cEl = null;                                 // режим «вся карточка = воспроизведение»
+  function flush() {
+    if (!timer) return;
+    clearTimeout(timer); timer = 0;
+    var c = card; card = null;
+    if (c && c.isConnected) c.click();
+  }
+  window.cardTap = function (e, cardEl) {
+    if (e.target.closest("button")) return;
+    var wrap = cardEl.querySelector(".meme-vid-wrap"); if (!wrap) return;
+    var vid = wrap.querySelector("video"), k = vid ? (vid.dataset.src || "") : "", now = Date.now();
+    if (k && k === cKey && now - cAt < 400 && cEl && (cEl === cardEl || !cEl.isConnected)) {
+      cKey = ""; cAt = 0; cEl = null;
+      toggleMemeSound(e, wrap);
+    } else { cKey = k; cAt = now; cEl = cardEl; }
+  };
+  window.memeTap = function (e, wrap) {
+    var vid = wrap.querySelector("video");
+    var k = vid ? (vid.dataset.src || "") : "";
+    var c = wrap.closest(".card");
+    if (c && c.hasAttribute("data-cardplay")) return;   // обрабатывает cardTap на всей карточке
+    var now = Date.now();
+    if (c) e.stopPropagation();
+    var same = k && k === key && now - at < 400 && wrapRef && (wrapRef === wrap || !wrapRef.isConnected);
+    if (same) {
+      clearTimeout(timer); timer = 0; card = null; key = ""; at = 0; wrapRef = null;
+      toggleMemeSound(e, wrap);
+      return;
+    }
+    flush();
+    key = k; at = now; wrapRef = wrap;
+    if (c) { card = c; timer = setTimeout(flush, 380); }
+  };
+  window.__stopLoud = function () {
+    if (!__loudVideo) return;
+    var lv = __loudVideo, wrap = __loudWrap;
+    __loudVideo = null; __loudWrap = null;
+    __stopVideoKey(wrap);
+    lv.pause(); lv.muted = true;
+    try { lv.currentTime = 0; } catch (e) {}
+    lv.removeAttribute("src"); lv.load();
+    if (wrap) wrap.classList.remove("playing");
+    try { __queueThumb(lv); } catch (e) {}
+  };
+})();
 </script>
 </body>
 </html>
