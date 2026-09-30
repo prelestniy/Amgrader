@@ -358,6 +358,22 @@ def public_config():
             "referrerBonus": REFERRAL_REFERRER_BONUS, "refereeBonus": REFERRAL_REFEREE_BONUS}
 
 
+@app.get("/api/leaderboard")
+def leaderboard(limit: int = 10):
+    """Публичный топ игроков по балансу — для слайдера в профиле.
+    Отдаём только ник/баланс/фото, без логина, id и токена."""
+    limit = max(1, min(limit, 50))
+    with closing(db()) as conn:
+        rows = conn.execute(
+            "SELECT nickname, photo, balance FROM users ORDER BY balance DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return {"top": [
+        {"nickname": r["nickname"] or "Игрок", "balance": r["balance"], "photo": r["photo"]}
+        for r in rows
+    ]}
+
+
 @app.get("/api/me")
 def me(user=Depends(auth_user)):
     return user_public(user)
