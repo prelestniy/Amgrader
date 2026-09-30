@@ -561,7 +561,8 @@ button, input { font-family:inherit; font-synthesis:none; }
 .cart-ico { color:var(--accent); display:flex; }
 .cart-open { padding:12px 20px; }
 /* ===== V6: страницы ===== */
-.pg-title { font-size:22px; margin:6px 2px 6px; }
+.pg-title { font-size:22px; margin:6px 2px 6px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px; }
+.pg-title .soon-badge { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; line-height:1; margin-left:0!important; font-size:10.5px; font-weight:800; }
 .pg-hint { font-size:12.5px; color:var(--text-mute); line-height:1.45; margin:0 2px 12px; }
 .pg-sub { font-size:13px; color:var(--text-dim); margin:18px 2px 10px; }
 /* ===== Лобби кейсов — стартовый экран с крупными карточками ===== */
@@ -1143,6 +1144,14 @@ function renderIcon(item, sizePx) {
   __iconCache.set(key, html);
   return html;
 }
+/* Лёгкая версия иконки для бегущей ленты кейсов (см. renderIconRaw staticOnly) */
+function renderIconReel(item, sizePx) {
+  const key = item.id + "_" + sizePx + "_reel";
+  if (__iconCache.has(key)) return __iconCache.get(key);
+  const html = renderIconRaw(item, sizePx, true);
+  __iconCache.set(key, html);
+  return html;
+}
 
 /* ---------- видео предметов: без автоплея ----------
    Раньше видео-иконки (мемы в кейсах/инвентаре/ленте открытия) стартовали
@@ -1241,12 +1250,23 @@ new MutationObserver(muts => {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") __stopLoud();
 });
-function renderIconRaw(item, sizePx) {
+function renderIconRaw(item, sizePx, staticOnly) {
   const size = sizePx ? (typeof sizePx === "number" ? sizePx + "px" : sizePx) : "var(--icon-size)";
   const color = getRarityHex(item.rarity);
   const box = `width:${size};height:${size};background:${color}2e;border:1px solid ${color}4d;`;
 
   if (item.video) {
+    /* staticOnly: используется в бегущей ленте кейсов — ролик там всё равно
+       не виден за скоростью прокрутки и не кликабелен, а создание <video> +
+       IntersectionObserver на десятки ячеек разом (3-5 кейсов × длинная лента)
+       и было основной причиной лагов при старте анимации. Даём лёгкую
+       статичную плашку без видео/наблюдателя; настоящий видео-блок
+       подставляется только для итоговой ячейки после остановки ленты. */
+    if (staticOnly) {
+      return `<div class="icon meme-vid-wrap novideo" style="${box}position:relative;overflow:hidden;padding:0;">` +
+        `<span class="play-hint">${ICON_PLAY}</span>` +
+        `</div>`;
+    }
     return `<div class="icon meme-vid-wrap" style="${box}position:relative;overflow:hidden;padding:0;" onclick="memeTap(event,this)">` +
       `<video class="meme-vid" data-src="/videos/${encodeURIComponent(item.video)}" loop muted playsinline webkit-playsinline preload="none" onplay="this.closest('.meme-vid-wrap').classList.add('playing')" onpause="this.closest('.meme-vid-wrap').classList.remove('playing')" onended="this.closest('.meme-vid-wrap').classList.remove('playing')" onerror="this.closest('.meme-vid-wrap').classList.add('novideo')"></video>` +
       `<span class="play-hint">${ICON_PLAY}</span>` +
@@ -3371,8 +3391,18 @@ function showCaseLobby() {
   cs.view = "lobby";
   renderCaseLobby(); switchCaseView(false);
 }
-function caseLen() { return isFast() ? 20 : 46; }
-function caseWinIdx() { return caseLen() - 6; }
+/* Длина ленты уменьшается с ростом числа одновременно открываемых кейсов:
+   при n колонках суммарное число ячеек росло как n×46 (до 230 при n=5),
+   отсюда и лаги в момент построения/старта анимации. Видно всё равно только
+   несколько последних ячеек перед остановкой, так что длину можно сократить
+   без потери ощущения прокрутки. */
+function caseLen(n) {
+  const base = isFast() ? 20 : 46;
+  if (n >= 4) return Math.round(base * 0.55);
+  if (n >= 2) return Math.round(base * 0.7);
+  return base;
+}
+function caseWinIdx(n) { return caseLen(n) - 6; }
 
 function pickCase(i) { if (state.spinning) return; cs.sel = i; renderCases(); }
 function pickQty(n) { if (state.spinning) return; cs.qty = n; renderCases(); }
@@ -3400,7 +3430,7 @@ function fmtCasePct(c) {
 }
 function setTrack(col, vert, off) { col.track.style.transform = vert ? `translate3d(0,${-off}px,0)` : `translate3d(${-off}px,0,0)`; }
 function buildStage(n, results) {
-  const st = $("caseStage"), c = CASES[cs.sel], vert = n > 1, GAP = 8, LEN = caseLen(), WIN = caseWinIdx();
+  const st = $("caseStage"), c = CASES[cs.sel], vert = n > 1, GAP = 8, LEN = caseLen(n), WIN = caseWinIdx(n);
   const cw = st.clientWidth || 340;
   const cell = vert ? 84 : Math.max(80, Math.min(104, Math.floor(cw / 3.6)));
   const across = vert ? Math.floor((cw - GAP * (n - 1)) / n) : cell + 26;
@@ -3414,7 +3444,7 @@ function buildStage(n, results) {
     strip.className = "strip " + (vert ? "v" : "h");
     strip.style.cssText = vert ? `width:${across}px;height:${viewGuess}px` : "width:100%";
     strip.innerHTML = `<div class="vp" style="${vert ? "" : `height:${across}px`}"><div class="track">${items.map(m =>
-      `<div class="cc" style="--rc:${getRarityHex(m.rarity)};${vert ? `height:${cell}px;margin-bottom:${GAP}px;width:100%` : `width:${cell}px;margin-right:${GAP}px;height:${across}px`}">${renderIcon(m, vert ? 40 : 56)}<span>${esc(m.name)}</span></div>`).join("")}</div></div><div class="ptr"><i></i></div>`;
+      `<div class="cc" style="--rc:${getRarityHex(m.rarity)};${vert ? `height:${cell}px;margin-bottom:${GAP}px;width:100%` : `width:${cell}px;margin-right:${GAP}px;height:${across}px`}">${renderIconReel(m, vert ? 40 : 56)}<span>${esc(m.name)}</span></div>`).join("")}</div></div><div class="ptr"><i></i></div>`;
     st.appendChild(strip);
     cols.push({ strip, vp: strip.firstChild, track: strip.firstChild.firstChild, ptr: strip.lastChild, step, cell, LEN, WIN, vert });
   }
@@ -3491,7 +3521,13 @@ async function openCases() {
   if (token !== caseRunToken) return;
   try { wheelStop(); } catch (e) {}
   try { mediaPlay(); } catch (e) {}
-  cols.forEach(col => col.track.children[col.WIN].classList.add("win"));
+  cols.forEach((col, k) => {
+    const cell = col.track.children[col.WIN];
+    cell.classList.add("win");
+    /* сейчас лента показывала облегчённую (не-видео) иконку — на итоговой
+       выигравшей ячейке подменяем на настоящую интерактивную, с плеером */
+    cell.innerHTML = renderIcon(results[k], col.vert ? 40 : 56) + `<span>${esc(results[k].name)}</span>`;
+  });
   $("caseStage").classList.add("done");
   await delay(650);
   const worth = results.reduce((s, m) => s + m.price, 0);
