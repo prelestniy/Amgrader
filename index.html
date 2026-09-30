@@ -355,6 +355,23 @@ button, input { font-family:inherit; font-synthesis:none; }
 .stat-card { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-card); padding:16px; }
 .stat-value { font-size:22px; color:var(--accent); }
 .stat-label { font-size:12px; color:var(--text-mute); margin-top:4px; }
+
+/* ---------- мини-слайдер «Топ по балансу» в профиле ---------- */
+.top-slider-wrap { margin:14px 0 4px; }
+.top-slider { display:flex; gap:8px; overflow-x:auto; padding:2px 2px 6px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+.top-slider::-webkit-scrollbar { display:none; }
+.top-card { flex:0 0 auto; scroll-snap-align:start; width:104px; background:var(--surface-1); border:1px solid var(--border);
+  border-radius:var(--r-card); padding:10px 10px 11px; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; }
+.top-card.me { border-color:var(--accent); background:rgba(182,242,74,0.08); }
+.top-card .top-rank { font-size:10.5px; font-weight:800; letter-spacing:.03em; color:var(--text-mute); }
+.top-card.top1 .top-rank { color:#ffd35b; }
+.top-card.top2 .top-rank { color:#cfd6e0; }
+.top-card.top3 .top-rank { color:#d69a63; }
+.top-card .top-av { width:38px; height:38px; border-radius:12px; background:var(--accent); color:#0A0A0B;
+  display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; overflow:hidden; }
+.top-card .top-av img { width:100%; height:100%; object-fit:cover; }
+.top-card .top-nick { font-size:12px; font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.top-card .top-bal { font-size:12.5px; font-weight:800; color:var(--accent); }
 .profile-list { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-card); overflow:hidden; margin-top:12px; }
 .profile-row { display:flex; align-items:center; justify-content:space-between; padding:15px 16px;
   border-bottom:1px solid var(--border); font-size:14px; cursor:pointer; }
@@ -815,6 +832,11 @@ button, input { font-family:inherit; font-synthesis:none; }
     <div class="profile-stats">
       <div class="stat-card"><div class="stat-value" id="statBalance">0</div><div class="stat-label">Баланс</div></div>
       <div class="stat-card"><div class="stat-value" id="statItems">0</div><div class="stat-label">Предметов</div></div>
+    </div>
+
+    <div class="top-slider-wrap">
+      <div class="pg-sub" style="margin-top:0">Топ по балансу</div>
+      <div class="top-slider" id="topBalanceSlider"></div>
     </div>
 
     <div class="profile-tiles">
@@ -2489,6 +2511,63 @@ function renderProfile() {
 
   document.getElementById("statBalance").textContent = fmt(state.balance);
   document.getElementById("statItems").textContent = state.inventory.length;
+
+  renderTopBalanceSlider();
+}
+
+/* ---------- мини-слайдер «Топ по балансу» ---------- */
+const __TOP_BOT_NAMES = ["Nikita", "Max", "Sasha_G", "Vlad", "Kirill", "Artem_P", "Dan", "Egor", "Ruslan", "Ivan_K"];
+let __topBalanceCache = null, __topBalanceLoading = false;
+/* Сид от даты, чтобы «боты» не менялись каждую перерисовку, но плавно
+   обновлялись день ото дня — раз настоящего рейтинга с бэкенда пока нет. */
+function __topSeed() {
+  const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+function __seededRand(seed) { const x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+function __buildFallbackTop() {
+  const seed = __topSeed();
+  return __TOP_BOT_NAMES.map((name, i) => ({
+    nickname: name,
+    balance: Math.round((50000 + __seededRand(seed + i * 7.3) * 4500000) / 10) * 10,
+    bot: true
+  })).sort((a, b) => b.balance - a.balance);
+}
+async function loadTopBalances() {
+  if (__topBalanceCache || __topBalanceLoading) return;
+  __topBalanceLoading = true;
+  try {
+    const r = await api("/api/leaderboard");
+    const list = (r && (r.top || r.leaderboard || r.list)) || null;
+    __topBalanceCache = Array.isArray(list) && list.length
+      ? list.map(u => ({ nickname: u.nickname || u.name || "Игрок", balance: u.balance || 0, photo: u.photo }))
+      : __buildFallbackTop();
+  } catch (e) {
+    /* бэкенда для рейтинга ещё нет / недоступен — показываем локальную заглушку,
+       чтобы слайдик не был пустым */
+    __topBalanceCache = __buildFallbackTop();
+  }
+  __topBalanceLoading = false;
+  renderTopBalanceSlider();
+}
+function renderTopBalanceSlider() {
+  const el = document.getElementById("topBalanceSlider");
+  if (!el) return;
+  if (!__topBalanceCache) { loadTopBalances(); el.innerHTML = ""; return; }
+  const p = state.profile || {}, loggedIn = isLoggedIn();
+  let list = __topBalanceCache.map(u => ({ ...u, me: false }));
+  if (loggedIn) list.push({ nickname: p.nickname || "Игрок", balance: state.balance, photo: p.photo, me: true });
+  list.sort((a, b) => b.balance - a.balance);
+  list = list.slice(0, 10);
+  el.innerHTML = list.map((u, i) => {
+    const rank = i + 1;
+    const av = u.photo ? `<img src="${u.photo}" alt="">` : esc(initials(u.nickname));
+    return `<div class="top-card ${u.me ? "me" : ""} ${rank <= 3 ? "top" + rank : ""}">` +
+      `<div class="top-rank">#${rank}${u.me ? " · вы" : ""}</div>` +
+      `<div class="top-av">${av}</div>` +
+      `<div class="top-nick">${esc(u.nickname)}</div>` +
+      `<div class="top-bal">${fmt(u.balance)}</div>` +
+      `</div>`;
+  }).join("");
 }
 
 /* ---------- отдельный полноэкранный инвентарь (открывается из профиля) ---------- */
@@ -2887,6 +2966,7 @@ document.getElementById("miscOverlay").addEventListener("click", e => { if (e.ta
 async function init() {
   state.targets = MEMES.map(m => ({ ...m, uid: "t_" + m.id }));
   resetGuestState(); loadGame(); renderAll(); renderProfile();
+  loadTopBalances();
   try { selfTest(); } catch (e) {}
   const tg = tgApp();
   if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
