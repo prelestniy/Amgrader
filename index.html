@@ -2515,36 +2515,19 @@ function renderProfile() {
   renderTopBalanceSlider();
 }
 
-/* ---------- мини-слайдер «Топ по балансу» ---------- */
-const __TOP_BOT_NAMES = ["Nikita", "Max", "Sasha_G", "Vlad", "Kirill", "Artem_P", "Dan", "Egor", "Ruslan", "Ivan_K"];
-let __topBalanceCache = null, __topBalanceLoading = false;
-/* Сид от даты, чтобы «боты» не менялись каждую перерисовку, но плавно
-   обновлялись день ото дня — раз настоящего рейтинга с бэкенда пока нет. */
-function __topSeed() {
-  const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-}
-function __seededRand(seed) { const x = Math.sin(seed) * 10000; return x - Math.floor(x); }
-function __buildFallbackTop() {
-  const seed = __topSeed();
-  return __TOP_BOT_NAMES.map((name, i) => ({
-    nickname: name,
-    balance: Math.round((50000 + __seededRand(seed + i * 7.3) * 4500000) / 10) * 10,
-    bot: true
-  })).sort((a, b) => b.balance - a.balance);
-}
+/* ---------- мини-слайдер «Топ по балансу» (реальные игроки с сервера) ---------- */
+let __topBalanceCache = null, __topBalanceLoading = false, __topBalanceFailed = false;
 async function loadTopBalances() {
   if (__topBalanceCache || __topBalanceLoading) return;
-  __topBalanceLoading = true;
+  __topBalanceLoading = true; __topBalanceFailed = false;
   try {
     const r = await api("/api/leaderboard");
-    const list = (r && (r.top || r.leaderboard || r.list)) || null;
-    __topBalanceCache = Array.isArray(list) && list.length
-      ? list.map(u => ({ nickname: u.nickname || u.name || "Игрок", balance: u.balance || 0, photo: u.photo }))
-      : __buildFallbackTop();
+    const list = (r && r.top) || [];
+    __topBalanceCache = list.map(u => ({ nickname: u.nickname || "Игрок", balance: u.balance || 0, photo: u.photo }));
   } catch (e) {
-    /* бэкенда для рейтинга ещё нет / недоступен — показываем локальную заглушку,
-       чтобы слайдик не был пустым */
-    __topBalanceCache = __buildFallbackTop();
+    /* сервер недоступен / эндпоинта ещё нет на этом окружении — оставляем
+       блок пустым, никаких выдуманных игроков не показываем */
+    __topBalanceCache = null; __topBalanceFailed = true;
   }
   __topBalanceLoading = false;
   renderTopBalanceSlider();
@@ -2552,12 +2535,19 @@ async function loadTopBalances() {
 function renderTopBalanceSlider() {
   const el = document.getElementById("topBalanceSlider");
   if (!el) return;
-  if (!__topBalanceCache) { loadTopBalances(); el.innerHTML = ""; return; }
+  if (!__topBalanceCache) {
+    if (!__topBalanceLoading && !__topBalanceFailed) loadTopBalances();
+    el.innerHTML = __topBalanceFailed ? `<div class="misc-hint">Топ пока недоступен</div>` : "";
+    return;
+  }
   const p = state.profile || {}, loggedIn = isLoggedIn();
   let list = __topBalanceCache.map(u => ({ ...u, me: false }));
-  if (loggedIn) list.push({ nickname: p.nickname || "Игрок", balance: state.balance, photo: p.photo, me: true });
+  if (loggedIn && !list.some(u => u.nickname === p.nickname && u.balance === state.balance)) {
+    list.push({ nickname: p.nickname || "Игрок", balance: state.balance, photo: p.photo, me: true });
+  }
   list.sort((a, b) => b.balance - a.balance);
   list = list.slice(0, 10);
+  if (!list.length) { el.innerHTML = `<div class="misc-hint">Пока никто не в топе</div>`; return; }
   el.innerHTML = list.map((u, i) => {
     const rank = i + 1;
     const av = u.photo ? `<img src="${u.photo}" alt="">` : esc(initials(u.nickname));
