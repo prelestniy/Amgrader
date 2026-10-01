@@ -833,16 +833,16 @@ button, input { font-family:inherit; font-synthesis:none; }
 /* ===== сообщения (раскладка Telegram, цвета приложения) ===== */
 .chat-ov { display:flex; flex-direction:column; overflow:hidden; padding-bottom:0; z-index:160; background:var(--bg); }
 .chat-ov[hidden] { display:none; }
-.tg-head { display:flex; align-items:center; gap:4px; padding:8px 8px; background:var(--surface-1); flex-shrink:0; border-bottom:1px solid var(--border); }
-.tg-hbtn { width:40px; height:40px; flex-shrink:0; border:none; border-radius:50%; background:none; color:var(--text-dim); display:flex; align-items:center; justify-content:center; cursor:pointer; }
-.tg-hbtn:active { background:var(--surface-3); }
-.chat-peer { flex:1; display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; padding:2px 0; }
+.tg-head { display:flex; align-items:center; gap:10px; padding:10px 12px 8px; background:transparent; flex-shrink:0; }
+.tg-hbtn { width:46px; height:46px; flex-shrink:0; border:1px solid var(--border); border-radius:var(--r-btn); background:var(--surface-2); color:var(--text-dim); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.tg-hbtn:active { background:var(--surface-3); transform:scale(.96); }
+.chat-peer { flex:1; display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; padding:3px 16px 3px 3px; height:46px; box-sizing:border-box; background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-pill); }
 .tg-ptext { min-width:0; }
 .tg-pname { font-size:16px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tg-psub { font-size:12px; color:var(--text-mute); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tg-av { width:42px; height:42px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#0A0A0B; font-weight:800; font-size:17px; overflow:hidden; }
 .tg-av img { width:100%; height:100%; object-fit:cover; display:block; }
-.chat-peer .tg-av { width:40px; height:40px; }
+.chat-peer .tg-av { width:38px; height:38px; font-size:16px; }
 
 .chat-msgs { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:8px 10px; display:flex; flex-direction:column; background:var(--bg); }
 .tg-msg { position:relative; max-width:82%; margin-top:2px; padding:6px 10px; border-radius:16px; font-size:15px; line-height:1.3; color:var(--text);
@@ -1294,7 +1294,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 <div class="inv-full chats-ov" id="chatsOverlay" hidden>
   <div class="tg-head">
     <button class="tg-hbtn" onclick="closeChats()" aria-label="Назад"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-    <div class="chat-peer" style="cursor:default"><div class="tg-ptext"><div class="tg-pname" style="font-size:19px">Сообщения</div><div class="tg-psub">Ваши диалоги</div></div></div>
+    <div class="chat-peer" style="cursor:default;padding-left:16px"><div class="tg-ptext"><div class="tg-pname">Сообщения</div><div class="tg-psub">Ваши диалоги</div></div></div>
     <button class="tg-hbtn" onclick="openFindPlayer()" aria-label="Найти игрока"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   </div>
   <div class="chats-body" id="chatsBody"><div id="chatsList"><div class="hist-empty">Загрузка…</div></div></div>
@@ -3500,7 +3500,7 @@ async function openChat(pid) {
   if (!isLoggedIn()) { openAuth("Войдите, чтобы писать сообщения"); return; }
   closeMisc();
   clearInterval(__chatTimer); __chatTimer = null;
-  __chatPid = pid; __chatLastId = 0; __chatPeer = null; __chatMsgs = []; __chatBusy = false; __chatFailed = false; __chatSeq++;
+  __chatPid = pid; __chatLastId = 0; __chatPeer = null; __chatMsgs = []; __chatPeerRead = 0; __chatLastInId = 0; __chatBusy = false; __chatFailed = false; __chatSeq++;
   gid("chatBanner").innerHTML = "";
   gid("chatCompose").style.display = "none";
   gid("chatInput").value = ""; chatInputSync();
@@ -3531,14 +3531,20 @@ function chatBannerHTML(state) {
   }
 }
 const TG_TICK = '<svg viewBox="0 0 16 11" width="14" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 5.8l3.4 3.4L12.5 1.6"/></svg>';
+const TG_TICK2 = '<svg viewBox="0 0 19 11" width="18" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 5.8l3.4 3.4L12 1.6"/><path d="M7.4 8.2l1 1L17.4 1.6"/></svg>';
+let __chatPeerRead = 0, __chatLastInId = 0;
+function chatIsRead(m) {
+  return !!(m.read || m.readAt || m.seen || m.isRead || m.status === "read" || m.id <= __chatPeerRead || m.id < __chatLastInId);
+}
 function chatMsgHTML(m, first, last) {
   const cls = (m.mine ? "out" : "in") + (first ? " first" : "") + (last ? " last" : "");
-  return `<div class="tg-msg ${cls}">${esc(m.text)}<span class="tg-time">${fmtTime(m.at)}${m.mine ? TG_TICK : ""}</span></div>`;
+  return `<div class="tg-msg ${cls}">${esc(m.text)}<span class="tg-time">${fmtTime(m.at)}${m.mine ? (chatIsRead(m) ? TG_TICK2 : TG_TICK) : ""}</span></div>`;
 }
 function chatRender() {
   const box = gid("chatMsgs");
   if (!__chatMsgs.length) { box.innerHTML = '<div class="tg-empty"><div class="tg-empty-card">Пока нет сообщений.<br>Напишите первым</div></div>'; return; }
   let out = "", prevDay = "", prev = null;
+  __chatLastInId = 0; __chatMsgs.forEach(m => { if (!m.mine && m.id > __chatLastInId) __chatLastInId = m.id; });
   __chatMsgs.forEach((m, i) => {
     const day = new Date(m.at * 1000).toDateString();
     if (day !== prevDay) { out += `<div class="tg-day">${fmtDay(m.at)}</div>`; prevDay = day; prev = null; }
@@ -3563,7 +3569,9 @@ async function chatLoad(initial) {
     const atBottom = initial || box.scrollHeight - box.scrollTop - box.clientHeight < 80, keep = box.scrollTop;
     const fresh = ((r && r.messages) || []).filter(m => m.id > __chatLastId);
     if (fresh.length) { __chatMsgs = __chatMsgs.concat(fresh); __chatLastId = fresh[fresh.length - 1].id; }
-    if (initial || fresh.length) {
+    let readChanged = false;
+    if (r) { const pr = Number(r.peerReadId ?? r.peerLastReadId ?? r.readUpTo ?? 0) || 0; if (pr > __chatPeerRead) { __chatPeerRead = pr; readChanged = true; } }
+    if (initial || fresh.length || readChanged) {
       chatRender();
       box.scrollTop = atBottom ? box.scrollHeight : keep;
       if (!initial && fresh.length) { const all = box.querySelectorAll(".tg-msg"); for (let i = Math.max(0, all.length - fresh.length); i < all.length; i++) all[i].classList.add("arrive"); }
