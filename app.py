@@ -1,4 +1,7 @@
 import os
+import re
+import base64
+import html as htmllib
 import json
 import asyncio
 import logging
@@ -12,7 +15,7 @@ from contextlib import closing
 from typing import Optional, List, Dict, Any
 from urllib.parse import parse_qsl
 
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Response, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import sqlite3
@@ -70,6 +73,14 @@ def db():
     return conn
 
 
+def gen_public_id(conn) -> str:
+    """Случайный 6-значный публичный ID, которого ещё нет в базе."""
+    while True:
+        pid = str(secrets.randbelow(900000) + 100000)
+        if not conn.execute("SELECT 1 FROM users WHERE public_id=? COLLATE NOCASE", (pid,)).fetchone():
+            return pid
+
+
 def init_db():
     with closing(db()) as conn, conn:
         conn.execute("""CREATE TABLE IF NOT EXISTS users(
@@ -88,11 +99,36 @@ def init_db():
             token TEXT UNIQUE,
             created_at INTEGER
         )""")
-        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0", "luck_rules TEXT DEFAULT '[]'", "last_daily INTEGER DEFAULT 0", "history TEXT DEFAULT '[]'"):
+        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0", "luck_rules TEXT DEFAULT '[]'", "last_daily INTEGER DEFAULT 0", "history TEXT DEFAULT '[]'", "about TEXT DEFAULT ''", "avatar BLOB", "avatar_key TEXT"):
             try:
                 conn.execute("ALTER TABLE users ADD COLUMN " + col)
             except sqlite3.OperationalError:
                 pass
+        # публичный ID (виден игрокам, ищется по нему; админ может менять)
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN public_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        for r in conn.execute("SELECT id FROM users WHERE public_id IS NULL OR public_id=''").fetchall():
+            conn.execute("UPDATE users SET public_id=? WHERE id=?", (gen_public_id(conn), r["id"]))
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users(public_id COLLATE NOCASE)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS friendships(
+            user_a INTEGER, user_b INTEGER, requester INTEGER, status TEXT, created_at INTEGER,
+            PRIMARY KEY(user_a, user_b))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS blocks(
+            blocker_id INTEGER, blocked_id INTEGER, created_at INTEGER,
+            PRIMARY KEY(blocker_id, blocked_id))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS messages(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, sender_id INTEGER, recipient_id INTEGER,
+            text TEXT, created_at INTEGER, read_at INTEGER)""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(sender_id, recipient_id, id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_rcpt ON messages(recipient_id, read_at)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS chat_requests(
+            user_a INTEGER, user_b INTEGER, initiator INTEGER, status TEXT, created_at INTEGER,
+            PRIMARY KEY(user_a, user_b))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS reports(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, reporter_id INTEGER, reported_id INTEGER,
+            reason TEXT, comment TEXT, context TEXT, status TEXT DEFAULT 'new', created_at INTEGER)""")
         conn.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)")
         conn.execute("""CREATE TABLE IF NOT EXISTS tasks(
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, kind TEXT, url TEXT, chat TEXT,
@@ -173,6 +209,9 @@ def user_public(row) -> dict:
         "luck": luck_list(row),
         "rev": row["rev"] or 0,
         "id": row["id"],
+        "publicId": row["public_id"],
+        "about": row["about"] or "",
+        "hasPassword": bool(row["password_hash"]),
         "login": row["login"],
         "nickname": row["nickname"],
         "username": row["username"],
@@ -220,10 +259,10 @@ def create_user(login=None, password_hash=None, telegram_id=None, nickname="Иг
         token = gen_token()
         cur = conn.execute(
             """INSERT INTO users(login, password_hash, telegram_id, nickname, username, photo,
-                source, balance, inventory, referral_code, referred_by, token, created_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                source, balance, inventory, referral_code, referred_by, token, created_at, public_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (login, password_hash, telegram_id, nickname, username, photo, source,
-             balance, "[]", ref_code, referred_by, token, int(time.time())),
+             balance, "[]", ref_code, referred_by, token, int(time.time()), gen_public_id(conn)),
         )
         uid = cur.lastrowid
         if referred_by:
@@ -383,6 +422,11 @@ def me(user=Depends(auth_user)):
 def delete_me(user=Depends(auth_user)):
     with closing(db()) as conn, conn:
         conn.execute("DELETE FROM users WHERE id=?", (user["id"],))
+        conn.execute("DELETE FROM friendships WHERE user_a=? OR user_b=?", (user["id"], user["id"]))
+        conn.execute("DELETE FROM blocks WHERE blocker_id=? OR blocked_id=?", (user["id"], user["id"]))
+        conn.execute("DELETE FROM messages WHERE sender_id=? OR recipient_id=?", (user["id"], user["id"]))
+        conn.execute("DELETE FROM chat_requests WHERE user_a=? OR user_b=?", (user["id"], user["id"]))
+        conn.execute("DELETE FROM reports WHERE reporter_id=?", (user["id"],))
     return {"ok": True}
 
 
@@ -596,8 +640,15 @@ class BalanceBody(BaseModel):
 
 
 def find_user(conn, who: str):
-    who = who.strip().lstrip("#").lower()
-    row = conn.execute("SELECT * FROM users WHERE login=? OR CAST(id AS TEXT)=?", (who, who)).fetchone()
+    """Логин, публичный ID или #внутренний_id."""
+    raw = who.strip()
+    w = raw.lstrip("#").lower()
+    if raw.startswith("#"):
+        row = conn.execute("SELECT * FROM users WHERE CAST(id AS TEXT)=?", (w,)).fetchone()
+    else:
+        row = (conn.execute("SELECT * FROM users WHERE login=?", (w,)).fetchone()
+               or conn.execute("SELECT * FROM users WHERE public_id=? COLLATE NOCASE", (w,)).fetchone()
+               or conn.execute("SELECT * FROM users WHERE CAST(id AS TEXT)=?", (w,)).fetchone())
     if not row:
         raise HTTPException(404, "Пользователь не найден")
     return row
@@ -810,14 +861,606 @@ def admin_items(q: str = "", _=Depends(check_admin)):
     return [i for i in ITEMS if not q or q in i["name"].lower() or q in i["nameEn"].lower() or q == str(i["id"])][:8]
 
 
+PUBLIC_ID_RE = re.compile(r"[A-Za-z0-9_]{3,16}")
+
+
+class PublicIdBody(BaseModel):
+    login: str
+    new_id: str
+
+
+@app.post("/admin/public_id")
+def admin_set_public_id(body: PublicIdBody, _=Depends(check_admin)):
+    new = body.new_id.strip().lstrip("#")
+    if not PUBLIC_ID_RE.fullmatch(new):
+        raise HTTPException(400, "ID: 3–16 символов, латиница, цифры и _")
+    with closing(db()) as conn, conn:
+        row = find_user(conn, body.login)
+        if conn.execute("SELECT 1 FROM users WHERE public_id=? COLLATE NOCASE AND id<>?", (new, row["id"])).fetchone():
+            raise HTTPException(409, "Этот ID уже занят")
+        conn.execute("UPDATE users SET public_id=?, rev = rev + 1 WHERE id=?", (new, row["id"]))
+    return {"ok": True, "publicId": new}
+
+
+@app.get("/api/users/search")
+def search_users_by_public_id(q: str = "", user=Depends(auth_user)):
+    """Поиск игрока по точному публичному ID. Отдаём только ID, ник и фото."""
+    q = q.strip().lstrip("#")
+    if not q or len(q) > 16:
+        return {"users": []}
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id, public_id, nickname, photo FROM users WHERE public_id=? COLLATE NOCASE", (q,)).fetchone()
+    if not r:
+        return {"users": []}
+    return {"users": [{"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок",
+                       "photo": r["photo"], "isMe": r["id"] == user["id"]}]}
+
+
+ABOUT_MAX = 20
+AVATAR_MAX_BYTES = 300_000
+
+
+class AboutBody(BaseModel):
+    about: str = ""
+
+
+class AvatarBody(BaseModel):
+    image: str
+
+
+class CredentialsBody(BaseModel):
+    login: Optional[str] = None
+    new_password: Optional[str] = None
+    current_password: Optional[str] = None
+
+
+@app.post("/api/me/profile")
+def update_profile(body: AboutBody, user=Depends(auth_user)):
+    about = " ".join(body.about.split())
+    if len(about) > ABOUT_MAX:
+        raise HTTPException(400, f"«О себе»: не больше {ABOUT_MAX} символов")
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE users SET about=? WHERE id=?", (about, user["id"]))
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+    return user_public(row)
+
+
+@app.post("/api/me/avatar")
+def upload_avatar(body: AvatarBody, user=Depends(auth_user)):
+    """Аватар приходит уже уменьшенным JPEG (data URL) — храним в базе, отдаём по /avatar/<ключ>."""
+    try:
+        raw = base64.b64decode(body.image.split(",", 1)[-1], validate=True)
+    except Exception:
+        raise HTTPException(400, "Не удалось прочитать картинку")
+    if len(raw) < 100 or len(raw) > AVATAR_MAX_BYTES:
+        raise HTTPException(400, "Картинка слишком большая")
+    if not raw.startswith(b"\xff\xd8\xff"):
+        raise HTTPException(400, "Нужна JPEG-картинка")
+    key = secrets.token_urlsafe(9)
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE users SET avatar=?, avatar_key=?, photo=? WHERE id=?",
+                     (raw, key, "/avatar/" + key, user["id"]))
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+    return user_public(row)
+
+
+@app.get("/avatar/{key}")
+def get_avatar(key: str):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{6,32}", key):
+        raise HTTPException(404)
+    with closing(db()) as conn:
+        r = conn.execute("SELECT avatar FROM users WHERE avatar_key=?", (key,)).fetchone()
+    if not r or not r["avatar"]:
+        raise HTTPException(404)
+    return Response(bytes(r["avatar"]), media_type="image/jpeg",
+                    headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@app.post("/api/me/credentials")
+def update_credentials(body: CredentialsBody, user=Depends(auth_user)):
+    new_login = (body.login or "").strip().lower() or None
+    new_pw = body.new_password or None
+    has_pw = bool(user["password_hash"])
+    cur_login = user["login"]
+    login_changed = bool(new_login) and new_login != (cur_login or "")
+    if not login_changed and not new_pw:
+        raise HTTPException(400, "Нечего менять")
+    if has_pw and hash_password(body.current_password or "") != user["password_hash"]:
+        raise HTTPException(400, "Неверный текущий пароль")
+    if login_changed and not (3 <= len(new_login) <= 32):
+        raise HTTPException(400, "Логин: от 3 до 32 символов")
+    if new_pw is not None and not (4 <= len(new_pw) <= 64):
+        raise HTTPException(400, "Пароль: от 4 до 64 символов")
+    final_login = new_login if login_changed else cur_login
+    if not has_pw and (not final_login or not new_pw):
+        raise HTTPException(400, "Чтобы входить по логину, задайте и логин, и пароль")
+    sets, vals = [], []
+    if login_changed:
+        sets.append("login=?"); vals.append(new_login)
+    if new_pw:
+        sets.append("password_hash=?"); vals.append(hash_password(new_pw))
+    vals.append(user["id"])
+    try:
+        with closing(db()) as conn, conn:
+            if login_changed and conn.execute("SELECT 1 FROM users WHERE login=? AND id<>?", (new_login, user["id"])).fetchone():
+                raise HTTPException(400, "Такой логин уже занят")
+            conn.execute("UPDATE users SET " + ", ".join(sets) + " WHERE id=?", vals)
+            row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+    except sqlite3.IntegrityError:
+        raise HTTPException(400, "Такой логин уже занят")
+    return user_public(row)
+
+
+def _pair(x: int, y: int):
+    return (x, y) if x < y else (y, x)
+
+
+def _target(conn, public_id: str):
+    pid = (public_id or "").strip().lstrip("#")
+    if not PUBLIC_ID_RE.fullmatch(pid):
+        raise HTTPException(404, "Игрок не найден")
+    r = conn.execute("SELECT id, public_id, nickname, photo FROM users WHERE public_id=? COLLATE NOCASE", (pid,)).fetchone()
+    if not r:
+        raise HTTPException(404, "Игрок не найден")
+    return r
+
+
+def relation(conn, me: int, other: int) -> str:
+    """none | friend | incoming (он мне) | outgoing (я ему) | blocked (я заблокировал)."""
+    if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, other)).fetchone():
+        return "blocked"
+    x, y = _pair(me, other)
+    f = conn.execute("SELECT requester, status FROM friendships WHERE user_a=? AND user_b=?", (x, y)).fetchone()
+    if not f:
+        return "none"
+    if f["status"] == "accepted":
+        return "friend"
+    return "outgoing" if f["requester"] == me else "incoming"
+
+
+@app.get("/api/users/{public_id}")
+def public_profile(public_id: str, user=Depends(auth_user)):
+    """Чужой профиль: ник, фото, «о себе», дата регистрации, баланс, инвентарь и связь с вами."""
+    with closing(db()) as conn:
+        r = _target_full(conn, public_id)
+        rel = "none" if r["id"] == user["id"] else relation(conn, user["id"], r["id"])
+    return {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"],
+            "about": r["about"] or "", "createdAt": r["created_at"], "balance": r["balance"],
+            "inventory": json.loads(r["inventory"] or "[]"), "isMe": r["id"] == user["id"], "relation": rel}
+
+
+def _target_full(conn, public_id: str):
+    pid = (public_id or "").strip().lstrip("#")
+    if not PUBLIC_ID_RE.fullmatch(pid):
+        raise HTTPException(404, "Игрок не найден")
+    r = conn.execute("SELECT * FROM users WHERE public_id=? COLLATE NOCASE", (pid,)).fetchone()
+    if not r:
+        raise HTTPException(404, "Игрок не найден")
+    return r
+
+
+# ---------------------------------------------------------------------------
+# Друзья и блокировки
+# ---------------------------------------------------------------------------
+class PidBody(BaseModel):
+    publicId: str
+
+
+class BlockBody(BaseModel):
+    publicId: str
+    block: bool = True
+
+
+MAX_PENDING_OUT = 50
+
+
+@app.get("/api/friends")
+def friends_list(user=Depends(auth_user)):
+    me = user["id"]
+    with closing(db()) as conn:
+        rows = conn.execute(
+            """SELECT f.status, f.requester, u.public_id, u.nickname, u.photo
+               FROM friendships f
+               JOIN users u ON u.id = CASE WHEN f.user_a=? THEN f.user_b ELSE f.user_a END
+               WHERE f.user_a=? OR f.user_b=? ORDER BY f.created_at DESC""", (me, me, me)).fetchall()
+    out = {"friends": [], "incoming": [], "outgoing": []}
+    for r in rows:
+        item = {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"]}
+        if r["status"] == "accepted":
+            out["friends"].append(item)
+        elif r["requester"] == me:
+            out["outgoing"].append(item)
+        else:
+            out["incoming"].append(item)
+    return out
+
+
+@app.post("/api/friends/request")
+def friend_request(body: PidBody, user=Depends(auth_user)):
+    me = user["id"]
+    with closing(db()) as conn, conn:
+        t = _target(conn, body.publicId)
+        if t["id"] == me:
+            raise HTTPException(400, "Нельзя добавить в друзья себя")
+        if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, t["id"])).fetchone():
+            raise HTTPException(400, "Сначала разблокируйте игрока")
+        if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (t["id"], me)).fetchone():
+            raise HTTPException(400, "Не удалось отправить заявку")
+        x, y = _pair(me, t["id"])
+        f = conn.execute("SELECT requester, status FROM friendships WHERE user_a=? AND user_b=?", (x, y)).fetchone()
+        if f:
+            if f["status"] == "accepted":
+                return {"relation": "friend"}
+            if f["requester"] == me:
+                return {"relation": "outgoing"}
+            conn.execute("UPDATE friendships SET status='accepted' WHERE user_a=? AND user_b=?", (x, y))
+            return {"relation": "friend"}
+        n = conn.execute("SELECT COUNT(*) FROM friendships WHERE requester=? AND status='pending'", (me,)).fetchone()[0]
+        if n >= MAX_PENDING_OUT:
+            raise HTTPException(400, "Слишком много неотвеченных заявок")
+        conn.execute("INSERT INTO friendships(user_a, user_b, requester, status, created_at) VALUES(?,?,?,?,?)",
+                     (x, y, me, "pending", int(time.time())))
+    return {"relation": "outgoing"}
+
+
+@app.post("/api/friends/accept")
+def friend_accept(body: PidBody, user=Depends(auth_user)):
+    me = user["id"]
+    with closing(db()) as conn, conn:
+        t = _target(conn, body.publicId)
+        x, y = _pair(me, t["id"])
+        cur = conn.execute("UPDATE friendships SET status='accepted' WHERE user_a=? AND user_b=? AND status='pending' AND requester<>?",
+                           (x, y, me))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Заявка не найдена")
+    return {"relation": "friend"}
+
+
+@app.post("/api/friends/remove")
+def friend_remove(body: PidBody, user=Depends(auth_user)):
+    """Удалить из друзей, отклонить входящую или отменить свою исходящую заявку."""
+    me = user["id"]
+    with closing(db()) as conn, conn:
+        t = _target(conn, body.publicId)
+        x, y = _pair(me, t["id"])
+        conn.execute("DELETE FROM friendships WHERE user_a=? AND user_b=?", (x, y))
+    return {"relation": "none"}
+
+
+@app.get("/api/blocks")
+def blocks_list(user=Depends(auth_user)):
+    with closing(db()) as conn:
+        rows = conn.execute(
+            """SELECT u.public_id, u.nickname, u.photo FROM blocks b JOIN users u ON u.id=b.blocked_id
+               WHERE b.blocker_id=? ORDER BY b.created_at DESC""", (user["id"],)).fetchall()
+    return {"blocked": [{"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"]} for r in rows]}
+
+
+@app.post("/api/blocks")
+def block_user(body: BlockBody, user=Depends(auth_user)):
+    me = user["id"]
+    with closing(db()) as conn, conn:
+        t = _target(conn, body.publicId)
+        if t["id"] == me:
+            raise HTTPException(400, "Нельзя заблокировать себя")
+        if body.block:
+            conn.execute("INSERT OR IGNORE INTO blocks(blocker_id, blocked_id, created_at) VALUES(?,?,?)",
+                         (me, t["id"], int(time.time())))
+            x, y = _pair(me, t["id"])
+            conn.execute("DELETE FROM friendships WHERE user_a=? AND user_b=?", (x, y))
+        else:
+            conn.execute("DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, t["id"]))
+    return {"relation": "blocked" if body.block else "none"}
+
+
+# ---------------------------------------------------------------------------
+# Сообщения
+#  • друзьям — без ограничений;
+#  • не другу — одно сообщение (запрос на переписку), дальше — только после принятия.
+#  • в Telegram-бота уходит только уведомление «вам написал …», текст — только в мини-аппе.
+# ---------------------------------------------------------------------------
+MSG_MAX = 500
+MSG_PER_MINUTE = 20
+
+
+class SendBody(BaseModel):
+    text: str
+
+
+def webapp_url() -> str:
+    url = os.environ.get("WEBAPP_URL", "")
+    if not url and os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
+        url = "https://" + os.environ["RAILWAY_PUBLIC_DOMAIN"]
+    return url
+
+
+def notify_telegram(tg_id: int, text: str):
+    """Уведомление в бота (без текста сообщения). Любая ошибка игнорируется."""
+    if not BOT_TOKEN or not tg_id:
+        return
+    payload = {"chat_id": tg_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True}
+    url = webapp_url()
+    if url:
+        payload["reply_markup"] = {"inline_keyboard": [[{"text": "💬 Открыть", "web_app": {"url": url}}]]}
+    try:
+        httpx.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", json=payload, timeout=8)
+    except Exception:
+        log.warning("не удалось отправить уведомление в Telegram")
+
+
+def chat_state(conn, me: int, other: int):
+    """(state, can_send). state: friend | accepted | none | request_in | request_out | declined | blocked_by_me | blocked_me."""
+    if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, other)).fetchone():
+        return "blocked_by_me", False
+    if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (other, me)).fetchone():
+        return "blocked_me", False
+    if relation(conn, me, other) == "friend":
+        return "friend", True
+    x, y = _pair(me, other)
+    c = conn.execute("SELECT initiator, status FROM chat_requests WHERE user_a=? AND user_b=?", (x, y)).fetchone()
+    if not c:
+        return "none", True
+    if c["status"] == "accepted":
+        return "accepted", True
+    if c["status"] == "pending":
+        return ("request_out", False) if c["initiator"] == me else ("request_in", True)
+    # declined
+    return ("declined", False) if c["initiator"] == me else ("request_in", True)
+
+
+def _peer(conn, public_id: str):
+    return _target(conn, public_id)
+
+
+def _msg_json(r, me: int):
+    return {"id": r["id"], "mine": r["sender_id"] == me, "text": r["text"], "at": r["created_at"]}
+
+
+@app.get("/api/chats/unread")
+def chats_unread(user=Depends(auth_user)):
+    with closing(db()) as conn:
+        n = conn.execute("SELECT COUNT(*) FROM messages WHERE recipient_id=? AND read_at IS NULL", (user["id"],)).fetchone()[0]
+    return {"unread": n}
+
+
+@app.get("/api/chats")
+def chats_list(user=Depends(auth_user)):
+    me = user["id"]
+    with closing(db()) as conn:
+        rows = conn.execute(
+            """SELECT partner, MAX(id) AS last_id,
+                      SUM(CASE WHEN recipient_id=? AND read_at IS NULL THEN 1 ELSE 0 END) AS unread
+               FROM (SELECT id, recipient_id, read_at,
+                            CASE WHEN sender_id=? THEN recipient_id ELSE sender_id END AS partner
+                     FROM messages WHERE sender_id=? OR recipient_id=?)
+               GROUP BY partner ORDER BY last_id DESC LIMIT 50""", (me, me, me, me)).fetchall()
+        out, total = [], 0
+        for r in rows:
+            u = conn.execute("SELECT id, public_id, nickname, photo FROM users WHERE id=?", (r["partner"],)).fetchone()
+            m = conn.execute("SELECT * FROM messages WHERE id=?", (r["last_id"],)).fetchone()
+            if not u or not m:
+                continue
+            state, _ = chat_state(conn, me, u["id"])
+            total += r["unread"] or 0
+            out.append({"publicId": u["public_id"], "nickname": u["nickname"] or "Игрок", "photo": u["photo"],
+                        "unread": r["unread"] or 0, "state": state,
+                        "last": {"text": m["text"][:80], "mine": m["sender_id"] == me, "at": m["created_at"]}})
+    return {"chats": out, "unread": total}
+
+
+@app.get("/api/chats/{public_id}")
+def chat_open(public_id: str, after: int = 0, user=Depends(auth_user)):
+    """Сообщения с игроком (после after). Входящие помечаются прочитанными."""
+    me = user["id"]
+    with closing(db()) as conn, conn:
+        p = _peer(conn, public_id)
+        if p["id"] == me:
+            raise HTTPException(400, "Нельзя писать самому себе")
+        state, can = chat_state(conn, me, p["id"])
+        rows = conn.execute(
+            """SELECT * FROM (SELECT * FROM messages
+                  WHERE ((sender_id=? AND recipient_id=?) OR (sender_id=? AND recipient_id=?)) AND id>?
+                  ORDER BY id DESC LIMIT 100) ORDER BY id ASC""", (me, p["id"], p["id"], me, after)).fetchall()
+        conn.execute("UPDATE messages SET read_at=? WHERE recipient_id=? AND sender_id=? AND read_at IS NULL",
+                     (int(time.time()), me, p["id"]))
+    return {"peer": {"publicId": p["public_id"], "nickname": p["nickname"] or "Игрок", "photo": p["photo"]},
+            "state": state, "canSend": can, "messages": [_msg_json(r, me) for r in rows]}
+
+
+@app.post("/api/chats/{public_id}/send")
+def chat_send(public_id: str, body: SendBody, bg: BackgroundTasks, user=Depends(auth_user)):
+    me = user["id"]
+    text = body.text.replace("\r", "").strip()
+    if not text:
+        raise HTTPException(400, "Введите сообщение")
+    if len(text) > MSG_MAX:
+        raise HTTPException(400, f"Не больше {MSG_MAX} символов")
+    now = int(time.time())
+    notify = None
+    with closing(db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        p = _peer(conn, public_id)
+        if p["id"] == me:
+            raise HTTPException(400, "Нельзя писать самому себе")
+        state, can = chat_state(conn, me, p["id"])
+        if state == "blocked_by_me":
+            raise HTTPException(400, "Сначала разблокируйте игрока")
+        if not can:
+            if state == "request_out":
+                raise HTTPException(400, "Дождитесь, пока игрок примет запрос на переписку")
+            raise HTTPException(400, "Не удалось отправить сообщение")
+        if conn.execute("SELECT COUNT(*) FROM messages WHERE sender_id=? AND created_at>?", (me, now - 60)).fetchone()[0] >= MSG_PER_MINUTE:
+            raise HTTPException(429, "Слишком часто — подождите минуту")
+        x, y = _pair(me, p["id"])
+        is_request = False
+        if state == "none":
+            conn.execute("INSERT OR REPLACE INTO chat_requests(user_a, user_b, initiator, status, created_at) VALUES(?,?,?,?,?)",
+                         (x, y, me, "pending", now))
+            is_request = True
+        elif state == "request_in":
+            # ответ на запрос = его принятие
+            conn.execute("UPDATE chat_requests SET status='accepted' WHERE user_a=? AND user_b=?", (x, y))
+        unread_before = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE sender_id=? AND recipient_id=? AND read_at IS NULL", (me, p["id"])).fetchone()[0]
+        cur = conn.execute("INSERT INTO messages(sender_id, recipient_id, text, created_at) VALUES(?,?,?,?)",
+                           (me, p["id"], text, now))
+        mid = cur.lastrowid
+        new_state, new_can = chat_state(conn, me, p["id"])
+        rcpt = conn.execute("SELECT telegram_id FROM users WHERE id=?", (p["id"],)).fetchone()
+        if unread_before == 0 and rcpt and rcpt["telegram_id"]:
+            notify = (rcpt["telegram_id"], is_request)
+    if notify:
+        name = htmllib.escape(user["nickname"] or "Игрок")
+        msg = (f"💬 <b>{name}</b> хочет начать переписку" if notify[1] else f"💬 Вам написал(а) <b>{name}</b>") + \
+              "\n<i>Сообщение можно прочитать в мини-аппе.</i>"
+        bg.add_task(notify_telegram, notify[0], msg)
+    return {"message": {"id": mid, "mine": True, "text": text, "at": now}, "state": new_state, "canSend": new_can}
+
+
+@app.post("/api/chats/{public_id}/accept")
+def chat_accept(public_id: str, user=Depends(auth_user)):
+    me = user["id"]
+    with closing(db()) as conn, conn:
+        p = _peer(conn, public_id)
+        x, y = _pair(me, p["id"])
+        cur = conn.execute("UPDATE chat_requests SET status='accepted' WHERE user_a=? AND user_b=? AND initiator<>?", (x, y, me))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Запрос не найден")
+        state, can = chat_state(conn, me, p["id"])
+    return {"state": state, "canSend": can}
+
+
+@app.post("/api/chats/{public_id}/decline")
+def chat_decline(public_id: str, user=Depends(auth_user)):
+    me = user["id"]
+    with closing(db()) as conn, conn:
+        p = _peer(conn, public_id)
+        x, y = _pair(me, p["id"])
+        cur = conn.execute("UPDATE chat_requests SET status='declined' WHERE user_a=? AND user_b=? AND initiator<>? AND status='pending'", (x, y, me))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Запрос не найден")
+        state, can = chat_state(conn, me, p["id"])
+    return {"state": state, "canSend": can}
+
+
+# ---------------------------------------------------------------------------
+# Жалобы на игроков (приходят админам в админ-бота)
+# ---------------------------------------------------------------------------
+REPORT_REASONS = {"spam": "Спам", "abuse": "Оскорбления", "scam": "Мошенничество", "other": "Другое"}
+REPORT_COMMENT_MAX = 200
+REPORT_CONTEXT_MESSAGES = 10
+ADMIN_BOT_TOKEN = os.environ.get("ADMIN_BOT_TOKEN", "")
+ADMIN_TG_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
+
+
+class ReportBody(BaseModel):
+    publicId: str
+    reason: str
+    comment: str = ""
+
+
+def notify_admins(text: str):
+    if not ADMIN_BOT_TOKEN:
+        return
+    for chat_id in ADMIN_TG_IDS:
+        try:
+            httpx.post(f"https://api.telegram.org/bot{ADMIN_BOT_TOKEN}/sendMessage",
+                       json={"chat_id": chat_id, "text": text[:3900], "parse_mode": "HTML",
+                             "disable_web_page_preview": True}, timeout=8)
+        except Exception:
+            log.warning("не удалось отправить жалобу админу")
+
+
+def report_text(rid, reporter, reported, reason, comment, context) -> str:
+    e = htmllib.escape
+    lines = [f"🚩 <b>Жалоба #{rid}</b> · {e(reason)}",
+             f"От: <b>{e(reporter['nickname'] or '—')}</b> · ID <code>{e(reporter['public_id'] or '—')}</code>",
+             f"На: <b>{e(reported['nickname'] or '—')}</b> · ID <code>{e(reported['public_id'] or '—')}</code>"]
+    if comment:
+        lines.append(f"Комментарий: {e(comment)}")
+    if context:
+        lines.append("\nПоследние сообщения:")
+        for m in context[-6:]:
+            who = "жалуется" if m["from"] == "reporter" else "обвиняемый"
+            lines.append(f"• <i>{who}:</i> {e(m['text'][:120])}")
+    return "\n".join(lines)
+
+
+@app.post("/api/reports")
+def create_report(body: ReportBody, bg: BackgroundTasks, user=Depends(auth_user)):
+    me = user["id"]
+    if body.reason not in REPORT_REASONS:
+        raise HTTPException(400, "Выберите причину жалобы")
+    comment = " ".join(body.comment.split())
+    if len(comment) > REPORT_COMMENT_MAX:
+        raise HTTPException(400, f"Комментарий: не больше {REPORT_COMMENT_MAX} символов")
+    now = int(time.time())
+    with closing(db()) as conn, conn:
+        t = _target(conn, body.publicId)
+        if t["id"] == me:
+            raise HTTPException(400, "Нельзя пожаловаться на себя")
+        if conn.execute("SELECT COUNT(*) FROM reports WHERE reporter_id=? AND created_at>?", (me, now - 86400)).fetchone()[0] >= 10:
+            raise HTTPException(429, "Слишком много жалоб за сутки")
+        if conn.execute("SELECT 1 FROM reports WHERE reporter_id=? AND reported_id=? AND created_at>?", (me, t["id"], now - 3600)).fetchone():
+            raise HTTPException(400, "Вы уже отправили жалобу на этого игрока — модератор её рассмотрит")
+        rows = conn.execute(
+            """SELECT * FROM (SELECT * FROM messages
+                  WHERE (sender_id=? AND recipient_id=?) OR (sender_id=? AND recipient_id=?)
+                  ORDER BY id DESC LIMIT ?) ORDER BY id ASC""", (me, t["id"], t["id"], me, REPORT_CONTEXT_MESSAGES)).fetchall()
+        context = [{"from": "reporter" if r["sender_id"] == me else "reported", "text": r["text"], "at": r["created_at"]} for r in rows]
+        cur = conn.execute(
+            "INSERT INTO reports(reporter_id, reported_id, reason, comment, context, created_at) VALUES(?,?,?,?,?,?)",
+            (me, t["id"], body.reason, comment, json.dumps(context, ensure_ascii=False), now))
+        rid = cur.lastrowid
+        reported = conn.execute("SELECT nickname, public_id FROM users WHERE id=?", (t["id"],)).fetchone()
+        text = report_text(rid, user, reported, REPORT_REASONS[body.reason], comment, context)
+    bg.add_task(notify_admins, text)
+    return {"ok": True}
+
+
+class ReportCloseBody(BaseModel):
+    id: int
+
+
+@app.get("/admin/reports")
+def admin_reports(limit: int = 10, _=Depends(check_admin)):
+    limit = max(1, min(limit, 30))
+    with closing(db()) as conn:
+        rows = conn.execute(
+            """SELECT r.*, a.nickname AS rn, a.public_id AS rp, b.nickname AS tn, b.public_id AS tp
+               FROM reports r LEFT JOIN users a ON a.id=r.reporter_id LEFT JOIN users b ON b.id=r.reported_id
+               WHERE r.status='new' ORDER BY r.id DESC LIMIT ?""", (limit,)).fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM reports WHERE status='new'").fetchone()[0]
+    out = []
+    for r in rows:
+        try:
+            ctx = json.loads(r["context"] or "[]")
+        except ValueError:
+            ctx = []
+        out.append({"id": r["id"], "reason": REPORT_REASONS.get(r["reason"], r["reason"]), "comment": r["comment"] or "",
+                    "created_at": r["created_at"], "context": ctx,
+                    "reporter": {"nickname": r["rn"], "public_id": r["rp"]},
+                    "reported": {"nickname": r["tn"], "public_id": r["tp"]}})
+    return {"reports": out, "total": total}
+
+
+@app.post("/admin/reports/close")
+def admin_report_close(body: ReportCloseBody, _=Depends(check_admin)):
+    with closing(db()) as conn, conn:
+        n = conn.execute("UPDATE reports SET status='closed' WHERE id=?", (body.id,)).rowcount
+    if not n:
+        raise HTTPException(404, "Жалоба не найдена")
+    return {"ok": True}
+
+
 @app.get("/admin/users")
 def admin_search_users(q: str = "", _=Depends(check_admin)):
     like = f"%{q}%"
     with closing(db()) as conn:
         rows = conn.execute(
-            """SELECT id, login, nickname, username, balance, referral_code FROM users
-               WHERE login LIKE ? OR nickname LIKE ? OR username LIKE ? LIMIT 20""",
-            (like, like, like),
+            """SELECT id, public_id, login, nickname, username, balance, referral_code FROM users
+               WHERE login LIKE ? OR nickname LIKE ? OR username LIKE ? OR public_id LIKE ? LIMIT 20""",
+            (like, like, like, like),
         ).fetchall()
     return [dict(r) for r in rows]
 
