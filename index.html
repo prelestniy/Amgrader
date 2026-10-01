@@ -24,6 +24,9 @@
   --r-card:18px; --r-btn:14px; --r-slot:20px; --r-pill:999px;
   --icon-size:44px;
   --ease-out:cubic-bezier(0.16,1,0.3,1);
+  --tg-top:0px; --tg-bottom:0px;
+  --safe-top:max(env(safe-area-inset-top,0px), var(--tg-top));
+  --safe-bottom:max(env(safe-area-inset-bottom,0px), var(--tg-bottom));
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body { height:100%; }
@@ -37,7 +40,7 @@ body {
 button, input { font-family:inherit; font-synthesis:none; }
 
 #app { min-height:100vh; max-width:500px; margin:0 auto;
-  padding:16px 16px calc(96px + env(safe-area-inset-bottom));
+  padding:calc(16px + var(--safe-top)) 16px calc(96px + var(--safe-bottom));
   display:flex; flex-direction:column; gap:20px; }
 
 /* ШАПКА */
@@ -126,7 +129,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 .stepper button:active { background:var(--border-hi); }
 .stepper span { min-width:22px; text-align:center; font-size:14px; }
 .remove-btn { background:transparent; border:none; color:var(--danger); font-size:12px; cursor:pointer; padding:2px 4px; opacity:.85; }
-.sheet-foot { padding:14px 16px calc(18px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); flex-shrink:0; }
+.sheet-foot { padding:14px 16px calc(18px + var(--safe-bottom)); border-top:1px solid var(--border); flex-shrink:0; }
 .total-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
 .total-label { font-size:13px; color:var(--text-mute); }
 .total-value { font-size:26px; color:var(--accent); }
@@ -257,7 +260,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 .card-art { flex:1; display:flex; align-items:center; justify-content:center; padding:4px 0; }
 .card-rarity { font-size:11px; color:var(--text-mute); }
 .inv-full { position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto;
-  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  padding-top:var(--safe-top); padding-bottom:var(--safe-bottom); }
 .inv-full-head { display:flex; align-items:center; gap:10px; padding:12px 12px 0; }
 .meme-vid-wrap { display:flex; touch-action:manipulation; }
 .meme-vid-canvas { position:absolute; inset:0; width:100%; height:100%; display:none; pointer-events:none; }
@@ -287,7 +290,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 .icon img, .icon svg { width:100%; height:100%; object-fit:contain; }
 
 /* БАБЛ РЕЗУЛЬТАТА (сверху) */
-.bubble { position:fixed; top:calc(12px + env(safe-area-inset-top)); left:50%;
+.bubble { position:fixed; top:calc(12px + var(--safe-top)); left:50%;
   width:min(calc(100% - 32px), 380px);
   display:flex; align-items:center; gap:12px; padding:12px 14px 14px 12px;
   background:rgba(23,23,27,0.88); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px);
@@ -421,7 +424,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 /* ===== НИЖНЯЯ ПАНЕЛЬ ===== */
 .bottom-nav { position:fixed; left:0; right:0; bottom:0; z-index:150;
   display:flex; align-items:flex-end; justify-content:space-between; gap:6px;
-  padding:10px 18px calc(10px + env(safe-area-inset-bottom));
+  padding:10px 18px calc(10px + var(--safe-bottom));
   max-width:500px; margin:0 auto;
   background:rgba(17,17,20,0.92); -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
   border-top:1px solid var(--border); }
@@ -673,7 +676,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 /* ===== V6: корзина сверху магазина ===== */
 .panel { overflow:visible; }
 .grid { border-radius:0 0 var(--r-card) var(--r-card); }
-.cart-bar { position:sticky; top:calc(8px + env(safe-area-inset-top)); z-index:30; margin:10px 12px 0; padding:10px 10px 10px 14px;
+.cart-bar { position:sticky; top:calc(8px + var(--safe-top)); z-index:30; margin:10px 12px 0; padding:10px 10px 10px 14px;
   border:1px solid var(--border-hi); border-radius:16px; background:rgba(23,23,27,.94); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
   box-shadow:0 10px 28px rgba(0,0,0,.5); }
 .cart-ico { color:var(--accent); display:flex; }
@@ -872,7 +875,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 .tg-btn:active { opacity:.8; }
 .tg-btn.ghost { background:var(--surface-2); color:var(--text-dim); border:1px solid var(--border); }
 
-.chat-compose { display:flex; align-items:flex-end; gap:8px; padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); background:var(--surface-1); border-top:1px solid var(--border); flex-shrink:0; }
+.chat-compose { display:flex; align-items:flex-end; gap:8px; padding:8px 8px calc(8px + var(--safe-bottom)); background:var(--surface-1); border-top:1px solid var(--border); flex-shrink:0; }
 .tg-field { flex:1; min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:22px; padding:0 16px; }
 .tg-field:focus-within { border-color:var(--border-hi); }
 .chat-compose textarea { display:block; width:100%; border:none; outline:none; resize:none; background:transparent; color:var(--text); font:inherit; font-size:16px;
@@ -901,8 +904,8 @@ button, input { font-family:inherit; font-synthesis:none; }
 .chats-ov { display:flex; flex-direction:column; overflow:hidden; padding-bottom:0; z-index:150; background:var(--bg); }
 .chats-ov[hidden] { display:none; }
 .chats-ov:not([hidden]), .chat-ov:not([hidden]) { animation:tgSlideIn .28s cubic-bezier(.22,1,.36,1); }
-.chats-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:6px 12px calc(96px + env(safe-area-inset-bottom, 0px)); }
-.chats-fab { position:absolute; right:16px; bottom:calc(18px + env(safe-area-inset-bottom, 0px)); height:52px; padding:0 20px 0 16px; border:none; border-radius:26px;
+.chats-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:6px 12px calc(96px + var(--safe-bottom)); }
+.chats-fab { position:absolute; right:16px; bottom:calc(18px + var(--safe-bottom)); height:52px; padding:0 20px 0 16px; border:none; border-radius:26px;
   background:var(--accent); color:#0A0A0B; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.45); }
 .chats-fab:active { transform:scale(.96); }
 .chats-sep { height:1px; background:var(--border); margin:0 0 0 68px; }
@@ -2632,6 +2635,7 @@ function tryTelegramAuth() {
     if (!tg) return null;
     tg.ready();
     tg.expand();
+    setupTgFullscreen();
     const u = tg.initDataUnsafe && tg.initDataUnsafe.user;
     if (!u) return null;
     return {
@@ -2942,6 +2946,24 @@ const TOKEN_KEY = "amg_token";
 let apiCfg = { botUsername: "", referrerBonus: 0, refereeBonus: 0 };
 let lastSaveAt = 0;
 
+/* Telegram: полноэкранный режим — вместо чёрной полосы остаются две плавающие кнопки (Закрыть и ⌄ ⋮) */
+function applyTgInsets() {
+  const tg = tgApp(); if (!tg) return;
+  const px = n => Math.max(0, Number(n) || 0) + "px", r = document.documentElement.style;
+  const sa = tg.safeAreaInset || {}, ca = tg.contentSafeAreaInset || {};
+  r.setProperty("--tg-top", px((sa.top || 0) + (ca.top || 0)));
+  r.setProperty("--tg-bottom", px((sa.bottom || 0) + (ca.bottom || 0)));
+}
+function setupTgFullscreen() {
+  const tg = tgApp(); if (!tg || tg.__fsSetup) return; tg.__fsSetup = true;
+  try { tg.setHeaderColor && tg.setHeaderColor("#09090B"); } catch (e) {}
+  try { tg.setBackgroundColor && tg.setBackgroundColor("#09090B"); } catch (e) {}
+  try { tg.setBottomBarColor && tg.setBottomBarColor("#09090B"); } catch (e) {}
+  try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
+  ["safeAreaChanged", "contentSafeAreaChanged", "fullscreenChanged", "viewportChanged"].forEach(ev => { try { tg.onEvent(ev, applyTgInsets); } catch (e) {} });
+  try { if (tg.requestFullscreen && !tg.isFullscreen && /android|ios|iphone|ipad/i.test(tg.platform || "")) tg.requestFullscreen(); } catch (e) {}
+  applyTgInsets();
+}
 function tgApp() { return window.Telegram && window.Telegram.WebApp; }
 
 /* Telegram Mini Apps: localStorage может НЕ переживать перезапуск приложения
@@ -3836,7 +3858,7 @@ async function init() {
   loadTopBalances();
   try { selfTest(); } catch (e) {}
   const tg = tgApp();
-  if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+  if (tg) { try { tg.ready(); tg.expand(); setupTgFullscreen(); } catch (e) {} }
   try { apiCfg = await api("/api/config"); applyCasePrices(); } catch (e) {}
   if (!apiCfg.botUsername) setTimeout(async () => { try { apiCfg = await api("/api/config"); applyCasePrices(); } catch (e) {} }, 4000);
   try {
