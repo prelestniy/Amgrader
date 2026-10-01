@@ -895,6 +895,26 @@ button, input { font-family:inherit; font-synthesis:none; }
 .tg-rlast { font-size:14px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tg-rlast b { color:var(--accent); font-weight:400; }
 .tg-badge { min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--accent); color:#0A0A0B; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+/* ===== отдельный экран «Сообщения» + анимации ===== */
+@keyframes tgSlideIn { from { transform:translateX(28px); opacity:0; } to { transform:none; opacity:1; } }
+.chats-ov { display:flex; flex-direction:column; overflow:hidden; padding-bottom:0; z-index:150; background:var(--bg); }
+.chats-ov[hidden] { display:none; }
+.chats-ov:not([hidden]), .chat-ov:not([hidden]) { animation:tgSlideIn .28s cubic-bezier(.22,1,.36,1); }
+.chats-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:6px 12px calc(96px + env(safe-area-inset-bottom, 0px)); }
+.chats-fab { position:absolute; right:16px; bottom:calc(18px + env(safe-area-inset-bottom, 0px)); height:52px; padding:0 20px 0 16px; border:none; border-radius:26px;
+  background:var(--accent); color:#0A0A0B; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.45); }
+.chats-fab:active { transform:scale(.96); }
+.chats-sep { height:1px; background:var(--border); margin:0 0 0 68px; }
+.tg-fly { position:fixed; z-index:20; margin:0 !important; pointer-events:none; will-change:transform,opacity; }
+.tg-msg.hid { visibility:hidden; }
+@keyframes tgIncoming { from { transform:translateY(10px) scale(.96); opacity:0; } to { transform:none; opacity:1; } }
+.tg-msg.arrive { animation:tgIncoming .26s cubic-bezier(.22,1,.36,1); transform-origin:left bottom; }
+@keyframes tgPop { 0% { transform:scale(1); } 40% { transform:scale(.82); } 100% { transform:scale(1); } }
+.chat-compose .send-btn.pop { animation:tgPop .26s ease-out; }
+@keyframes tgPlane { 0% { transform:translate(0,0); opacity:1; } 45% { transform:translate(10px,-10px); opacity:0; } 46% { transform:translate(-10px,10px); opacity:0; } 100% { transform:translate(0,0); opacity:1; } }
+.chat-compose .send-btn.pop svg { animation:tgPlane .32s ease-out; }
+@media (prefers-reduced-motion:reduce) { .chats-ov:not([hidden]), .chat-ov:not([hidden]), .tg-msg.arrive { animation:none; } }
 .ghost-btn.sel { border-color:var(--accent); color:var(--accent); }
 </style>
 </head>
@@ -1269,6 +1289,16 @@ button, input { font-family:inherit; font-synthesis:none; }
     <div class="pg-title">Профиль игрока</div>
   </div>
   <div class="user-ov-body" id="userBody"></div>
+</div>
+
+<div class="inv-full chats-ov" id="chatsOverlay" hidden>
+  <div class="tg-head">
+    <button class="tg-hbtn" onclick="closeChats()" aria-label="Назад"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="chat-peer" style="cursor:default"><div class="tg-ptext"><div class="tg-pname" style="font-size:19px">Сообщения</div><div class="tg-psub">Ваши диалоги</div></div></div>
+    <button class="tg-hbtn" onclick="openFindPlayer()" aria-label="Найти игрока"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+  </div>
+  <div class="chats-body" id="chatsBody"><div id="chatsList"><div class="hist-empty">Загрузка…</div></div></div>
+  <button class="chats-fab" onclick="openFindPlayer()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Новый чат</button>
 </div>
 
 <div class="inv-full chat-ov" id="chatOverlay" hidden>
@@ -3411,23 +3441,28 @@ setTimeout(pollUnread, 3000);
 /* список диалогов */
 async function openChats() {
   if (!isLoggedIn()) { openAuth("Войдите, чтобы пользоваться сообщениями"); return; }
-  openMisc(miscHead(ic("users", 24), "Сообщения", "Ваши диалоги") + `
-    <div class="reg-body" style="overflow-y:auto;min-height:0"><div class="fr-list" id="chatsList"><div class="hist-empty">Загрузка…</div></div>
-      <div class="misc-msg" id="miscError"></div></div>
-    <div class="sheet-foot"><button class="primary-btn" onclick="openFindPlayer()">Найти игрока по ID</button></div>`);
+  gid("chatsList").innerHTML = '<div class="tg-loader" style="margin:60px auto"></div>';
+  gid("chatsOverlay").hidden = false;
+  await renderChatsList();
+}
+function closeChats() { gid("chatsOverlay").hidden = true; pollUnread(); }
+async function renderChatsList() {
+  const el = gid("chatsList");
   try {
-    const r = await api("/api/chats"), list = r.chats || [], el = gid("chatsList");
+    const r = await withTimeout(api("/api/chats"), 15000), list = r.chats || [];
     setChatsBadge(r.unread || 0);
-    if (!el) return;
-    el.innerHTML = list.length ? list.map(c => `
+    if (gid("chatsOverlay").hidden) return;
+    el.innerHTML = list.length ? list.map((c, i) => `${i ? '<div class="chats-sep"></div>' : ""}
       <div class="tg-row" onclick="openChat('${esc(c.publicId)}')">
         ${tgAvatar(c.photo, c.nickname)}
         <div class="tg-rbody">
           <div class="tg-rtop"><div class="tg-rname">${esc(c.nickname)}</div><div class="tg-rtime">${fmtChatTime(c.last.at)}</div></div>
           <div class="tg-rbot"><div class="tg-rlast">${c.state === "request_in" ? "Запрос на переписку · " : ""}${c.last.mine ? "<b>Вы:</b> " : ""}${esc(c.last.text)}</div>${c.unread ? `<span class="tg-badge">${c.unread}</span>` : ""}</div>
         </div>
-      </div>`).join("") : '<div class="hist-empty">Пока нет переписок. Откройте профиль игрока и нажмите «Написать»</div>';
-  } catch (e) { const el = gid("chatsList"); if (el) el.innerHTML = `<div class="hist-empty">${esc(e.message)}</div>`; }
+      </div>`).join("") : '<div class="tg-empty" style="padding-top:90px"><div class="tg-empty-card">Пока нет переписок.<br>Откройте профиль игрока и нажмите «Написать» или найдите его по ID</div></div>';
+  } catch (e) {
+    el.innerHTML = `<div class="tg-empty" style="padding-top:90px"><div class="tg-empty-card">${esc(e.message)}<button class="tg-btn" onclick="renderChatsList()">Повторить</button></div></div>`;
+  }
 }
 
 /* окно диалога */
@@ -3478,6 +3513,7 @@ async function openChat(pid) {
 function closeChat() {
   clearInterval(__chatTimer); __chatTimer = null; __chatPid = null; __chatBusy = false; __chatSeq++;
   gid("chatOverlay").hidden = true;
+  if (!gid("chatsOverlay").hidden) renderChatsList();
   pollUnread();
 }
 function chatOpenPeerProfile() { if (__chatPeer) { const pid = __chatPeer.publicId; closeChat(); openUserProfile(pid); } }
@@ -3530,6 +3566,7 @@ async function chatLoad(initial) {
     if (initial || fresh.length) {
       chatRender();
       box.scrollTop = atBottom ? box.scrollHeight : keep;
+      if (!initial && fresh.length) { const all = box.querySelectorAll(".tg-msg"); for (let i = Math.max(0, all.length - fresh.length); i < all.length; i++) all[i].classList.add("arrive"); }
     }
     if (r) chatApplyState(r.state, r.canSend);
   } catch (e) {
@@ -3550,16 +3587,39 @@ function chatInputSync() {
   inp.style.height = Math.min(inp.scrollHeight - 22, 120) + "px";
   btn.classList.toggle("empty", !inp.value.trim());
 }
+function chatFlyIn(fieldRect) {
+  const box = gid("chatMsgs"), ov = gid("chatOverlay");
+  const el = [...box.querySelectorAll(".tg-msg")].pop();
+  if (!el || !fieldRect || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+  const r = el.getBoundingClientRect();
+  if (!r.width) return;
+  el.classList.add("hid");
+  const g = el.cloneNode(true);
+  g.classList.remove("hid"); g.classList.add("tg-fly");
+  g.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;transform-origin:100% 100%;`;
+  ov.appendChild(g);
+  const dx = (fieldRect.right - 16) - r.right, dy = (fieldRect.top + fieldRect.height / 2) - (r.top + r.height / 2);
+  g.style.transform = `translate(${dx}px,${dy}px) scale(.82)`; g.style.opacity = ".15";
+  void g.offsetWidth;
+  g.style.transition = "transform .34s cubic-bezier(.22,1,.36,1), opacity .18s ease-out";
+  g.style.transform = "none"; g.style.opacity = "1";
+  const done = () => { g.remove(); el.classList.remove("hid"); };
+  setTimeout(done, 360);
+}
 async function chatSend() {
   const inp = gid("chatInput"), text = inp.value.trim();
   if (!text || !__chatPid) return;
   const btn = gid("chatSendBtn"); btn.disabled = true;
+  const fieldRect = inp.closest(".tg-field").getBoundingClientRect();
   try {
     const r = await api("/api/chats/" + encodeURIComponent(__chatPid) + "/send", { method: "POST", body: { text } });
     inp.value = ""; chatInputSync();
-    if (r.message.id > __chatLastId) { __chatMsgs.push(r.message); __chatLastId = r.message.id; }
+    btn.classList.remove("pop"); void btn.offsetWidth; btn.classList.add("pop");
+    let added = false;
+    if (r.message.id > __chatLastId) { __chatMsgs.push(r.message); __chatLastId = r.message.id; added = true; }
     chatRender();
     const box = gid("chatMsgs"); box.scrollTop = box.scrollHeight;
+    if (added) chatFlyIn(fieldRect);
     chatApplyState(r.state, r.canSend);
   } catch (e) { gid("chatBanner").innerHTML = `<div style="color:var(--danger)">${esc(e.message)}</div>`; }
   btn.disabled = false;
