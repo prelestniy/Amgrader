@@ -168,6 +168,8 @@ MENUS = {
     ]),
     "users": ("👤 <b>Игроки</b>", [
         [("🔍 Найти игрока", "go:find")],
+        [("🆔 Сменить ID игрока", "go:setpid")],
+        [("🚩 Жалобы", "a:reports")],
         [("🏆 Топ по балансу", "a:top")],
     ]),
     "luck": ("🍀 <b>Скрытая удача</b>\nПока показанный шанс ≤ порога, реальный = показанный + бонус.", [
@@ -508,7 +510,38 @@ async def act_tasks(target):
     await send(target, "📋 <b>Задания</b>\nНажмите на задание, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
 
 
-ACTIONS = {"top": act_top, "promos": act_promos, "delpromo": act_delpromo, "tasks": act_tasks}
+async def act_reports(target):
+    try:
+        d = await api("GET", "/admin/reports", params={"limit": 8})
+    except ApiError as e:
+        return await send(target, f"❌ {esc(e)}", back_kb("users"))
+    reports = d["reports"]
+    if not reports:
+        return await send(target, "🚩 <b>Жалобы</b>\n\nНовых жалоб нет ✅", back_kb("users"))
+    blocks = []
+    for r in reports:
+        who = lambda u: f"<b>{esc(u['nickname'] or '—')}</b> · ID <code>{esc(u['public_id'] or '—')}</code>"
+        t = [f"🚩 <b>#{r['id']}</b> · {esc(r['reason'])}", f"От: {who(r['reporter'])}", f"На: {who(r['reported'])}"]
+        if r["comment"]:
+            t.append(f"Комментарий: {esc(r['comment'])}")
+        for m in r["context"][-4:]:
+            t.append(f"• <i>{'жалуется' if m['from'] == 'reporter' else 'обвиняемый'}:</i> {esc(m['text'][:100])}")
+        blocks.append("\n".join(t))
+    kb = grid([B(f"✅ Закрыть #{r['id']}", f"rc:{r['id']}") for r in reports], 2)
+    await send(target, f"🚩 <b>Жалобы</b> · новых: <b>{d['total']}</b>\n\n" + "\n\n".join(blocks), back_kb("users", *kb))
+
+
+@admin.callback_query(F.data.startswith("rc:"))
+async def cb_report_close(cb: CallbackQuery):
+    await cb.answer()
+    try:
+        await api("POST", "/admin/reports/close", json={"id": int(cb.data[3:])})
+    except (ApiError, ValueError):
+        pass
+    await act_reports(cb)
+
+
+ACTIONS = {"top": act_top, "promos": act_promos, "delpromo": act_delpromo, "tasks": act_tasks, "reports": act_reports}
 
 
 @admin.callback_query(F.data.startswith("a:"))
@@ -564,9 +597,9 @@ COMMAND_FLOWS = {
     "new": "promo", "newpromo": "promo", "newitem": "promo", "items": "items",
     "grant": "grant", "setbal": "setbal", "grantall": "grantall", "setall": "setall",
     "luck": "luck", "gluck": "gluck", "luckoff": "luckoff", "gluckoff": "gluckoff",
-    "find": "find", "addtask": "task_tg",
+    "find": "find", "setid": "setpid", "addtask": "task_tg",
 }
-COMMAND_ACTIONS = {"top": "top", "promos": "promos", "delpromo": "delpromo", "tasks": "tasks", "deltask": "tasks"}
+COMMAND_ACTIONS = {"reports": "reports", "top": "top", "promos": "promos", "delpromo": "delpromo", "tasks": "tasks", "deltask": "tasks"}
 
 
 def cmd_name(message: Message) -> str:
@@ -942,13 +975,32 @@ async def run_find(v: dict, uid: int) -> str:
     if not users:
         return "Никого не найдено."
     blocks = [f"<b>{esc(u['nickname'])}</b> @{esc(u['username'] or '—')}\n"
-              f"#{u['id']} · логин: <code>{esc(u['login'] or '—')}</code> · {fmt_g(u['balance'])} G · код: <code>{esc(u['referral_code'])}</code>"
+              f"#{u['id']} · ID: <code>{esc(u.get('public_id') or '—')}</code> · логин: <code>{esc(u['login'] or '—')}</code> · {fmt_g(u['balance'])} G · код: <code>{esc(u['referral_code'])}</code>"
               for u in users[:15]]
     return "🔍 <b>Найдено</b>\n\n" + "\n\n".join(blocks)
 
 
 FLOWS["find"] = Flow("find", "🔍", "Поиск игрока", "users", [
     Step("q", "Введите логин, ник или @username (можно часть):", "", p_query)], run_find, confirm=False, again="🔍 Искать ещё")
+
+
+# ---- сменить публичный ID игроку ----
+def p_pid(t: str) -> str:
+    s = t.strip().lstrip("#")
+    if not re.fullmatch(r"[A-Za-z0-9_]{3,16}", s):
+        raise ValueError("ID: 3–16 символов, только латиница, цифры и _")
+    return s
+
+
+async def run_setpid(v: dict, uid: int) -> str:
+    r = await api("POST", "/admin/public_id", json={"login": v["user"], "new_id": v["pid"]})
+    return f"✅ Публичный ID <b>{lab(v, 'user')}</b> теперь <code>{esc(r.get('publicId', v['pid']))}</code>"
+
+
+FLOWS["setpid"] = Flow("setpid", "🆔", "Сменить ID игрока", "users", [
+    Step("user", USER_PROMPT, "Игрок", p_user),
+    Step("pid", "Введите <b>новый ID</b> (3–16 символов: латиница, цифры, _).", "Новый ID", p_pid),
+], run_setpid, lambda v: f"🆔 Игрок: <b>{lab(v, 'user')}</b>\nНовый ID: <code>{esc(v['pid'])}</code>", again="🆔 Ещё смена ID")
 
 
 # ====================================================================
