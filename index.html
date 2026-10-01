@@ -324,21 +324,33 @@ button, input { font-family:inherit; font-synthesis:none; }
 /* ===== МИНЫ ===== */
 .mines-wrap { display:flex; flex-direction:column; gap:12px; padding-bottom:12px; }
 .mines-top { display:flex; align-items:baseline; justify-content:space-between; padding:0 2px; }
-.mines-mult { font-size:26px; font-weight:800; color:var(--accent); }
-.mines-win { font-size:13px; color:var(--text-dim); }
-.mines-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
-.mine-cell { position:relative; aspect-ratio:1/1; border-radius:14px; background:var(--surface-2);
-  border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:transform .12s var(--ease-out), background .15s ease, border-color .15s ease; }
-.mine-cell:active { transform:scale(0.93); }
-.mine-cell.open { background:var(--surface-1); }
-.mine-cell.safe { border-color:rgba(182,242,74,.45); background:rgba(182,242,74,.1); }
-.mine-cell.safe svg { color:var(--accent); }
-.mine-cell.bomb { border-color:rgba(255,90,74,.5); background:rgba(255,90,74,.14); animation:bombPop .4s var(--ease-out); }
-.mine-cell.bomb svg { color:var(--danger); }
+.mines-mult { font-size:30px; font-weight:800; color:var(--accent); text-shadow:0 0 22px rgba(182,242,74,.45); }
+.mines-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:9px; padding:14px; border-radius:24px;
+  border:1px solid var(--border-hi); box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.45);
+  background:radial-gradient(110% 60% at 50% 0%, rgba(182,242,74,.09), transparent 60%), linear-gradient(180deg,#131418,#0c0c0f); }
+.mine-cell { position:relative; aspect-ratio:1/1; border-radius:15px; background:linear-gradient(180deg,#25262d 0%,#18191e 100%); border:1px solid rgba(255,255,255,.08);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 4px 0 #0a0a0d, 0 8px 12px rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  transition:transform .12s var(--ease-out), background .2s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s ease; }
+.mine-cell::before { content:""; width:26%; height:26%; border-radius:50%; background:rgba(255,255,255,.05); }
+.mine-cell:active { transform:translateY(3px); box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 1px 0 #0a0a0d; }
+.mine-cell.open::before { display:none; }
+.mine-cell.open { box-shadow:inset 0 2px 8px rgba(0,0,0,.5); }
+.mine-cell svg { width:62%; height:62%; position:relative; z-index:1; }
+.mine-cell.safe { border-color:rgba(182,242,74,.6); background:radial-gradient(circle at 50% 40%, rgba(182,242,74,.3), rgba(182,242,74,.06) 70%);
+  box-shadow:inset 0 0 14px rgba(182,242,74,.25), 0 0 18px rgba(182,242,74,.25); }
+.mine-cell.safe svg { filter:drop-shadow(0 0 8px rgba(182,242,74,.8)); animation:gemIn .5s cubic-bezier(.34,1.6,.5,1); }
+.mine-cell.safe::after, .mine-cell.bomb::after { content:""; position:absolute; inset:0; border-radius:15px; border:2px solid var(--accent); animation:ringOut .6s ease-out forwards; }
+.mine-cell.bomb { border-color:rgba(255,90,74,.7); background:radial-gradient(circle at 50% 45%, rgba(255,120,60,.45), rgba(255,90,74,.08) 72%);
+  box-shadow:inset 0 0 14px rgba(255,90,74,.35), 0 0 22px rgba(255,90,74,.4); animation:bombBoom .5s ease; }
+.mine-cell.bomb::after { border-color:var(--danger); }
+.mine-cell.bomb svg { filter:drop-shadow(0 0 8px rgba(255,120,60,.8)); animation:gemIn .45s cubic-bezier(.34,1.6,.5,1); }
 .mine-cell.disabled { pointer-events:none; }
-.mine-cell.locked { opacity:.55; }
-@keyframes bombPop { 0% { transform:scale(1); } 35% { transform:scale(1.18); } 100% { transform:scale(1); } }
+.mine-cell.locked { opacity:.6; }
+@keyframes gemIn { 0% { transform:scale(.2) rotate(-40deg); opacity:0; } 100% { transform:scale(1) rotate(0); opacity:1; } }
+@keyframes ringOut { 0% { transform:scale(.8); opacity:.9; } 100% { transform:scale(1.35); opacity:0; } }
+@keyframes bombBoom { 0%,100% { transform:translate(0); } 15% { transform:translate(-4px,2px) scale(1.12); } 30% { transform:translate(4px,-2px) scale(1.12); } 50% { transform:translate(-2px,1px); } 70% { transform:translate(2px,0); } }
+
 .mines-panel { margin-top:0; }
 .mines-panel input[type=number]::-webkit-inner-spin-button,
 .mines-panel input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
@@ -358,34 +370,53 @@ button, input { font-family:inherit; font-synthesis:none; }
   border:1px solid var(--border); font-size:12px; font-weight:700; color:var(--text-dim);
   transition:background .2s ease, color .2s ease, border-color .2s ease; }
 .ladder-chip.done { background:rgba(182,242,74,.14); border-color:rgba(182,242,74,.4); color:var(--accent); }
-.ladder-stage { position:relative; background:var(--surface-1); border:1px solid var(--border);
-  border-radius:var(--r-card); padding:10px; overflow:hidden; }
+.ladder-stage { position:relative; border:1px solid var(--border-hi); border-radius:22px; padding:12px 14px; overflow:hidden;
+  background:radial-gradient(120% 70% at 50% 0%, rgba(182,242,74,.10), transparent 62%), linear-gradient(180deg,#131418,#0c0c0f);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.45); }
+.ladder-stage::before, .ladder-stage::after { content:""; position:absolute; top:0; bottom:0; width:3px; z-index:4; pointer-events:none;
+  background:linear-gradient(180deg,transparent,rgba(182,242,74,.55),transparent); }
+.ladder-stage::before { left:4px; } .ladder-stage::after { right:4px; }
+.ladder-stage.shake { animation:ladderShake .4s ease; }
+@keyframes ladderShake { 0%,100% { transform:translate(0); } 20% { transform:translate(-5px,2px); } 40% { transform:translate(5px,-2px); } 60% { transform:translate(-3px,1px); } 80% { transform:translate(2px,0); } }
 .ladder-row { position:relative; height:226px; overflow:hidden; }
 .ladder-board { position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column-reverse; gap:6px;
-  transition:transform .38s cubic-bezier(.3,.9,.3,1); }
+  transition:transform .45s cubic-bezier(.3,.9,.3,1); }
 .ladder-line { height:52px; display:grid; grid-template-columns:44px repeat(8,1fr); gap:6px; align-items:stretch; }
-.ladder-lbl { display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:var(--text-mute); }
-.ladder-line.done .ladder-lbl { color:var(--accent); }
-.ladder-line.active .ladder-lbl { color:var(--text); }
-.ladder-cell { position:relative; border-radius:10px; background:var(--surface-2); border:1px solid var(--border);
-  transition:background .15s ease, border-color .15s ease, transform .12s ease, opacity .2s ease; }
-.ladder-line.future .ladder-cell { opacity:.45; }
-.ladder-line.ground .ladder-cell { background:transparent; border-style:dashed; opacity:.5; }
-.ladder-line.done .ladder-cell { opacity:.4; }
-.ladder-line.done .ladder-cell.ok { opacity:1; background:rgba(182,242,74,.16); border-color:rgba(182,242,74,.5); }
-.ladder-line.active .ladder-cell { border-color:var(--border-hi); background:var(--surface-3); cursor:pointer; }
-.ladder-line.active .ladder-cell:active { transform:scale(0.92); }
-.ladder-cell.disabled { pointer-events:none; }
+.ladder-lbl { display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:var(--text-mute);
+  background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:10px; }
+.ladder-line.done .ladder-lbl { color:#0A0A0B; background:var(--accent); border-color:var(--accent); box-shadow:0 0 14px rgba(182,242,74,.4); }
+.ladder-line.active .ladder-lbl { color:var(--accent); border-color:rgba(182,242,74,.5); background:rgba(182,242,74,.08); }
+.ladder-cell { position:relative; border-radius:11px; background:linear-gradient(180deg,#25262d 0%,#18191e 100%); border:1px solid rgba(255,255,255,.07);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 3px 0 #0b0b0e;
+  transition:background .15s ease, border-color .15s ease, transform .12s ease, opacity .2s ease, box-shadow .2s ease; }
+.ladder-line.future .ladder-cell { opacity:.4; }
+.ladder-line.ground .ladder-cell { background:repeating-linear-gradient(45deg,#17181d 0 6px,#1d1e24 6px 12px); opacity:.7; box-shadow:none; }
+.ladder-line.done .ladder-cell { opacity:.35; }
+.ladder-line.done .ladder-cell.ok { opacity:1; background:linear-gradient(180deg,rgba(182,242,74,.32),rgba(182,242,74,.1));
+  border-color:rgba(182,242,74,.6); box-shadow:inset 0 1px 0 rgba(255,255,255,.2), 0 0 16px rgba(182,242,74,.3); }
+.ladder-line.active .ladder-cell { cursor:pointer; border-color:rgba(182,242,74,.45); animation:ladderPulse 1.6s ease-in-out infinite; }
+.ladder-line.active .ladder-cell:active { transform:translateY(2px) scale(.94); }
+.ladder-line.active .ladder-cell:nth-child(odd) { animation-delay:.25s; }
+@keyframes ladderPulse { 0%,100% { box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 3px 0 #0b0b0e, 0 0 0 rgba(182,242,74,0); }
+  50% { box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 3px 0 #0b0b0e, 0 0 14px rgba(182,242,74,.35); } }
+.ladder-cell.disabled { pointer-events:none; animation:none !important; }
 .ladder-over { position:absolute; left:50px; right:0; top:0; bottom:0; pointer-events:none; z-index:3; }
 .ladder-char { position:absolute; height:52px; display:flex; align-items:center; justify-content:center; color:var(--accent);
-  transition:left .26s cubic-bezier(.34,1.3,.4,1), bottom .3s var(--ease-out), opacity .2s ease; z-index:3; }
-.ladder-char svg { filter:drop-shadow(0 3px 5px rgba(0,0,0,.45)); }
-.ladder-char.hit { animation:ladderHit .5s ease forwards; }
-@keyframes ladderHit { 0% { transform:translateY(0) rotate(0); } 30% { transform:translateY(2px) rotate(-10deg); } 100% { transform:translateY(18px) rotate(28deg); opacity:0; } }
-.ladder-stone { position:absolute; height:52px; display:flex; align-items:center; justify-content:center; color:var(--text-dim);
-  transform:translateY(-90px); opacity:0; transition:transform .34s cubic-bezier(.5,0,.75,0), opacity .2s ease; z-index:2; }
-.ladder-stone.fall { transform:translateY(0); opacity:1; }
-.ladder-stone.hit { color:var(--danger); }
+  transition:left .3s cubic-bezier(.4,0,.2,1), bottom .3s var(--ease-out), opacity .2s ease; z-index:3; }
+.ladder-char svg { filter:drop-shadow(0 0 7px rgba(182,242,74,.6)) drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+.ladder-char .lm { transform-box:view-box; }
+.ladder-char.go .la { animation:limbA .28s ease-in-out infinite alternate; }
+.ladder-char.go .lb { animation:limbA .28s ease-in-out infinite alternate-reverse; }
+.ladder-char.go svg { animation:bodyBob .56s ease-in-out infinite; }
+@keyframes limbA { from { transform:translateY(-2.2px); } to { transform:translateY(2.2px); } }
+@keyframes bodyBob { 0%,100% { transform:translateX(-1px) rotate(-3deg); } 50% { transform:translateX(1px) rotate(3deg); } }
+.ladder-char.hit { animation:ladderHit .55s ease forwards; }
+@keyframes ladderHit { 0% { transform:scale(1); } 25% { transform:scale(1.1,.55) translateY(10px); } 100% { transform:scale(1.2,.2) translateY(24px); opacity:0; } }
+.ladder-stone { position:absolute; height:52px; display:flex; align-items:center; justify-content:center;
+  transform:translateY(-110px) rotate(-60deg); opacity:0; transition:transform .38s cubic-bezier(.55,0,.8,.4), opacity .15s ease; z-index:2; }
+.ladder-stone svg { filter:drop-shadow(0 4px 4px rgba(0,0,0,.55)); }
+.ladder-stone.fall { transform:translateY(0) rotate(0); opacity:1; }
+.ladder-stone.hit svg { filter:drop-shadow(0 0 8px var(--danger)) saturate(1.6) hue-rotate(-20deg); }
 
 /* ===== НИЖНЯЯ ПАНЕЛЬ ===== */
 .bottom-nav { position:fixed; left:0; right:0; bottom:0; z-index:150;
@@ -3443,8 +3474,8 @@ function updateNavScale(name) {
    МИНЫ — игра на баланс
    ============================================================ */
 const MINES_TOTAL = 25, MINES_EDGE = 0.97;
-const ICON_GEM = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6-6 6 6-6 11z"/><path d="M6 9h12M9.5 9L12 20M14.5 9L12 20"/></svg>';
-const ICON_BOMB = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="14" r="7"/><path d="M15.5 8.5L18 6M17 4l2 .7-.7 2M11 7V4"/></svg>';
+const ICON_GEM = '<svg viewBox="0 0 24 24"><polygon points="9,4 15,4 18,9 6,9" fill="#E8FFA8"/><polygon points="6,9 12,9 12,20" fill="#B6F24A"/><polygon points="12,9 18,9 12,20" fill="#7DBE1C"/><polygon points="9,4 12,9 6,9" fill="#fff" opacity=".35"/><circle cx="9.6" cy="6.4" r=".9" fill="#fff"/></svg>';
+const ICON_BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#2B2E37"/><circle cx="8.4" cy="11.4" r="2.4" fill="#fff" opacity=".18"/><rect x="9" y="3.6" width="4" height="3.6" rx="1" fill="#6B6F7B"/><path d="M13 5q3-1.6 5 .6" fill="none" stroke="#D9B26A" stroke-width="1.5" stroke-linecap="round"/><polygon points="19,1.5 20,4 22.5,4.6 20.4,6.2 21,8.6 19,7.2 17,8.6 17.6,6.2 15.5,4.6 18,4" fill="#FFB020"/><circle cx="19" cy="5" r="1.3" fill="#FFF1A8"/></svg>';
 let mines = { phase: "idle", bet: 100, count: 3, bombs: [], opened: [] };
 function minesLoadPrefs() {
   try {
@@ -3552,8 +3583,8 @@ function minesCashout() {
    ЛЕСЕНКА — человечек бежит по клеткам, сверху падают камни
    ============================================================ */
 const LADDER_COLS = 8, LADDER_EDGE = 0.97, LADDER_MAX_ROWS = 12;
-const ICON_RUN = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.6" r="2"/><path d="M12 7v5"/><path d="M12 12l-4 3.2M12 12l5 2"/><path d="M8.2 9.6L12 7.6l3.4 1.6"/><path d="M8 17.2l1-4.3M15.4 16l1 3.2"/></svg>';
-const ICON_STONE = '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><ellipse cx="12" cy="15.5" rx="8.2" ry="5"/><ellipse cx="12" cy="9" rx="5.6" ry="3.6"/></svg>';
+const ICON_RUN = '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="12" cy="5" r="2.6" fill="currentColor" stroke="none"/><path d="M12 8.4V15"/><g class="lm la"><path d="M12 9.6L7.4 5.6"/></g><g class="lm lb"><path d="M12 9.6l4.6-4"/></g><g class="lm lb"><path d="M12 15l-3.6 5.2"/></g><g class="lm la"><path d="M12 15l3.6 5.2"/></g></svg>';
+const ICON_STONE = '<svg viewBox="0 0 24 24" width="30" height="30"><polygon points="4,16 7,8 13,5 19,9 21,16 15,20 8,20" fill="#7B808C"/><polygon points="7,8 13,5 19,9 13,12" fill="#A7ACB8"/><polygon points="13,12 19,9 21,16 15,20" fill="#575B66"/><polygon points="4,16 7,8 13,12 8,20" fill="#6A6F7B"/></svg>';
 let ladder = { phase: "idle", bet: 100, stones: 3, row: 0, resolving: false };
 function ladderLoadPrefs() {
   try {
@@ -3658,18 +3689,24 @@ function ladderStart() {
 function ladderPickCell(c) {
   if (ladder.phase !== "playing" || ladder.resolving) return;
   ladder.resolving = true;
-  const rowEl = $("ladderRow");
+  const rowEl = $("ladderRow"), stage = rowEl.parentElement;
   rowEl.querySelectorAll(".ladder-cell").forEach(el => el.classList.add("disabled"));
-  const char = $("ladderChar");
-  char.style.opacity = 1; char.style.left = ladderX(c);
+  const char = $("ladderChar"), target = ladder.row + 1;
+  char.style.opacity = 1; char.classList.add("go"); char.style.left = ladderX(c);
   ladderRenderHud();
+  // 1) бежит к клетке -> 2) лезет на ступень -> 3) падают камни
   setTimeout(() => {
+    char.style.transition = "left .3s ease, bottom .8s cubic-bezier(.45,.05,.55,.95), opacity .2s ease";
+    char.style.bottom = (target * LADDER_STEP) + "px";
+  }, 320);
+  setTimeout(() => {
+    char.classList.remove("go");
     const stoneCols = [];
     while (stoneCols.length < ladder.stones) { const r = Math.floor(Math.random() * LADDER_COLS); if (!stoneCols.includes(r)) stoneCols.push(r); }
     stoneCols.forEach(sc => {
       const st = document.createElement("div");
       st.className = "ladder-stone"; st.style.left = ladderX(sc); st.style.width = "calc((100% - 42px) / 8)";
-      st.style.bottom = ((ladder.row + 1) * LADDER_STEP) + "px"; st.innerHTML = ICON_STONE;
+      st.style.bottom = (target * LADDER_STEP) + "px"; st.innerHTML = ICON_STONE;
       if (sc === c) st.dataset.hit = "1";
       $("ladderOver").appendChild(st);
       requestAnimationFrame(() => requestAnimationFrame(() => st.classList.add("fall")));
@@ -3677,22 +3714,23 @@ function ladderPickCell(c) {
     const hit = stoneCols.includes(c);
     setTimeout(() => {
       if (hit) {
-        char.classList.add("hit");
+        char.classList.add("hit"); stage.classList.add("shake");
         rowEl.querySelectorAll(".ladder-stone[data-hit='1']").forEach(st => st.classList.add("hit"));
         ladder.phase = "lost"; ladder.resolving = false;
         notify("lose", "Лесенка", "Придавило", "- " + fmt(ladder.bet), OK_ITEM);
         ladderRenderHud();
-        setTimeout(ladderRenderRow, 550);
+        setTimeout(() => { stage.classList.remove("shake"); ladderRenderRow(); }, 900);
       } else {
         (ladder.picks = ladder.picks || []).push(c);
-        ladder.row++; ladder.resolving = false;
-        char.style.bottom = (ladder.row * LADDER_STEP) + "px";
-        ladderRenderTrail(); ladderRenderHud();
-        if (ladder.row >= LADDER_MAX_ROWS) { setTimeout(() => ladderCashout(true), 260); return; }
-        setTimeout(ladderRenderRow, 300);
+        ladder.row++;
+        setTimeout(() => {
+          ladder.resolving = false;
+          ladderRenderTrail(); ladderRenderHud(); ladderRenderRow();
+          if (ladder.row >= LADDER_MAX_ROWS) setTimeout(() => ladderCashout(true), 260);
+        }, 500);
       }
-    }, 360);
-  }, 260);
+    }, 420);
+  }, 1160);
 }
 function ladderCashout(top) {
   if (ladder.phase !== "playing" || ladder.row <= 0) return;
