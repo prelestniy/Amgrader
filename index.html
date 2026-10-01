@@ -830,30 +830,75 @@ button, input { font-family:inherit; font-synthesis:none; }
 .up-actions { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
 .up-two { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 
-/* ===== сообщения ===== */
-.chat-ov { display:flex; flex-direction:column; overflow:hidden; padding-bottom:0; z-index:160; }
+/* ===== сообщения (стиль Telegram) ===== */
+.chat-ov { --tg-bg:#0e1621; --tg-bar:#17212b; --tg-in:#182533; --tg-out:#2b5278; --tg-blue:#6ab3f3; --tg-send:#5288c1; --tg-dim:#708499;
+  display:flex; flex-direction:column; overflow:hidden; padding-bottom:0; z-index:160; background:var(--tg-bg); }
 .chat-ov[hidden] { display:none; }
-.chat-head { display:flex; align-items:center; gap:10px; padding:12px; border-bottom:1px solid var(--border); flex-shrink:0; }
-.chat-peer { display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; }
-.chat-peer .fp-av { width:36px; height:36px; border-radius:11px; }
-.chat-msgs { flex:1; min-height:0; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:6px; }
-.msg { max-width:78%; padding:9px 12px; border-radius:14px; background:var(--surface-2); font-size:14px; line-height:1.35;
-  word-break:break-word; white-space:pre-wrap; align-self:flex-start; }
-.msg.me { align-self:flex-end; background:var(--accent); color:#0A0A0B; }
-.msg small { display:block; font-size:10px; opacity:.6; margin-top:3px; text-align:right; }
-.chat-banner { padding:10px 14px; font-size:13px; color:var(--text-dim); text-align:center; border-top:1px solid var(--border);
-  display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
+.tg-head { display:flex; align-items:center; gap:4px; padding:6px 8px; background:var(--tg-bar); flex-shrink:0; box-shadow:0 1px 0 rgba(0,0,0,.3); }
+.tg-hbtn { width:40px; height:40px; flex-shrink:0; border:none; border-radius:50%; background:none; color:var(--tg-dim); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.tg-hbtn:active { background:rgba(255,255,255,.08); }
+.chat-peer { flex:1; display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; padding:2px 0; }
+.tg-ptext { min-width:0; }
+.tg-pname { font-size:16px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tg-psub { font-size:13px; color:var(--tg-dim); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tg-av { width:42px; height:42px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:17px; overflow:hidden; }
+.tg-av img { width:100%; height:100%; object-fit:cover; display:block; }
+.chat-peer .tg-av { width:40px; height:40px; }
+
+.chat-msgs { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:8px 10px; display:flex; flex-direction:column;
+  background-image:radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.6px); background-size:22px 22px; }
+.tg-msg { position:relative; max-width:82%; margin-top:2px; padding:6px 10px 6px; border-radius:12px; font-size:15px; line-height:1.3; color:#fff;
+  word-break:break-word; white-space:pre-wrap; }
+.tg-msg.first { margin-top:8px; }
+.tg-msg.in { align-self:flex-start; background:var(--tg-in); }
+.tg-msg.out { align-self:flex-end; background:var(--tg-out); }
+.tg-msg.in:not(.first) { border-top-left-radius:5px; }
+.tg-msg.in:not(.last) { border-bottom-left-radius:5px; }
+.tg-msg.out:not(.first) { border-top-right-radius:5px; }
+.tg-msg.out:not(.last) { border-bottom-right-radius:5px; }
+.tg-msg.in.last { border-bottom-left-radius:0; }
+.tg-msg.out.last { border-bottom-right-radius:0; }
+.tg-msg.last::after { content:""; position:absolute; bottom:0; width:9px; height:11px; }
+.tg-msg.in.last::after { left:-8px; background:var(--tg-in); clip-path:polygon(100% 0,100% 100%,0 100%); }
+.tg-msg.out.last::after { right:-8px; background:var(--tg-out); clip-path:polygon(0 0,100% 100%,0 100%); }
+.tg-time { float:right; margin:8px 0 -3px 10px; font-size:11px; line-height:1; color:rgba(255,255,255,.45); display:inline-flex; align-items:center; gap:3px; white-space:nowrap; user-select:none; }
+.tg-msg.out .tg-time { color:#8fb6dc; }
+.tg-day { align-self:center; margin:10px 0 4px; padding:3px 11px; border-radius:999px; background:rgba(14,22,33,.75); color:#fff; font-size:13px; }
+.tg-empty { margin:auto; padding:0 24px; }
+.tg-empty-card { background:rgba(14,22,33,.75); color:#cfd8e3; padding:10px 18px; border-radius:16px; font-size:14px; text-align:center; display:flex; flex-direction:column; gap:10px; align-items:center; }
+.tg-loader { margin:auto; width:34px; height:34px; border-radius:50%; border:3px solid rgba(255,255,255,.14); border-top-color:var(--tg-blue); animation:tgspin .8s linear infinite; }
+@keyframes tgspin { to { transform:rotate(360deg); } }
+
+.chat-banner { padding:10px 14px; font-size:13px; line-height:1.35; color:#a8b8c8; text-align:center; background:var(--tg-bar);
+  border-top:1px solid rgba(0,0,0,.3); display:flex; flex-direction:column; gap:10px; flex-shrink:0; }
 .chat-banner:empty { display:none; }
-.chat-banner .up-two { margin:0; }
-.chat-compose { display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--border); flex-shrink:0; }
-.chat-compose input { flex:1; min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-btn);
-  padding:12px 14px; color:var(--text); font-size:15px; outline:none; }
-.chat-compose input:focus { border-color:var(--border-hi); }
-.chat-compose .send-btn { width:48px; border:none; border-radius:var(--r-btn); background:var(--accent); color:#0A0A0B; display:flex;
-  align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
-.chat-compose .send-btn:disabled { background:var(--surface-2); color:var(--text-mute); }
-.chat-row-last { font-size:12px; color:var(--text-mute); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:190px; }
-.chat-row-meta { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
+.tg-actions { display:flex; gap:8px; }
+.tg-btn { flex:1; border:none; border-radius:10px; padding:10px 14px; background:var(--tg-send); color:#fff; font-size:14px; cursor:pointer; }
+.tg-btn:active { opacity:.8; }
+.tg-btn.ghost { background:rgba(255,255,255,.08); color:#cfd8e3; }
+
+.chat-compose { display:flex; align-items:flex-end; gap:8px; padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); background:var(--tg-bar); flex-shrink:0; }
+.tg-field { flex:1; min-width:0; background:var(--tg-bg); border-radius:22px; padding:0 16px; }
+.chat-compose textarea { display:block; width:100%; border:none; outline:none; resize:none; background:transparent; color:#fff; font:inherit; font-size:16px;
+  line-height:22px; height:22px; max-height:120px; padding:11px 0; box-sizing:content-box; }
+.chat-compose textarea::placeholder { color:var(--tg-dim); }
+.chat-compose .send-btn { width:44px; height:44px; border:none; border-radius:50%; background:var(--tg-send); color:#fff; display:flex; align-items:center;
+  justify-content:center; cursor:pointer; flex-shrink:0; transition:background .15s, color .15s; }
+.chat-compose .send-btn.empty { background:transparent; color:var(--tg-dim); }
+.chat-compose .send-btn:disabled { opacity:.5; }
+
+/* список диалогов */
+.tg-row { display:flex; align-items:center; gap:12px; padding:9px 4px; border-radius:12px; cursor:pointer; }
+.tg-row:active { background:rgba(255,255,255,.05); }
+.tg-row .tg-av { width:54px; height:54px; font-size:21px; }
+.tg-rbody { flex:1; min-width:0; }
+.tg-rtop, .tg-rbot { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.tg-rbot { margin-top:3px; }
+.tg-rname { font-size:16px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tg-rtime { font-size:12px; color:var(--text-mute); flex-shrink:0; }
+.tg-rlast { font-size:14px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tg-rlast b { color:#6ab3f3; font-weight:400; }
+.tg-badge { min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:#5288c1; color:#fff; font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .ghost-btn.sel { border-color:var(--accent); color:var(--accent); }
 </style>
 </head>
@@ -1231,16 +1276,16 @@ button, input { font-family:inherit; font-synthesis:none; }
 </div>
 
 <div class="inv-full chat-ov" id="chatOverlay" hidden>
-  <div class="chat-head">
-    <button class="case-back-btn" onclick="closeChat()" aria-label="Назад"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <div class="tg-head">
+    <button class="tg-hbtn" onclick="closeChat()" aria-label="Назад"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
     <div class="chat-peer" id="chatPeer" onclick="chatOpenPeerProfile()"></div>
-    <button class="icon-btn" style="margin-left:auto" onclick="chatReport()" aria-label="Пожаловаться"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg></button>
+    <button class="tg-hbtn" onclick="chatReport()" aria-label="Пожаловаться"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg></button>
   </div>
   <div class="chat-msgs" id="chatMsgs"></div>
   <div class="chat-banner" id="chatBanner"></div>
   <div class="chat-compose" id="chatCompose">
-    <input id="chatInput" type="text" maxlength="500" placeholder="Сообщение" autocomplete="off" enterkeyhint="send">
-    <button class="send-btn" onclick="chatSend()" aria-label="Отправить"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    <div class="tg-field"><textarea id="chatInput" rows="1" maxlength="500" placeholder="Сообщение" autocomplete="off" enterkeyhint="send"></textarea></div>
+    <button class="send-btn empty" id="chatSendBtn" onclick="chatSend()" aria-label="Отправить"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4l17.45-7.48a1 1 0 000-1.84L3.4 3.6a.99.99 0 00-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"/></svg></button>
   </div>
 </div>
 
@@ -3379,88 +3424,155 @@ async function openChats() {
     setChatsBadge(r.unread || 0);
     if (!el) return;
     el.innerHTML = list.length ? list.map(c => `
-      <div class="fp-row" onclick="openChat('${esc(c.publicId)}')">
-        <div class="fp-av">${avatarHTML(c.photo, c.nickname)}</div>
-        <div style="min-width:0"><div class="fp-name">${esc(c.nickname)}</div>
-          <div class="chat-row-last">${c.state === "request_in" ? "Запрос на переписку · " : ""}${c.last.mine ? "Вы: " : ""}${esc(c.last.text)}</div></div>
-        <div class="chat-row-meta"><div class="fp-id">${fmtChatTime(c.last.at)}</div>${c.unread ? `<span class="row-badge">${c.unread}</span>` : ""}</div>
+      <div class="tg-row" onclick="openChat('${esc(c.publicId)}')">
+        ${tgAvatar(c.photo, c.nickname)}
+        <div class="tg-rbody">
+          <div class="tg-rtop"><div class="tg-rname">${esc(c.nickname)}</div><div class="tg-rtime">${fmtChatTime(c.last.at)}</div></div>
+          <div class="tg-rbot"><div class="tg-rlast">${c.state === "request_in" ? "Запрос на переписку · " : ""}${c.last.mine ? "<b>Вы:</b> " : ""}${esc(c.last.text)}</div>${c.unread ? `<span class="tg-badge">${c.unread}</span>` : ""}</div>
+        </div>
       </div>`).join("") : '<div class="hist-empty">Пока нет переписок. Откройте профиль игрока и нажмите «Написать»</div>';
   } catch (e) { const el = gid("chatsList"); if (el) el.innerHTML = `<div class="hist-empty">${esc(e.message)}</div>`; }
 }
 
 /* окно диалога */
+let __chatSeq = 0, __chatMsgs = [], __chatFailed = false;
+const TG_COLORS = [["#ff885e","#ff516a"],["#ffcd6a","#ffa85c"],["#82b1ff","#665fff"],["#a0de7e","#54cb68"],["#53edd6","#28c9b7"],["#72d5fd","#2a9ef1"],["#e0a2f3","#d669ed"]];
+function tgAvatar(photo, nick) {
+  let h = 0; const t = String(nick || "?");
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+  const c = TG_COLORS[h % TG_COLORS.length];
+  return `<div class="tg-av" style="background:linear-gradient(180deg,${c[0]},${c[1]})">${avatarHTML(photo, nick)}</div>`;
+}
+function withTimeout(p, ms) {
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("Сервер не отвечает. Проверьте соединение")), ms))]);
+}
+function fmtDay(ts) {
+  const d = new Date(ts * 1000), n = new Date(), y = new Date(); y.setDate(n.getDate() - 1);
+  if (d.toDateString() === n.toDateString()) return "Сегодня";
+  if (d.toDateString() === y.toDateString()) return "Вчера";
+  const o = { day: "numeric", month: "long" }; if (d.getFullYear() !== n.getFullYear()) o.year = "numeric";
+  return d.toLocaleDateString("ru-RU", o);
+}
+function chatRenderHead() {
+  const p = __chatPeer;
+  gid("chatPeer").innerHTML = p
+    ? tgAvatar(p.photo, p.nickname) + `<div class="tg-ptext"><div class="tg-pname">${esc(p.nickname)}</div><div class="tg-psub">ID ${esc(p.publicId || __chatPid)}</div></div>`
+    : tgAvatar("", "?") + `<div class="tg-ptext"><div class="tg-pname">Загрузка…</div><div class="tg-psub">ID ${esc(__chatPid || "")}</div></div>`;
+}
+function chatShowLoading() { gid("chatMsgs").innerHTML = '<div class="tg-loader"></div>'; }
+function chatShowError(msg) {
+  gid("chatMsgs").innerHTML = `<div class="tg-empty"><div class="tg-empty-card">${esc(msg || "Не удалось загрузить переписку")}<button class="tg-btn" onclick="chatRetry()">Повторить</button></div></div>`;
+}
+function chatRetry() { __chatLastId = 0; __chatMsgs = []; chatShowLoading(); chatLoad(true); }
+
 async function openChat(pid) {
   if (!isLoggedIn()) { openAuth("Войдите, чтобы писать сообщения"); return; }
   closeMisc();
-  __chatPid = pid; __chatLastId = 0; __chatPeer = null;
-  gid("chatMsgs").innerHTML = ""; gid("chatPeer").innerHTML = ""; gid("chatBanner").innerHTML = "";
+  clearInterval(__chatTimer); __chatTimer = null;
+  __chatPid = pid; __chatLastId = 0; __chatPeer = null; __chatMsgs = []; __chatBusy = false; __chatFailed = false; __chatSeq++;
+  gid("chatBanner").innerHTML = "";
   gid("chatCompose").style.display = "none";
+  gid("chatInput").value = ""; chatInputSync();
+  chatRenderHead(); chatShowLoading();
   gid("chatOverlay").hidden = false;
   await chatLoad(true);
-  clearInterval(__chatTimer);
-  __chatTimer = setInterval(() => { if (!document.hidden) chatLoad(false); }, 3000);
+  if (__chatPid !== pid) return;
+  __chatTimer = setInterval(() => { if (!document.hidden) chatLoad(__chatFailed); }, 3000);
 }
 function closeChat() {
-  clearInterval(__chatTimer); __chatTimer = null; __chatPid = null;
+  clearInterval(__chatTimer); __chatTimer = null; __chatPid = null; __chatBusy = false; __chatSeq++;
   gid("chatOverlay").hidden = true;
   pollUnread();
 }
 function chatOpenPeerProfile() { if (__chatPeer) { const pid = __chatPeer.publicId; closeChat(); openUserProfile(pid); } }
 
 function chatBannerHTML(state) {
-  const p = esc(__chatPid);
   switch (state) {
     case "none": return "Вы не друзья: можно отправить одно сообщение — это запрос на переписку. Писать дальше получится, когда игрок его примет.";
     case "request_out": return "Запрос на переписку отправлен. Вы сможете писать дальше, когда игрок его примет.";
     case "request_in": return `<div>Игрок хочет начать с вами переписку. Ответ на сообщение тоже принимает запрос.</div>
-      <div class="up-two"><button class="primary-btn" onclick="chatAnswer('accept')">Принять</button><button class="ghost-btn" onclick="chatAnswer('decline')">Отклонить</button></div>`;
+      <div class="tg-actions"><button class="tg-btn" onclick="chatAnswer('accept')">Принять</button><button class="tg-btn ghost" onclick="chatAnswer('decline')">Отклонить</button></div>`;
     case "declined": return "Игрок не принял запрос на переписку.";
     case "blocked_by_me": return "Вы заблокировали этого игрока.";
     case "blocked_me": return "Не удалось отправить сообщение этому игроку.";
     default: return "";
   }
 }
-function chatMsgHTML(m) { return `<div class="msg ${m.mine ? "me" : ""}">${esc(m.text)}<small>${fmtTime(m.at)}</small></div>`; }
+const TG_TICK = '<svg viewBox="0 0 16 11" width="14" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 5.8l3.4 3.4L12.5 1.6"/></svg>';
+function chatMsgHTML(m, first, last) {
+  const cls = (m.mine ? "out" : "in") + (first ? " first" : "") + (last ? " last" : "");
+  return `<div class="tg-msg ${cls}">${esc(m.text)}<span class="tg-time">${fmtTime(m.at)}${m.mine ? TG_TICK : ""}</span></div>`;
+}
+function chatRender() {
+  const box = gid("chatMsgs");
+  if (!__chatMsgs.length) { box.innerHTML = '<div class="tg-empty"><div class="tg-empty-card">Пока нет сообщений.<br>Напишите первым</div></div>'; return; }
+  let out = "", prevDay = "", prev = null;
+  __chatMsgs.forEach((m, i) => {
+    const day = new Date(m.at * 1000).toDateString();
+    if (day !== prevDay) { out += `<div class="tg-day">${fmtDay(m.at)}</div>`; prevDay = day; prev = null; }
+    const nx = __chatMsgs[i + 1];
+    const nextSame = nx && !!nx.mine === !!m.mine && new Date(nx.at * 1000).toDateString() === day;
+    out += chatMsgHTML(m, !prev || !!prev.mine !== !!m.mine, !nextSame);
+    prev = m;
+  });
+  box.innerHTML = out;
+}
 async function chatLoad(initial) {
-  if (!__chatPid || __chatBusy) return;
-  const pid = __chatPid; __chatBusy = true;
+  if (!__chatPid) return;
+  if (__chatBusy && !initial) return;
+  const pid = __chatPid, seq = ++__chatSeq;
+  __chatBusy = true;
   try {
-    const r = await api("/api/chats/" + encodeURIComponent(pid) + "?after=" + (initial ? 0 : __chatLastId));
-    if (pid !== __chatPid) return;
-    if (!__chatPeer) {
-      __chatPeer = r.peer;
-      gid("chatPeer").innerHTML = `<div class="fp-av">${avatarHTML(r.peer.photo, r.peer.nickname)}</div><div class="fp-name">${esc(r.peer.nickname)}</div>`;
+    const r = await withTimeout(api("/api/chats/" + encodeURIComponent(pid) + "?after=" + (initial ? 0 : __chatLastId)), 15000);
+    if (pid !== __chatPid || seq !== __chatSeq) return;
+    __chatFailed = false;
+    if (r && r.peer && !__chatPeer) { __chatPeer = r.peer; chatRenderHead(); }
+    const box = gid("chatMsgs");
+    const atBottom = initial || box.scrollHeight - box.scrollTop - box.clientHeight < 80, keep = box.scrollTop;
+    const fresh = ((r && r.messages) || []).filter(m => m.id > __chatLastId);
+    if (fresh.length) { __chatMsgs = __chatMsgs.concat(fresh); __chatLastId = fresh[fresh.length - 1].id; }
+    if (initial || fresh.length) {
+      chatRender();
+      box.scrollTop = atBottom ? box.scrollHeight : keep;
     }
-    const box = gid("chatMsgs"), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-    if (r.messages.length) {
-      box.insertAdjacentHTML("beforeend", r.messages.map(chatMsgHTML).join(""));
-      __chatLastId = r.messages[r.messages.length - 1].id;
-      if (initial || atBottom) box.scrollTop = box.scrollHeight;
-    }
-    chatApplyState(r.state, r.canSend);
-  } catch (e) { if (initial) gid("chatBanner").textContent = e.message; }
-  __chatBusy = false;
+    if (r) chatApplyState(r.state, r.canSend);
+  } catch (e) {
+    if (pid === __chatPid && seq === __chatSeq && initial) { __chatFailed = true; chatShowError(e.message); }
+  } finally {
+    if (seq === __chatSeq) __chatBusy = false;
+  }
 }
 function chatApplyState(state, canSend) {
   gid("chatBanner").innerHTML = chatBannerHTML(state);
   gid("chatCompose").style.display = canSend ? "" : "none";
+  if (canSend) chatInputSync();
+}
+function chatInputSync() {
+  const inp = gid("chatInput"), btn = gid("chatSendBtn");
+  if (!inp || !btn) return;
+  inp.style.height = "22px";
+  inp.style.height = Math.min(inp.scrollHeight - 22, 120) + "px";
+  btn.classList.toggle("empty", !inp.value.trim());
 }
 async function chatSend() {
   const inp = gid("chatInput"), text = inp.value.trim();
   if (!text || !__chatPid) return;
-  const btn = document.querySelector("#chatCompose .send-btn"); btn.disabled = true;
+  const btn = gid("chatSendBtn"); btn.disabled = true;
   try {
     const r = await api("/api/chats/" + encodeURIComponent(__chatPid) + "/send", { method: "POST", body: { text } });
-    inp.value = "";
-    const box = gid("chatMsgs");
-    if (r.message.id > __chatLastId) { box.insertAdjacentHTML("beforeend", chatMsgHTML(r.message)); __chatLastId = r.message.id; }
-    box.scrollTop = box.scrollHeight;
+    inp.value = ""; chatInputSync();
+    if (r.message.id > __chatLastId) { __chatMsgs.push(r.message); __chatLastId = r.message.id; }
+    chatRender();
+    const box = gid("chatMsgs"); box.scrollTop = box.scrollHeight;
     chatApplyState(r.state, r.canSend);
   } catch (e) { gid("chatBanner").innerHTML = `<div style="color:var(--danger)">${esc(e.message)}</div>`; }
   btn.disabled = false;
-  if (!gid("chatCompose").style.display) inp.focus();
+  if (gid("chatCompose").style.display !== "none") inp.focus();
 }
-document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target && e.target.id === "chatInput") { e.preventDefault(); chatSend(); } });
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey && e.target && e.target.id === "chatInput") { e.preventDefault(); chatSend(); }
+});
+document.addEventListener("input", e => { if (e.target && e.target.id === "chatInput") chatInputSync(); });
 async function chatAnswer(kind) {
   try {
     const r = await api("/api/chats/" + encodeURIComponent(__chatPid) + "/" + kind, { method: "POST" });
