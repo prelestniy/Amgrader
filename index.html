@@ -921,16 +921,22 @@ button, input { font-family:inherit; font-synthesis:none; }
 .ghost-btn.sel { border-color:var(--accent); color:var(--accent); }
 
 /* ===== реакции, ответы, обои, свайпы ===== */
-.chat-ov{touch-action:pan-y}
+.chat-ov,.chat-ov *{touch-action:pan-y}
+.chat-ov textarea{touch-action:manipulation}
 .chat-ov.dragging{transition:none!important}
 .tg-msg{will-change:transform}
 .tg-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px;clear:both}
 .tg-foot .tg-time{float:none;margin:0 0 0 auto}
-.tg-react{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 4px 0 7px;border-radius:999px;background:rgba(10,10,12,.88);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);animation:rIn .35s cubic-bezier(.34,1.6,.5,1)}
+.tg-react{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 4px 0 7px;border-radius:999px;background:rgba(10,10,12,.88);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
 .tg-react svg{width:17px;height:17px;display:block;filter:drop-shadow(0 0 4px rgba(255,255,255,.12))}
 .tg-react .rav{width:18px;height:18px;border-radius:50%;overflow:hidden;background:var(--accent);color:#0A0A0B;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center}
 .tg-react .rav img{width:100%;height:100%;object-fit:cover}
 @keyframes rIn{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.tg-foot.new{overflow:hidden;animation:footIn .34s cubic-bezier(.22,1,.36,1)}
+.tg-foot.new .tg-react,.tg-react.swap{animation:rIn .4s cubic-bezier(.34,1.6,.5,1)}
+.tg-foot.leaving{overflow:hidden;animation:footOut .26s ease-in forwards}
+@keyframes footIn{from{max-height:0;margin-top:0;opacity:0}to{max-height:40px;margin-top:5px;opacity:1}}
+@keyframes footOut{from{max-height:40px;opacity:1}to{max-height:0;margin-top:0;opacity:0}}
 .tg-pop svg{width:56px;height:56px;display:block;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
 .react-pick button svg{width:28px;height:28px;display:block;margin:auto}
 .tg-quote{border-left:3px solid currentColor;background:rgba(255,255,255,.14);border-radius:4px 10px 10px 4px;padding:5px 10px;margin:0 0 4px;font-size:13px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
@@ -939,7 +945,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 @keyframes tgFlash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
 .tg-pop{position:fixed;z-index:300;pointer-events:none;transform:translate(-50%,-50%);animation:tgPopR .75s ease-out forwards}
 @keyframes tgPopR{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-60%) scale(1.25);opacity:1}100%{transform:translate(-50%,-150%) scale(1);opacity:0}}
-.tg-swipe-ic{position:fixed;right:14px;z-index:30;width:34px;height:34px;border-radius:50%;background:var(--surface-3);color:var(--accent);display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transform:scale(.4)}
+.tg-swipe-ic{position:fixed;right:14px;z-index:400;width:34px;height:34px;border-radius:50%;background:var(--surface-3);color:var(--accent);display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transform:scale(.4)}
 .chat-replybar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface-1);border-top:1px solid var(--border);flex-shrink:0}
 .chat-replybar[hidden]{display:none}
 .chat-replybar .rb-line{width:3px;align-self:stretch;border-radius:2px;background:var(--accent)}
@@ -5119,9 +5125,29 @@ chatMsgHTML=function(m,first,last){
 };
 function rerender(){const b=gid("chatMsgs"),s=b.scrollTop;chatRender();b.scrollTop=s}
 function popEmoji(e,x,y){const d=document.createElement("div");d.className="tg-pop";d.innerHTML=RI[e];d.style.left=x+"px";d.style.top=y+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),800)}
-function doubleTapReact(el,x,y){const id=+el.dataset.id,e=dblEmoji(),cur=getReact(id);
-  if(cur===e){setReact(id,"")}else{setReact(id,e);popEmoji(e,x,y)}
-  rerender();if(navigator.vibrate)try{navigator.vibrate(12)}catch(_){}}
+function patchMsg(el,id,kind){
+  const m=__chatMsgs.find(z=>z.id===id);if(!m||!el.isConnected)return;
+  const t=document.createElement("div");
+  t.innerHTML=chatMsgHTML(m,el.classList.contains("first"),el.classList.contains("last"));
+  const n=t.firstChild;
+  if(kind==="new"){const f=n.querySelector(".tg-foot");f&&f.classList.add("new")}
+  if(kind==="swap"){const p=n.querySelector(".tg-react");p&&p.classList.add("swap")}
+  el.innerHTML=n.innerHTML;
+}
+function doubleTapReact(el,x,y){
+  const id=+el.dataset.id,e=dblEmoji(),cur=getReact(id),box=gid("chatMsgs");
+  const stick=box.scrollHeight-box.scrollTop-box.clientHeight<6;
+  const foot=el.querySelector(".tg-foot");
+  if(cur===e){
+    setReact(id,"");
+    if(foot){foot.classList.add("leaving");setTimeout(()=>patchMsg(el,id),270)}
+  }else{
+    setReact(id,e);popEmoji(e,x,y);
+    patchMsg(el,id,foot?"swap":"new");
+  }
+  if(stick){const t0=performance.now();(function f(){box.scrollTop=box.scrollHeight;if(performance.now()-t0<400)requestAnimationFrame(f)})()}
+  if(navigator.vibrate)try{navigator.vibrate(12)}catch(_){}
+}
 
 /* --- ответ на сообщение --- */
 let reply=null;
@@ -5164,7 +5190,7 @@ document.addEventListener("click",e=>{const q=e.target.closest&&e.target.closest
     return null};
   window.__msgAt=msgAt;
   const reset=()=>{if(g&&g.msg){g.msg.style.transition="transform .2s";g.msg.style.transform="";}ico.style.opacity=0;g=null};
-  ov.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&e.button!==0)return;
+  ov.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&e.button!==0)return;if(e.target.closest&&e.target.closest("textarea,input"))return;
     g={x:e.clientX,y:e.clientY,t:Date.now(),msg:msgAt(e.clientX,e.clientY,e.target),mode:null,dx:0,moved:false};if(g.msg)g.msg.style.transition="none"});
   ov.addEventListener("pointermove",e=>{if(!g)return;
     const dx=e.clientX-g.x,dy=e.clientY-g.y;
@@ -5172,10 +5198,9 @@ document.addEventListener("click",e=>{const q=e.target.closest&&e.target.closest
     if(!g.mode){
       if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){g.mode="v";return}
       if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.3){
-        if(g.msg&&g.msg.dataset.id){g.mode="reply";g.dir=dx>0?1:-1;const r=g.msg.getBoundingClientRect();
-          ico.style.top=(r.top+r.height/2-17)+"px";
-          if(g.dir>0){ico.style.left="14px";ico.style.right="auto"}else{ico.style.right="14px";ico.style.left="auto"}}
-        else if(dx>0){g.mode="close";if(gid("chatsOverlay").hidden){g.opened=true;openChats()}}
+        if(dx>0){g.mode="close";if(gid("chatsOverlay").hidden){g.opened=true;openChats()}}
+        else if(g.msg&&g.msg.dataset.id){g.mode="reply";g.dir=-1;const r=g.msg.getBoundingClientRect();
+          ico.style.top=(r.top+r.height/2-17)+"px";ico.style.right="14px";ico.style.left="auto"}
         else{g=null;return}
         try{ov.setPointerCapture(e.pointerId)}catch(_){}
       }else return;
@@ -5188,7 +5213,7 @@ document.addEventListener("click",e=>{const q=e.target.closest&&e.target.closest
   ov.addEventListener("pointerup",e=>{if(!g)return;const m=g.mode,dx=g.dx;
     if(m==="reply"){const id=+g.msg.dataset.id;const go=g.dir*dx>60;reset();if(go)setReply(id);return}
     if(m==="close"){ov.classList.remove("dragging");
-      if(dx>90){ov.style.transition="transform .2s ease-out, opacity .2s";ov.style.transform="translateX(100%)";ov.style.opacity=0;
+      if(dx>90||(dx>40&&dx/(Date.now()-g.t+1)>.6)){ov.style.transition="transform .2s ease-out, opacity .2s";ov.style.transform="translateX(100%)";ov.style.opacity=0;
         setTimeout(()=>{ov.style.transition="";ov.style.transform="";ov.style.opacity="";closeChat()},200)}
       else{ov.style.transition="transform .2s, opacity .2s";ov.style.transform="";ov.style.opacity="";setTimeout(()=>ov.style.transition="",220);
         if(g.opened)setTimeout(()=>{gid("chatsOverlay").hidden=true},220)}
@@ -5249,7 +5274,7 @@ window.openMsgSettings=function(){
     <div class="up-two"><button class="ghost-btn" onclick="pickWp('*')">Из галереи</button><button class="ghost-btn" onclick="clearWp('*')">Сбросить</button></div>
     <div class="vol-row"><label><span>Затемнение обоев</span><b id="wpDimV">${dim}%</b></label>
       <input type="range" min="0" max="80" step="5" value="${dim}" oninput="ls_dim(this.value)"></div>
-    <div class="misc-hint">Свайп по сообщению вправо (или влево) — ответить. Свайп вправо в любом другом месте чата — закрыть диалог и открыть список сообщений. Обои отдельного чата меняются в профиле собеседника: нажмите на его имя вверху чата.</div>
+    <div class="misc-hint">Свайп влево по сообщению — ответить. Свайп вправо в любом месте чата, в том числе по сообщению, — закрыть диалог и открыть список сообщений. Обои отдельного чата меняются в профиле собеседника: нажмите на его имя вверху чата.</div>
   </div>`);
   wpRefresh();
 };
