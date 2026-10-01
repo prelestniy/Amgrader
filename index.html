@@ -933,7 +933,7 @@ button, input { font-family:inherit; font-synthesis:none; }
 @keyframes rIn{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
 .tg-pop svg{width:56px;height:56px;display:block;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
 .react-pick button svg{width:28px;height:28px;display:block;margin:auto}
-.tg-quote{border-left:3px solid currentColor;background:rgba(127,127,127,.2);border-radius:8px;padding:4px 8px;margin:0 0 4px;font-size:13px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+.tg-quote{border-left:3px solid currentColor;background:rgba(255,255,255,.14);border-radius:4px 10px 10px 4px;padding:5px 10px;margin:0 0 4px;font-size:13px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
 .tg-qn{font-weight:700;font-size:12px}
 .tg-msg.flash{animation:tgFlash 1s}
 @keyframes tgFlash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
@@ -5152,38 +5152,53 @@ document.addEventListener("click",e=>{const q=e.target.closest&&e.target.closest
   ico.className="tg-swipe-ic";ico.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v3"/></svg>';
   document.body.appendChild(ico);
   let g=null,last={id:0,t:0};
+  const msgAt=(x,y,t)=>{
+    if(!t||!t.closest||!t.closest("#chatMsgs"))return null;
+    const list=[...gid("chatMsgs").querySelectorAll(".tg-msg[data-id]")];
+    for(let i=0;i<list.length;i++){
+      const r=list[i].getBoundingClientRect(),pv=list[i-1],nx=list[i+1];
+      const up=pv?Math.min(10,(r.top-pv.getBoundingClientRect().bottom)/2):6;
+      const dn=nx?Math.min(10,(nx.getBoundingClientRect().top-r.bottom)/2):6;
+      if(y>=r.top-Math.max(up,0)&&y<=r.bottom+Math.max(dn,0))return list[i];
+    }
+    return null};
+  window.__msgAt=msgAt;
   const reset=()=>{if(g&&g.msg){g.msg.style.transition="transform .2s";g.msg.style.transform="";}ico.style.opacity=0;g=null};
   ov.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&e.button!==0)return;
-    g={x:e.clientX,y:e.clientY,t:Date.now(),msg:e.target.closest(".tg-msg"),mode:null,dx:0,moved:false};if(g.msg)g.msg.style.transition="none"});
+    g={x:e.clientX,y:e.clientY,t:Date.now(),msg:msgAt(e.clientX,e.clientY,e.target),mode:null,dx:0,moved:false};if(g.msg)g.msg.style.transition="none"});
   ov.addEventListener("pointermove",e=>{if(!g)return;
     const dx=e.clientX-g.x,dy=e.clientY-g.y;
     if(Math.abs(dx)>8||Math.abs(dy)>8)g.moved=true;
     if(!g.mode){
       if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){g.mode="v";return}
       if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.3){
-        if(dx<0&&g.msg&&g.msg.dataset.id){g.mode="reply";const r=g.msg.getBoundingClientRect();ico.style.top=(r.top+r.height/2-17)+"px"}
-        else if(dx>0)g.mode="close";else{g=null;return}
+        if(g.msg&&g.msg.dataset.id){g.mode="reply";g.dir=dx>0?1:-1;const r=g.msg.getBoundingClientRect();
+          ico.style.top=(r.top+r.height/2-17)+"px";
+          if(g.dir>0){ico.style.left="14px";ico.style.right="auto"}else{ico.style.right="14px";ico.style.left="auto"}}
+        else if(dx>0){g.mode="close";if(gid("chatsOverlay").hidden){g.opened=true;openChats()}}
+        else{g=null;return}
         try{ov.setPointerCapture(e.pointerId)}catch(_){}
       }else return;
     }
     g.dx=dx;
-    if(g.mode==="reply"){const x=-Math.min(90,Math.abs(Math.min(dx,0))*.85);g.msg.style.transform=`translateX(${x}px)`;
-      const p=Math.min(1,-x/60);ico.style.opacity=p;ico.style.transform=`scale(${.4+.6*p})`}
+    if(g.mode==="reply"){const mv=Math.max(0,dx*g.dir),x=g.dir*Math.min(90,mv*.85);g.msg.style.transform=`translateX(${x}px)`;
+      const p=Math.min(1,Math.abs(x)/60);ico.style.opacity=p;ico.style.transform=`scale(${.4+.6*p})`}
     else if(g.mode==="close"){const x=Math.max(0,dx);ov.classList.add("dragging");ov.style.transform=`translateX(${x}px)`;ov.style.opacity=1-Math.min(.5,x/(innerWidth*1.2))}
   });
   ov.addEventListener("pointerup",e=>{if(!g)return;const m=g.mode,dx=g.dx;
-    if(m==="reply"){const id=+g.msg.dataset.id;const go=dx<-60;reset();if(go)setReply(id);return}
+    if(m==="reply"){const id=+g.msg.dataset.id;const go=g.dir*dx>60;reset();if(go)setReply(id);return}
     if(m==="close"){ov.classList.remove("dragging");
       if(dx>90){ov.style.transition="transform .2s ease-out, opacity .2s";ov.style.transform="translateX(100%)";ov.style.opacity=0;
         setTimeout(()=>{ov.style.transition="";ov.style.transform="";ov.style.opacity="";closeChat()},200)}
-      else{ov.style.transition="transform .2s, opacity .2s";ov.style.transform="";ov.style.opacity="";setTimeout(()=>ov.style.transition="",220)}
+      else{ov.style.transition="transform .2s, opacity .2s";ov.style.transform="";ov.style.opacity="";setTimeout(()=>ov.style.transition="",220);
+        if(g.opened)setTimeout(()=>{gid("chatsOverlay").hidden=true},220)}
       g=null;return}
     const tap=!g.moved&&Date.now()-g.t<300,msg=g.msg;g=null;
     if(tap&&msg&&msg.dataset.id){const id=+msg.dataset.id,now=Date.now();
       if(last.id===id&&now-last.t<320){last={id:0,t:0};doubleTapReact(msg,e.clientX,e.clientY)}else last={id,t:now}}
   });
-  ov.addEventListener("pointercancel",()=>{if(g&&g.mode==="close"){ov.classList.remove("dragging");ov.style.transform="";ov.style.opacity=""}reset()});
-  ov.addEventListener("dblclick",e=>{const m=e.target.closest(".tg-msg");if(m&&m.dataset.id&&e.pointerType==="mouse")doubleTapReact(m,e.clientX,e.clientY)});
+  ov.addEventListener("pointercancel",()=>{if(g&&g.mode==="close"){ov.classList.remove("dragging");ov.style.transform="";ov.style.opacity="";if(g.opened)gid("chatsOverlay").hidden=true}reset()});
+  ov.addEventListener("dblclick",e=>{const m=window.__msgAt(e.clientX,e.clientY,e.target);if(m&&m.dataset.id&&e.pointerType==="mouse")doubleTapReact(m,e.clientX,e.clientY)});
 })();
 
 /* --- обои --- */
@@ -5234,7 +5249,7 @@ window.openMsgSettings=function(){
     <div class="up-two"><button class="ghost-btn" onclick="pickWp('*')">Из галереи</button><button class="ghost-btn" onclick="clearWp('*')">Сбросить</button></div>
     <div class="vol-row"><label><span>Затемнение обоев</span><b id="wpDimV">${dim}%</b></label>
       <input type="range" min="0" max="80" step="5" value="${dim}" oninput="ls_dim(this.value)"></div>
-    <div class="misc-hint">Свайп влево по сообщению — ответить. Свайп вправо в любом месте чата — закрыть диалог. Обои отдельного чата меняются в профиле собеседника: нажмите на его имя вверху чата.</div>
+    <div class="misc-hint">Свайп по сообщению вправо (или влево) — ответить. Свайп вправо в любом другом месте чата — закрыть диалог и открыть список сообщений. Обои отдельного чата меняются в профиле собеседника: нажмите на его имя вверху чата.</div>
   </div>`);
   wpRefresh();
 };
