@@ -919,6 +919,33 @@ button, input { font-family:inherit; font-synthesis:none; }
 .chat-compose .send-btn.pop svg { animation:tgPlane .32s ease-out; }
 @media (prefers-reduced-motion:reduce) { .chats-ov:not([hidden]), .chat-ov:not([hidden]), .tg-msg.arrive { animation:none; } }
 .ghost-btn.sel { border-color:var(--accent); color:var(--accent); }
+
+/* ===== реакции, ответы, обои, свайпы ===== */
+.chat-ov{touch-action:pan-y}
+.chat-ov.dragging{transition:none!important}
+.tg-msg{will-change:transform}
+.tg-reacts{float:left;clear:both;margin-top:4px}
+.tg-react{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:rgba(127,127,127,.28);font-size:14px;line-height:1.2}
+.tg-time{clear:none}
+.tg-quote{border-left:3px solid currentColor;background:rgba(127,127,127,.2);border-radius:8px;padding:4px 8px;margin:0 0 4px;font-size:13px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+.tg-qn{font-weight:700;font-size:12px}
+.tg-msg.flash{animation:tgFlash 1s}
+@keyframes tgFlash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.tg-pop{position:fixed;z-index:300;font-size:46px;pointer-events:none;transform:translate(-50%,-50%);animation:tgPopR .75s ease-out forwards}
+@keyframes tgPopR{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-60%) scale(1.25);opacity:1}100%{transform:translate(-50%,-150%) scale(1);opacity:0}}
+.tg-swipe-ic{position:fixed;right:14px;z-index:30;width:34px;height:34px;border-radius:50%;background:var(--surface-3);color:var(--accent);display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transform:scale(.4)}
+.chat-replybar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface-1);border-top:1px solid var(--border);flex-shrink:0}
+.chat-replybar[hidden]{display:none}
+.chat-replybar .rb-line{width:3px;align-self:stretch;border-radius:2px;background:var(--accent)}
+.chat-replybar .rb-t{flex:1;min-width:0;font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-replybar .rb-t b{display:block;color:var(--accent);font-weight:700;font-size:12px}
+#userOverlay.over{z-index:170}
+#userOverlay.anim:not([hidden]){animation:peerIn .4s cubic-bezier(.22,1,.36,1);transform-origin:50% 0}
+@keyframes peerIn{from{transform:translateY(60px) scale(.9);opacity:0;border-radius:40px}to{transform:none;opacity:1}}
+.react-pick{display:flex;flex-wrap:wrap;gap:8px}
+.react-pick button{width:46px;height:46px;border-radius:14px;border:1px solid var(--border);background:var(--surface-2);font-size:24px;cursor:pointer}
+.react-pick button.sel{border-color:var(--accent);background:var(--surface-3)}
+.wp-prev{height:110px;border-radius:var(--r-btn);border:1px dashed var(--border-hi);background:var(--surface-2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px}
 </style>
 </head>
 <body>
@@ -1100,6 +1127,9 @@ button, input { font-family:inherit; font-synthesis:none; }
       </div>
       <div class="profile-row" onclick="showScreen('bonus')">
         <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 1 1 0 5"/></svg> Бонусы</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+      <div class="profile-row" onclick="openMsgSettings()">
+        <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z"/></svg> Настройки сообщений</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
       </div>
       <div class="profile-row" onclick="openSoundSettings()">
         <span class="row-label"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg> Звук и анимация</span><span class="row-arrow"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></span>
@@ -1312,12 +1342,14 @@ button, input { font-family:inherit; font-synthesis:none; }
   </div>
   <div class="chat-msgs" id="chatMsgs"></div>
   <div class="chat-banner" id="chatBanner"></div>
+  <div class="chat-replybar" id="chatReplyBar" hidden><div class="rb-line"></div><div class="rb-t" id="chatReplyTxt"></div><button class="tg-hbtn" style="width:34px;height:34px" onclick="chatClearReply()" aria-label="Отмена"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="chat-compose" id="chatCompose">
     <div class="tg-field"><textarea id="chatInput" rows="1" maxlength="500" placeholder="Сообщение" autocomplete="off" enterkeyhint="send"></textarea></div>
     <button class="send-btn empty" id="chatSendBtn" onclick="chatSend()" aria-label="Отправить"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4l17.45-7.48a1 1 0 000-1.84L3.4 3.6a.99.99 0 00-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"/></svg></button>
   </div>
 </div>
 
+<input type="file" id="wpFile" accept="image/*" hidden>
 <div class="bubble" id="bubble">
   <div class="bubble-icon" id="bubbleIcon"></div>
   <div class="bubble-text">
@@ -3479,7 +3511,7 @@ async function renderChatsList() {
         ${tgAvatar(c.photo, c.nickname)}
         <div class="tg-rbody">
           <div class="tg-rtop"><div class="tg-rname">${esc(c.nickname)}</div><div class="tg-rtime">${fmtChatTime(c.last.at)}</div></div>
-          <div class="tg-rbot"><div class="tg-rlast">${c.state === "request_in" ? "Запрос на переписку · " : ""}${c.last.mine ? "<b>Вы:</b> " : ""}${esc(c.last.text)}</div>${c.unread ? `<span class="tg-badge">${c.unread}</span>` : ""}</div>
+          <div class="tg-rbot"><div class="tg-rlast">${c.state === "request_in" ? "Запрос на переписку · " : ""}${c.last.mine ? "<b>Вы:</b> " : ""}${esc(chatPlain(c.last.text))}</div>${c.unread ? `<span class="tg-badge">${c.unread}</span>` : ""}</div>
         </div>
       </div>`).join("") : '<div class="tg-empty" style="padding-top:90px"><div class="tg-empty-card">Пока нет переписок.<br>Откройте профиль игрока и нажмите «Написать» или найдите его по ID</div></div>';
   } catch (e) {
@@ -5020,6 +5052,154 @@ async function taskClaim(id) {
     if (wrap) wrap.classList.remove("playing");
     try { __queueThumb(lv); } catch (e) {}
   };
+})();
+</script>
+
+<script>
+(function(){
+const SEP="\u2063", EMOJI=["❤️","👍","🔥","😂","😮","😢","👎","🎉","🤝","💀"];
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);v===null?localStorage.removeItem(k):localStorage.setItem(k,v);return true}catch(e){return v===undefined?null:false}};
+const peerName=()=>__chatPeer?__chatPeer.nickname:"Собеседник";
+
+/* --- разбор ответа, зашитого в текст --- */
+window.chatParse=function(t){t=String(t||"");if(t[0]!==SEP)return{body:t};const p=t.split(SEP);if(p.length<5)return{body:t.split(SEP).join("")};return{fl:p[1],id:+p[2],snip:p[3],body:p.slice(4).join(SEP)}};
+window.chatPlain=t=>chatParse(t).body;
+
+/* --- реакции (хранятся на устройстве) --- */
+const rmap=()=>{try{return JSON.parse(ls("amg_reacts")||"{}")}catch(e){return{}}};
+const getReact=id=>(rmap()[__chatPid]||{})[id]||"";
+function setReact(id,e){const M=rmap();M[__chatPid]=M[__chatPid]||{};e?M[__chatPid][id]=e:delete M[__chatPid][id];ls("amg_reacts",JSON.stringify(M))}
+const dblEmoji=()=>ls("amg_dbl_react")||"❤️";
+
+chatMsgHTML=function(m,first,last){
+  const cls=(m.mine?"out":"in")+(first?" first":"")+(last?" last":""), p=chatParse(m.text);
+  let q="";
+  if(p.fl){const me=p.fl==="s"?!!m.mine:!m.mine;q=`<div class="tg-quote" data-q="${p.id}"><div class="tg-qn">${me?"Вы":esc(peerName())}</div>${esc(p.snip)}</div>`}
+  const r=getReact(m.id);
+  return `<div class="tg-msg ${cls}" data-id="${m.id}">${q}${esc(p.body)}${r?`<div class="tg-reacts"><span class="tg-react">${r}</span></div>`:""}<span class="tg-time">${fmtTime(m.at)}${m.mine?(chatIsRead(m)?TG_TICK2:TG_TICK):""}</span></div>`;
+};
+function rerender(){const b=gid("chatMsgs"),s=b.scrollTop;chatRender();b.scrollTop=s}
+function popEmoji(e,x,y){const d=document.createElement("div");d.className="tg-pop";d.textContent=e;d.style.left=x+"px";d.style.top=y+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),800)}
+function doubleTapReact(el,x,y){const id=+el.dataset.id,e=dblEmoji(),cur=getReact(id);
+  if(cur===e){setReact(id,"")}else{setReact(id,e);popEmoji(e,x,y)}
+  rerender();if(navigator.vibrate)try{navigator.vibrate(12)}catch(_){}}
+
+/* --- ответ на сообщение --- */
+let reply=null;
+window.chatClearReply=function(){reply=null;gid("chatReplyBar").hidden=true};
+function setReply(id){
+  const m=__chatMsgs.find(x=>x.id===id);if(!m||gid("chatCompose").style.display==="none")return;
+  reply={id:m.id,mine:!!m.mine,snip:chatParse(m.text).body.replace(/\s+/g," ").split(SEP).join("").slice(0,40)};
+  gid("chatReplyTxt").innerHTML=`<b>${m.mine?"Вы":esc(peerName())}</b>${esc(reply.snip)}`;
+  gid("chatReplyBar").hidden=false;gid("chatInput").focus();
+  if(navigator.vibrate)try{navigator.vibrate(10)}catch(_){}
+}
+const _send=chatSend;
+chatSend=async function(){
+  const inp=gid("chatInput"),raw=inp.value;
+  if(!reply||!raw.trim())return _send();
+  const h=SEP+(reply.mine?"s":"r")+SEP+reply.id+SEP+reply.snip+SEP;
+  inp.value=h+raw.trim().slice(0,500-h.length);
+  await _send();
+  if(inp.value)inp.value=raw;else chatClearReply();
+  chatInputSync();
+};
+document.addEventListener("click",e=>{const q=e.target.closest&&e.target.closest(".tg-quote");if(!q)return;
+  const t=gid("chatMsgs").querySelector(`.tg-msg[data-id="${q.dataset.q}"]`);if(t){t.scrollIntoView({block:"center",behavior:"smooth"});t.classList.remove("flash");void t.offsetWidth;t.classList.add("flash")}});
+
+/* --- жесты: двойной тап, свайп влево = ответ, свайп вправо = закрыть --- */
+(function(){
+  const ov=gid("chatOverlay"),ico=document.createElement("div");
+  ico.className="tg-swipe-ic";ico.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v3"/></svg>';
+  document.body.appendChild(ico);
+  let g=null,last={id:0,t:0};
+  const reset=()=>{if(g&&g.msg){g.msg.style.transition="transform .2s";g.msg.style.transform="";}ico.style.opacity=0;g=null};
+  ov.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&e.button!==0)return;
+    g={x:e.clientX,y:e.clientY,t:Date.now(),msg:e.target.closest(".tg-msg"),mode:null,dx:0,moved:false};if(g.msg)g.msg.style.transition="none"});
+  ov.addEventListener("pointermove",e=>{if(!g)return;
+    const dx=e.clientX-g.x,dy=e.clientY-g.y;
+    if(Math.abs(dx)>8||Math.abs(dy)>8)g.moved=true;
+    if(!g.mode){
+      if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){g.mode="v";return}
+      if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.3){
+        if(dx<0&&g.msg&&g.msg.dataset.id){g.mode="reply";const r=g.msg.getBoundingClientRect();ico.style.top=(r.top+r.height/2-17)+"px"}
+        else if(dx>0)g.mode="close";else{g=null;return}
+        try{ov.setPointerCapture(e.pointerId)}catch(_){}
+      }else return;
+    }
+    g.dx=dx;
+    if(g.mode==="reply"){const x=-Math.min(90,Math.abs(Math.min(dx,0))*.85);g.msg.style.transform=`translateX(${x}px)`;
+      const p=Math.min(1,-x/60);ico.style.opacity=p;ico.style.transform=`scale(${.4+.6*p})`}
+    else if(g.mode==="close"){const x=Math.max(0,dx);ov.classList.add("dragging");ov.style.transform=`translateX(${x}px)`;ov.style.opacity=1-Math.min(.5,x/(innerWidth*1.2))}
+  });
+  ov.addEventListener("pointerup",e=>{if(!g)return;const m=g.mode,dx=g.dx;
+    if(m==="reply"){const id=+g.msg.dataset.id;const go=dx<-60;reset();if(go)setReply(id);return}
+    if(m==="close"){ov.classList.remove("dragging");
+      if(dx>90){ov.style.transition="transform .2s ease-out, opacity .2s";ov.style.transform="translateX(100%)";ov.style.opacity=0;
+        setTimeout(()=>{ov.style.transition="";ov.style.transform="";ov.style.opacity="";closeChat()},200)}
+      else{ov.style.transition="transform .2s, opacity .2s";ov.style.transform="";ov.style.opacity="";setTimeout(()=>ov.style.transition="",220)}
+      g=null;return}
+    const tap=!g.moved&&Date.now()-g.t<300,msg=g.msg;g=null;
+    if(tap&&msg&&msg.dataset.id){const id=+msg.dataset.id,now=Date.now();
+      if(last.id===id&&now-last.t<320){last={id:0,t:0};doubleTapReact(msg,e.clientX,e.clientY)}else last={id,t:now}}
+  });
+  ov.addEventListener("pointercancel",()=>{if(g&&g.mode==="close"){ov.classList.remove("dragging");ov.style.transform="";ov.style.opacity=""}reset()});
+  ov.addEventListener("dblclick",e=>{const m=e.target.closest(".tg-msg");if(m&&m.dataset.id&&e.pointerType==="mouse")doubleTapReact(m,e.clientX,e.clientY)});
+})();
+
+/* --- обои --- */
+const wpGet=t=>ls("amg_wp_"+t)||"";
+window.applyChatWp=function(){const b=gid("chatMsgs"),w=(__chatPid&&wpGet(__chatPid))||wpGet("*");
+  if(!w){b.style.background="";return}
+  const d=(+(ls("amg_wp_dim")??25))/100;
+  b.style.background=`linear-gradient(rgba(0,0,0,${d}),rgba(0,0,0,${d})),url("${w}") center/cover no-repeat`};
+window.wpRefresh=function(){applyChatWp();document.querySelectorAll(".wp-prev").forEach(el=>{const t=el.dataset.t,w=wpGet(t);
+  el.style.backgroundImage=w?`url("${w}")`:"";el.textContent=w?"":(t==="*"?"Не выбраны":"Как в общих настройках")})};
+let wpT="";
+window.pickWp=t=>{wpT=t;const f=gid("wpFile");f.value="";f.click()};
+window.clearWp=t=>{ls("amg_wp_"+t,null);wpRefresh()};
+gid("wpFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;
+  const url=URL.createObjectURL(f),img=new Image();
+  img.onload=()=>{const s=Math.min(1,1000/Math.max(img.width,img.height)),c=document.createElement("canvas");
+    c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(url);
+    if(ls("amg_wp_"+wpT,c.toDataURL("image/jpeg",.72))===false)alert("Не удалось сохранить обои: не хватает места");
+    wpRefresh()};
+  img.onerror=()=>URL.revokeObjectURL(url);img.src=url});
+
+/* --- профиль собеседника поверх чата, с анимацией; обои чата --- */
+const _uah=userActionsHTML;
+userActionsHTML=function(u){const base=_uah(u);if(u.isMe)return base;const p=esc(u.publicId);
+  return base+`<div class="up-actions"><div class="pg-sub">Обои этого чата</div><div class="wp-prev" data-t="${p}"></div>
+  <div class="up-two"><button class="ghost-btn" onclick="pickWp('${p}')">Из галереи</button><button class="ghost-btn" onclick="clearWp('${p}')">Сбросить</button></div></div>`};
+const _oup=openUserProfile;
+openUserProfile=async function(pid,silent){const r=await _oup(pid,silent);wpRefresh();return r};
+chatOpenPeerProfile=function(){if(!__chatPeer)return;const ov=gid("userOverlay");ov.classList.remove("anim");void ov.offsetWidth;ov.classList.add("over","anim");openUserProfile(__chatPeer.publicId)};
+const _cup=closeUserProfile;
+closeUserProfile=function(){_cup();const ov=gid("userOverlay");ov.classList.remove("over","anim");applyChatWp()};
+const _oc=openChat;
+openChat=function(pid){chatClearReply();const r=_oc(pid);applyChatWp();return r};
+const _cc=closeChat;
+closeChat=function(){chatClearReply();_cc()};
+
+/* --- настройки сообщений --- */
+window.setDblReact=e=>{ls("amg_dbl_react",e);document.querySelectorAll("#reactPick button").forEach(b=>b.classList.toggle("sel",b.dataset.e===e))};
+window.openMsgSettings=function(){
+  const cur=dblEmoji(),dim=ls("amg_wp_dim")??25;
+  openMisc(miscHead(ic("users",24),"Настройки сообщений","Реакции и обои")+`
+  <div class="reg-body" style="overflow-y:auto;min-height:0">
+    <div class="misc-hint">Реакция по двойному тапу на сообщение</div>
+    <div class="react-pick" id="reactPick">${EMOJI.map(e=>`<button data-e="${e}" class="${e===cur?"sel":""}" onclick="setDblReact('${e}')">${e}</button>`).join("")}</div>
+    <div class="misc-hint">Общие обои всех чатов</div>
+    <div class="wp-prev" data-t="*"></div>
+    <div class="up-two"><button class="ghost-btn" onclick="pickWp('*')">Из галереи</button><button class="ghost-btn" onclick="clearWp('*')">Сбросить</button></div>
+    <div class="vol-row"><label><span>Затемнение обоев</span><b id="wpDimV">${dim}%</b></label>
+      <input type="range" min="0" max="80" step="5" value="${dim}" oninput="ls_dim(this.value)"></div>
+    <div class="misc-hint">Свайп влево по сообщению — ответить. Свайп вправо в любом месте чата — закрыть диалог. Обои отдельного чата меняются в профиле собеседника: нажмите на его имя вверху чата.</div>
+  </div>`);
+  wpRefresh();
+};
+window.ls_dim=v=>{ls("amg_wp_dim",String(v));gid("wpDimV").textContent=v+"%";applyChatWp()};
 })();
 </script>
 </body>
