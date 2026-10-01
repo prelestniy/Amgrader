@@ -924,14 +924,20 @@ button, input { font-family:inherit; font-synthesis:none; }
 .chat-ov{touch-action:pan-y}
 .chat-ov.dragging{transition:none!important}
 .tg-msg{will-change:transform}
-.tg-reacts{float:left;clear:both;margin-top:4px}
-.tg-react{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:rgba(127,127,127,.28);font-size:14px;line-height:1.2}
-.tg-time{clear:none}
+.tg-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px;clear:both}
+.tg-foot .tg-time{float:none;margin:0 0 0 auto}
+.tg-react{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 4px 0 7px;border-radius:999px;background:rgba(10,10,12,.88);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);animation:rIn .35s cubic-bezier(.34,1.6,.5,1)}
+.tg-react svg{width:17px;height:17px;display:block;filter:drop-shadow(0 0 4px rgba(255,255,255,.12))}
+.tg-react .rav{width:18px;height:18px;border-radius:50%;overflow:hidden;background:var(--accent);color:#0A0A0B;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.tg-react .rav img{width:100%;height:100%;object-fit:cover}
+@keyframes rIn{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.tg-pop svg{width:56px;height:56px;display:block;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
+.react-pick button svg{width:28px;height:28px;display:block;margin:auto}
 .tg-quote{border-left:3px solid currentColor;background:rgba(127,127,127,.2);border-radius:8px;padding:4px 8px;margin:0 0 4px;font-size:13px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
 .tg-qn{font-weight:700;font-size:12px}
 .tg-msg.flash{animation:tgFlash 1s}
 @keyframes tgFlash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
-.tg-pop{position:fixed;z-index:300;font-size:46px;pointer-events:none;transform:translate(-50%,-50%);animation:tgPopR .75s ease-out forwards}
+.tg-pop{position:fixed;z-index:300;pointer-events:none;transform:translate(-50%,-50%);animation:tgPopR .75s ease-out forwards}
 @keyframes tgPopR{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-60%) scale(1.25);opacity:1}100%{transform:translate(-50%,-150%) scale(1);opacity:0}}
 .tg-swipe-ic{position:fixed;right:14px;z-index:30;width:34px;height:34px;border-radius:50%;background:var(--surface-3);color:var(--accent);display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transform:scale(.4)}
 .chat-replybar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface-1);border-top:1px solid var(--border);flex-shrink:0}
@@ -5057,7 +5063,38 @@ async function taskClaim(id) {
 
 <script>
 (function(){
-const SEP="\u2063", EMOJI=["❤️","👍","🔥","😂","😮","😢","👎","🎉","🤝","💀"];
+const SEP="\u2063";
+const _f=(c,x)=>`<svg viewBox="0 0 24 24" aria-hidden="true">${x}</svg>`;
+(function(){const d=document.createElement("div");d.style.cssText="position:absolute;width:0;height:0;overflow:hidden";
+d.innerHTML=`<svg width="0" height="0" aria-hidden="true"><defs>
+<linearGradient id="rgHeart" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8FA0"/><stop offset=".45" stop-color="#FF3D5F"/><stop offset="1" stop-color="#D1103A"/></linearGradient>
+<linearGradient id="rgGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE98A"/><stop offset="1" stop-color="#FFB914"/></linearGradient>
+<linearGradient id="rgGoldD" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC93C"/><stop offset="1" stop-color="#E07F00"/></linearGradient>
+<radialGradient id="rgFace" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#FFF0A0"/><stop offset=".55" stop-color="#FFCA3A"/><stop offset="1" stop-color="#F29A00"/></radialGradient>
+<linearGradient id="rgFireO" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FF3B30"/><stop offset=".6" stop-color="#FF7A1A"/><stop offset="1" stop-color="#FFB02E"/></linearGradient>
+<linearGradient id="rgFireI" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFB400"/><stop offset="1" stop-color="#FFF08A"/></linearGradient>
+<linearGradient id="rgDrop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B9ECFF"/><stop offset="1" stop-color="#2F9BFF"/></linearGradient>
+<linearGradient id="rgCone" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF8A00"/><stop offset="1" stop-color="#FFD54A"/></linearGradient>
+<linearGradient id="rgStar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF28A"/><stop offset="1" stop-color="#FFB000"/></linearGradient>
+<linearGradient id="rgSkull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#BFC4DD"/></linearGradient>
+</defs></svg>`;document.body.appendChild(d)})();
+const _face=(inner)=>`<circle cx="12" cy="12" r="9.8" fill="url(#rgFace)"/><circle cx="12" cy="12" r="9.8" fill="none" stroke="#D98200" stroke-opacity=".35" stroke-width=".7"/><ellipse cx="8.600" cy="5.800" rx="4.200" ry="2" transform="rotate(-25 8.600 5.800)" fill="#fff" fill-opacity=".38"/>${inner}`;
+const _B="#4F2A00";
+const RI={
+ heart:_f(0,'<path d="M12 21.600S2.400 15.900 2.400 8.900C2.400 5.600 4.900 3.400 7.700 3.400c1.800 0 3.400 1 4.300 2.600.9-1.600 2.500-2.600 4.300-2.600 2.800 0 5.300 2.200 5.300 5.500 0 7-9.600 12.700-9.600 12.700z" fill="url(#rgHeart)"/><ellipse cx="7.200" cy="7.600" rx="2.700" ry="1.500" transform="rotate(-38 7.200 7.600)" fill="#fff" fill-opacity=".55"/>'),
+ like:_f(0,'<path d="M7 9.800l4.400-8c.3-.5.800-.8 1.400-.8 1.100 0 1.900 1 1.700 2.100L13.700 8.600h6.500c1.400 0 2.400 1.300 2.100 2.700l-1.600 7.100c-.2 1-1.100 1.700-2.100 1.700H9c-1 0-2-.9-2-2z" fill="url(#rgGold)"/><path d="M1.300 10.200c0-.6.500-1.100 1.100-1.100h3.400c.5 0 .9.400.9.900v10.200c0 .5-.4.900-.9.900H2.400c-.6 0-1.100-.5-1.100-1.100z" fill="url(#rgGoldD)"/><path d="M9.300 9.800l3.600-6.300" stroke="#fff" stroke-opacity=".55" stroke-width="1.200" stroke-linecap="round" fill="none"/>'),
+ dislike:_f(0,'<g transform="rotate(180 12 11.500)"><path d="M7 9.800l4.400-8c.3-.5.800-.8 1.400-.8 1.100 0 1.900 1 1.700 2.100L13.700 8.600h6.500c1.400 0 2.400 1.300 2.100 2.700l-1.600 7.100c-.2 1-1.100 1.700-2.100 1.700H9c-1 0-2-.9-2-2z" fill="url(#rgGold)"/><path d="M1.300 10.200c0-.6.500-1.100 1.100-1.100h3.400c.5 0 .9.400.9.900v10.200c0 .5-.4.900-.9.900H2.400c-.6 0-1.100-.5-1.100-1.100z" fill="url(#rgGoldD)"/></g>'),
+ fire:_f(0,'<path d="M12.500 1.600c.7 3.300 2.700 4.900 4.300 7.200 1.500 2 2.200 4 2.200 6 0 3.900-3.100 7.200-7 7.200s-7-3.300-7-7.200c0-2.200 1-4 2.200-5.400.3 1.600 1.100 2.600 2.100 3C9 8 10.400 4 12.500 1.600z" fill="url(#rgFireO)"/><path d="M12 22.100c-2.100 0-3.800-1.700-3.800-3.800 0-1.800 1.200-2.800 2.100-4.600.6 1 1.100 1.600 1.700 1.800.3-.6.500-1.200.4-2 1.600 1.200 3.400 2.800 3.400 4.800 0 2.100-1.700 3.800-3.800 3.800z" fill="url(#rgFireI)"/>'),
+ laugh:_f(0,_face(`<path d="M5.700 9.700Q7.500 7.300 9.300 9.700M14.700 9.700Q16.500 7.300 18.300 9.700" fill="none" stroke="${_B}" stroke-width="1.800" stroke-linecap="round"/><path d="M5.900 12.700h12.200c0 3.400-2.700 5.900-6.100 5.900s-6.100-2.500-6.100-5.900z" fill="#6B1E0A"/><path d="M6.400 12.700h11.200c-.1.900-.3 1.400-.7 1.700H7.100c-.4-.3-.6-.8-.7-1.700z" fill="#fff"/><path d="M8.700 17.100c.7-1.500 1.900-2.200 3.300-2.200s2.600.7 3.300 2.200c-.9.900-2 1.500-3.300 1.500s-2.400-.6-3.300-1.500z" fill="#FF6F7F"/><path d="M2.700 8.500c-1.200 1.700-1.200 2.900-.3 3.500.9-.6 1.100-1.800.3-3.500zM21.300 8.500c1.200 1.700 1.200 2.900.3 3.500-.9-.6-1.100-1.800-.3-3.500z" fill="url(#rgDrop)"/>`)),
+ wow:_f(0,_face(`<ellipse cx="8.500" cy="10" rx="2" ry="2.500" fill="#fff"/><ellipse cx="15.500" cy="10" rx="2" ry="2.500" fill="#fff"/><circle cx="8.700" cy="10.300" r="1.150" fill="${_B}"/><circle cx="15.300" cy="10.300" r="1.150" fill="${_B}"/><path d="M6 6.300q2.200-1.700 4.300-.4M18 6.300q-2.200-1.700-4.300-.4" fill="none" stroke="${_B}" stroke-width="1.400" stroke-linecap="round"/><ellipse cx="12" cy="16.800" rx="2.300" ry="2.900" fill="#6B1E0A"/><ellipse cx="12" cy="18.200" rx="1.400" ry="1" fill="#FF6F7F"/>`)),
+ cry:_f(0,_face(`<circle cx="8.300" cy="10" r="1.600" fill="${_B}"/><circle cx="15.700" cy="10" r="1.600" fill="${_B}"/><circle cx="8.800" cy="9.500" r=".5" fill="#fff"/><circle cx="16.200" cy="9.500" r=".5" fill="#fff"/><path d="M5.900 7.700L9.900 6.600M18.100 7.700L14.100 6.600" fill="none" stroke="${_B}" stroke-width="1.400" stroke-linecap="round"/><path d="M8.300 17.300Q12 13.700 15.700 17.300" fill="none" stroke="${_B}" stroke-width="1.700" stroke-linecap="round"/><path d="M6.700 12c-1.300 1.800-1.300 3.100 0 3.800 1.300-.7 1.300-2 0-3.800z" fill="url(#rgDrop)"/>`)),
+ party:_f(0,'<path d="M2.600 21.400L7.400 7.400l9.200 9.200z" fill="url(#rgCone)" stroke="url(#rgCone)" stroke-width="1.200" stroke-linejoin="round"/><path d="M4.900 14.700l4.400 4.400M3.800 18l2.200 2.200" stroke="#fff" stroke-opacity=".5" stroke-width="1.200" stroke-linecap="round"/><ellipse cx="12" cy="12" rx="6.300" ry="1.700" transform="rotate(45 12 12)" fill="#D46F00"/><circle cx="15.800" cy="4.400" r="1.400" fill="#FF3D6B"/><circle cx="20.400" cy="10.200" r="1.300" fill="#35D0FF"/><circle cx="9.800" cy="3.300" r="1" fill="#7CE23B"/><rect x="18.600" y="3.800" width="3.200" height="1.600" rx=".8" transform="rotate(40 20.200 4.600)" fill="#A56BFF"/><rect x="12.100" y="1.600" width="3" height="1.500" rx=".75" transform="rotate(-35 13.600 2.400)" fill="#FFE04A"/><path d="M14.600 9.600c2.400-1.800 3.900-1 5-2.600" fill="none" stroke="#FF3D6B" stroke-width="1.100" stroke-linecap="round"/><path d="M11.600 7.400c.8-1.700 2.200-1.600 2.500-3.200" fill="none" stroke="#35D0FF" stroke-width="1.100" stroke-linecap="round"/>'),
+ star:_f(0,'<path d="M12 3l2.800 5.800 6.300.9-4.600 4.500 1.100 6.300L12 17.400l-5.600 3.100 1.100-6.300L2.900 9.700l6.300-.9z" fill="url(#rgStar)" stroke="#FFC21A" stroke-width="1.800" stroke-linejoin="round"/><path d="M8.700 9.700L12 5.600" stroke="#fff" stroke-opacity=".6" stroke-width="1.300" stroke-linecap="round"/>'),
+ skull:_f(0,'<path d="M12 2.400c-5 0-8.800 3.500-8.800 8.100 0 2.800 1.400 4.800 3.400 6v3c0 1 .8 1.800 1.800 1.800h7.200c1 0 1.800-.8 1.800-1.800v-3c2-1.200 3.400-3.200 3.400-6 0-4.600-3.800-8.100-8.800-8.100z" fill="url(#rgSkull)"/><ellipse cx="8.500" cy="11.200" rx="2.500" ry="2.800" fill="#262736"/><ellipse cx="15.500" cy="11.200" rx="2.500" ry="2.800" fill="#262736"/><path d="M12 14.100l-1.200 2h2.400z" fill="#262736"/><path d="M9.600 18v3.200M12 18v3.200M14.400 18v3.200" stroke="#7B7F99" stroke-width="1" stroke-linecap="round"/><ellipse cx="7.500" cy="6.200" rx="2.600" ry="1.200" transform="rotate(-25 7.500 6.200)" fill="#fff" fill-opacity=".8"/>')
+};
+const RKEYS=Object.keys(RI);
+const R_OLD={"❤️":"heart","❤":"heart","👍":"like","👎":"dislike","🔥":"fire","😂":"laugh","😮":"wow","😢":"cry","🎉":"party","🤝":"star","💀":"skull"};
+const rkey=v=>RI[v]?v:(R_OLD[v]||"heart");
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);v===null?localStorage.removeItem(k):localStorage.setItem(k,v);return true}catch(e){return v===undefined?null:false}};
 const peerName=()=>__chatPeer?__chatPeer.nickname:"Собеседник";
 
@@ -5067,19 +5104,21 @@ window.chatPlain=t=>chatParse(t).body;
 
 /* --- реакции (хранятся на устройстве) --- */
 const rmap=()=>{try{return JSON.parse(ls("amg_reacts")||"{}")}catch(e){return{}}};
-const getReact=id=>(rmap()[__chatPid]||{})[id]||"";
+const getReact=id=>{const v=(rmap()[__chatPid]||{})[id];return v?rkey(v):""};
 function setReact(id,e){const M=rmap();M[__chatPid]=M[__chatPid]||{};e?M[__chatPid][id]=e:delete M[__chatPid][id];ls("amg_reacts",JSON.stringify(M))}
-const dblEmoji=()=>ls("amg_dbl_react")||"❤️";
+const dblEmoji=()=>rkey(ls("amg_dbl_react")||"heart");
 
 chatMsgHTML=function(m,first,last){
   const cls=(m.mine?"out":"in")+(first?" first":"")+(last?" last":""), p=chatParse(m.text);
   let q="";
   if(p.fl){const me=p.fl==="s"?!!m.mine:!m.mine;q=`<div class="tg-quote" data-q="${p.id}"><div class="tg-qn">${me?"Вы":esc(peerName())}</div>${esc(p.snip)}</div>`}
-  const r=getReact(m.id);
-  return `<div class="tg-msg ${cls}" data-id="${m.id}">${q}${esc(p.body)}${r?`<div class="tg-reacts"><span class="tg-react">${r}</span></div>`:""}<span class="tg-time">${fmtTime(m.at)}${m.mine?(chatIsRead(m)?TG_TICK2:TG_TICK):""}</span></div>`;
+  const r=getReact(m.id), tm=`<span class="tg-time">${fmtTime(m.at)}${m.mine?(chatIsRead(m)?TG_TICK2:TG_TICK):""}</span>`;
+  const me=state.profile||{};
+  const foot=r?`<div class="tg-foot"><span class="tg-react">${RI[r]}<span class="rav">${avatarHTML(me.photo,me.nickname)}</span></span>${tm}</div>`:tm;
+  return `<div class="tg-msg ${cls}" data-id="${m.id}">${q}${esc(p.body)}${foot}</div>`;
 };
 function rerender(){const b=gid("chatMsgs"),s=b.scrollTop;chatRender();b.scrollTop=s}
-function popEmoji(e,x,y){const d=document.createElement("div");d.className="tg-pop";d.textContent=e;d.style.left=x+"px";d.style.top=y+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),800)}
+function popEmoji(e,x,y){const d=document.createElement("div");d.className="tg-pop";d.innerHTML=RI[e];d.style.left=x+"px";d.style.top=y+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),800)}
 function doubleTapReact(el,x,y){const id=+el.dataset.id,e=dblEmoji(),cur=getReact(id);
   if(cur===e){setReact(id,"")}else{setReact(id,e);popEmoji(e,x,y)}
   rerender();if(navigator.vibrate)try{navigator.vibrate(12)}catch(_){}}
@@ -5189,7 +5228,7 @@ window.openMsgSettings=function(){
   openMisc(miscHead(ic("users",24),"Настройки сообщений","Реакции и обои")+`
   <div class="reg-body" style="overflow-y:auto;min-height:0">
     <div class="misc-hint">Реакция по двойному тапу на сообщение</div>
-    <div class="react-pick" id="reactPick">${EMOJI.map(e=>`<button data-e="${e}" class="${e===cur?"sel":""}" onclick="setDblReact('${e}')">${e}</button>`).join("")}</div>
+    <div class="react-pick" id="reactPick">${RKEYS.map(e=>`<button data-e="${e}" class="${e===cur?"sel":""}" onclick="setDblReact('${e}')" aria-label="${e}">${RI[e]}</button>`).join("")}</div>
     <div class="misc-hint">Общие обои всех чатов</div>
     <div class="wp-prev" data-t="*"></div>
     <div class="up-two"><button class="ghost-btn" onclick="pickWp('*')">Из галереи</button><button class="ghost-btn" onclick="clearWp('*')">Сбросить</button></div>
