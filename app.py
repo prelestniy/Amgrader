@@ -400,15 +400,15 @@ def public_config():
 @app.get("/api/leaderboard")
 def leaderboard(limit: int = 10):
     """Публичный топ игроков по балансу — для слайдера в профиле.
-    Отдаём только ник/баланс/фото, без логина, id и токена."""
+    Отдаём ник/баланс/фото и публичный ID (по нему открывается профиль), без логина, внутреннего id и токена."""
     limit = max(1, min(limit, 50))
     with closing(db()) as conn:
         rows = conn.execute(
-            "SELECT nickname, photo, balance FROM users ORDER BY balance DESC LIMIT ?",
+            "SELECT public_id, nickname, photo, balance FROM users ORDER BY balance DESC LIMIT ?",
             (limit,),
         ).fetchall()
     return {"top": [
-        {"nickname": r["nickname"] or "Игрок", "balance": r["balance"], "photo": r["photo"]}
+        {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "balance": r["balance"], "photo": r["photo"]}
         for r in rows
     ]}
 
