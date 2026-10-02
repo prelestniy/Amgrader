@@ -2956,7 +2956,8 @@ async function openTopUser(i) {
     try { await api("/api/users/" + encodeURIComponent(pid)); } catch (e) { return false; }
     u.publicId = String(pid); openUserProfile(String(pid)); return true;
   };
-  if (u.me && state.profile && state.profile.publicId && await tryOpen(state.profile.publicId)) return;
+  /* своя карточка: профиль собираем локально, без запроса /api/users — он для себя может не отвечать */
+  if (u.me) { openLocalProfile(u); return; }
   /* 1) любые id-поля, которые сервер положил в запись топа */
   const raw = u.raw || {}, cands = [];
   const add = v => { if (v != null && v !== "" && typeof v !== "object" && !cands.includes(String(v))) cands.push(String(v)); };
@@ -2970,7 +2971,29 @@ async function openTopUser(i) {
     const found = (r.users || []).find(x => x.nickname === u.nickname);
     if (found && await tryOpen(found.publicId)) return;
   } catch (e) {}
-  notify("lose", "Профиль не открылся", "Сервер не отдаёт ID игрока в топе", "", OK_ITEM);
+  /* сервер не дал ID — показываем то, что известно из топа (ник, фото, баланс), вместо ошибки */
+  openLocalProfile(u);
+}
+function openLocalProfile(u) {
+  closeMisc();
+  const ov = gid("userOverlay"), body = gid("userBody");
+  const p = state.profile || {};
+  const pid = u.me ? (p.publicId || u.publicId || "") : (u.publicId || "");
+  const items = u.me ? state.inventory : null;
+  body.innerHTML = `
+    <div class="profile-card">
+      <div class="profile-avatar">${avatarHTML(u.photo || (u.me ? p.photo : ""), u.nickname)}</div>
+      <div class="profile-info">
+        <div class="profile-name">${esc(u.nickname)}</div>
+        <div class="profile-sub">${pid ? "ID: " + esc(pid) : "Игрок из топа"}</div>
+      </div>
+    </div>
+    <div class="profile-stats">
+      <div class="stat-card"><div class="stat-value">${fmt(u.balance)}</div><div class="stat-label">Баланс</div></div>
+      <div class="stat-card"><div class="stat-value">${items ? items.length : "—"}</div><div class="stat-label">Предметов</div></div>
+    </div>
+    ${items ? `<div class="pg-sub">Инвентарь</div><div class="grid">${items.length ? items.map(m => cardHTML(m, {})).join("") : '<div class="empty-state">Инвентарь пуст</div>'}</div>` : ""}`;
+  ov.hidden = false; ov.scrollTop = 0;
 }
 function renderTopBalanceSlider() {
   const el = document.getElementById("topBalanceSlider");
