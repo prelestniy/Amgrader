@@ -2915,7 +2915,7 @@ async function loadTopBalances() {
   try {
     const r = await api("/api/leaderboard");
     const list = (r && r.top) || [];
-    __topBalanceCache = list.map(u => ({ nickname: u.nickname || "Игрок", balance: u.balance || 0, photo: u.photo, publicId: u.publicId || u.public_id || u.id || "" }));
+    __topBalanceCache = list.map(u => ({ nickname: u.nickname || "Игрок", balance: u.balance || 0, photo: u.photo, publicId: u.publicId || u.public_id || "", raw: u }));
   } catch (e) {
     /* сервер недоступен / эндпоинта ещё нет на этом окружении — оставляем
        блок пустым, никаких выдуманных игроков не показываем */
@@ -2927,17 +2927,26 @@ async function loadTopBalances() {
 async function openTopUser(i) {
   const u = (window.__topList || [])[i]; if (!u) return;
   if (!isLoggedIn()) { openAuth("Войдите, чтобы смотреть профили"); return; }
-  let pid = u.publicId;
-  if (!pid && u.me && state.profile) pid = state.profile.publicId;
-  if (!pid) {
-    try {
-      const r = await api("/api/users/search?q=" + encodeURIComponent(u.nickname));
-      const found = (r.users || []).find(x => x.nickname === u.nickname) || (r.users || [])[0];
-      if (found) { u.publicId = pid = found.publicId; }
-    } catch (e) {}
-  }
-  if (!pid) { notify("lose", "Профиль недоступен", u.nickname, "", OK_ITEM); return; }
-  openUserProfile(pid);
+  const tryOpen = async pid => {
+    if (!pid) return false;
+    try { await api("/api/users/" + encodeURIComponent(pid)); } catch (e) { return false; }
+    u.publicId = String(pid); openUserProfile(String(pid)); return true;
+  };
+  if (u.me && state.profile && state.profile.publicId && await tryOpen(state.profile.publicId)) return;
+  /* 1) любые id-поля, которые сервер положил в запись топа */
+  const raw = u.raw || {}, cands = [];
+  const add = v => { if (v != null && v !== "" && typeof v !== "object" && !cands.includes(String(v))) cands.push(String(v)); };
+  add(u.publicId);
+  ["publicId", "public_id", "pid", "shortId", "short_id", "displayId", "userId", "user_id", "uid", "id"].forEach(k => add(raw[k]));
+  Object.keys(raw).forEach(k => { if (/id$/i.test(k)) add(raw[k]); });
+  for (const c of cands) if (await tryOpen(c)) return;
+  /* 2) поиск по нику */
+  try {
+    const r = await api("/api/users/search?q=" + encodeURIComponent(u.nickname));
+    const found = (r.users || []).find(x => x.nickname === u.nickname);
+    if (found && await tryOpen(found.publicId)) return;
+  } catch (e) {}
+  notify("lose", "Профиль не открылся", "Сервер не отдаёт ID игрока в топе", "", OK_ITEM);
 }
 function renderTopBalanceSlider() {
   const el = document.getElementById("topBalanceSlider");
