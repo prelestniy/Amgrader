@@ -1323,7 +1323,9 @@ button, input { font-family:inherit; font-synthesis:none; }
 <div class="inv-full" id="invFullOverlay" hidden>
   <div class="inv-full-head">
     <button class="case-back-btn" onclick="closeProfileInventory()" aria-label="Назад"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-    <div class="pg-title">Мой инвентарь</div>
+    <div class="pg-title" style="flex:1;min-width:0">Мой инвентарь</div>
+    <button class="select-all-btn" id="invSelAll" onclick="invSelectAll()" aria-label="Выбрать все"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M7.5 12.5l3 3 6-6.5"/></svg></button>
+    <button class="sell-cart-btn" id="invSellBtn" onclick="openSellCart()" aria-label="Продать выбранные"><span class="sell-cart-ic-wrap"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg></span><span class="sell-cart-badge" id="invSellBadge">0</span></button>
   </div>
   <div class="grid" id="invFullGrid"></div>
 </div>
@@ -2243,6 +2245,7 @@ function removeFromSellCart(uid) {
   const idx = state.selectedMemeUids.indexOf(uid);
   if (idx >= 0) state.selectedMemeUids.splice(idx, 1);
   renderAll();
+  refreshInvFull();
   if (state.selectedMemeUids.length < 1) { closeBuy(); return; }
   renderSellCartSheet();
 }
@@ -2271,6 +2274,7 @@ function finishSellCart() {
   renderAll();
   renderProfile();
   pulseBalance();
+  refreshInvFull();
   notify("win", "Продано", n + " " + plural(n, "предмет", "предмета", "предметов"), "+ " + fmt(total), list[0]);
 }
 
@@ -2951,8 +2955,42 @@ function renderProfileInventoryGrid() {
   const el = document.getElementById("invFullGrid");
   const list = state.inventory;
   el.innerHTML = list.length
-    ? list.map(m => cardHTML(m, { play: true })).join("")
+    ? list.map(m => cardHTML(m, { selected: state.selectedMemeUids.includes(m.uid), check: true, select: `toggleInvSel('${m.uid}')`, play: true })).join("")
     : '<div class="empty-state">Инвентарь пуст</div>';
+  updateInvSellUI();
+}
+function updateInvSellUI() {
+  const all = document.getElementById("invSelAll"), btn = document.getElementById("invSellBtn"), badge = document.getElementById("invSellBadge");
+  if (!all || !btn) return;
+  const list = state.inventory, n = sellCartEntries().length;
+  const showAll = list.length > 0, showSell = n >= 1;
+  all.classList.toggle("show", showAll);
+  all.classList.toggle("all", showAll && list.every(m => state.selectedMemeUids.includes(m.uid)));
+  const was = btn.classList.contains("show");
+  btn.classList.toggle("show", showSell);
+  if (badge) { badge.textContent = n; if (showSell && was) { badge.classList.remove("pop"); void badge.offsetWidth; badge.classList.add("pop"); } }
+}
+function toggleInvSel(uid) {
+  if (state.spinning) return;
+  const idx = state.selectedMemeUids.indexOf(uid);
+  if (idx >= 0) state.selectedMemeUids.splice(idx, 1); else state.selectedMemeUids.push(uid);
+  const tgt = getTarget();
+  if (tgt && (getTotalStake() === 0 || tgt.price <= getTotalStake())) state.targetMemeId = null;
+  renderAll();
+  renderProfileInventoryGrid();
+}
+function invSelectAll() {
+  if (state.spinning || !state.inventory.length) return;
+  const allSel = state.inventory.every(m => state.selectedMemeUids.includes(m.uid));
+  state.selectedMemeUids = allSel ? [] : state.inventory.map(m => m.uid);
+  const tgt = getTarget();
+  if (tgt && (getTotalStake() === 0 || tgt.price <= getTotalStake())) state.targetMemeId = null;
+  renderAll();
+  renderProfileInventoryGrid();
+}
+function refreshInvFull() {
+  const o = document.getElementById("invFullOverlay");
+  if (o && !o.hidden) renderProfileInventoryGrid();
 }
 function openProfileInventory() {
   if (state.spinning) return;
