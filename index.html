@@ -3005,12 +3005,19 @@ function renderTopBalanceSlider() {
   }
   const p = state.profile || {}, loggedIn = isLoggedIn();
   let list = __topBalanceCache.map(u => {
-    const mine = loggedIn && u.nickname === p.nickname && u.balance === state.balance;
-    return mine ? { ...u, me: true, publicId: p.publicId || u.publicId } : { ...u, me: false };
+    /* «это я»: совпал публичный ID; если сервер ID в топе не отдал — совпал ник */
+    const mine = loggedIn && (
+      (p.publicId && u.publicId && String(u.publicId) === String(p.publicId)) ||
+      (!u.publicId && u.nickname === p.nickname)
+    );
+    /* всегда показываем актуальный баланс — он мог измениться после загрузки топа */
+    return mine ? { ...u, me: true, balance: state.balance, photo: p.photo || u.photo, publicId: p.publicId || u.publicId } : { ...u, me: false };
   });
   if (loggedIn && !list.some(u => u.me)) {
     list.push({ nickname: p.nickname || "Игрок", balance: state.balance, photo: p.photo, me: true, publicId: p.publicId || "" });
   }
+  /* на всякий случай: «я» — только одна карточка */
+  { let seen = false; list = list.filter(u => { if (!u.me) return true; if (seen) return false; seen = true; return true; }); }
   list.sort((a, b) => b.balance - a.balance);
   list = list.slice(0, 10);
   if (!list.length) { el.innerHTML = `<div class="misc-hint">Пока никто не в топе</div>`; return; }
