@@ -36,7 +36,7 @@ function tradeHTML() {
   const who = other.publicId ? `${esc(other.nickname)} <small>#${esc(other.publicId)}</small>` : "ждём второго игрока";
   const shareBtn = !other.publicId && v.status === "open" ? `<button class="ghost-btn" onclick="tradeShare()">Поделиться ссылкой</button>` : "";
   return `<div class="reg-body tr-wrap">
-    <div class="tr-status">${tStatusText(v)}</div>
+    <div class="tr-status">${v.status === "open" && mine.ok ? "Вы подтвердили · ждём партнёра" : tStatusText(v)}</div>
     <div class="tr-cols">
       <div class="tr-col"><div class="tr-h">Вы отдаёте${unsaved ? ' <small class="tr-unsaved">не сохранено</small>' : ""}</div>${tSideList(tFlat(tradeDraft.items), tradeDraft.g)}</div>
       <div class="tr-col"><div class="tr-h">Вы получаете</div>${tSideList(other.items, other.g)}</div>
@@ -110,8 +110,12 @@ async function tradeSave() {
 }
 async function tradeConfirm() {
   try {
-    await tradeSave();
+    const mine = tradeView.you === "a" ? tradeView.a : tradeView.b;
+    const dirty = JSON.stringify(tFlat(tradeDraft.items).sort()) !== JSON.stringify((mine.items || []).slice().sort()) || tradeDraft.g !== mine.g;
+    if (dirty) await tradeSave();
     tradeApply(await api(`/api/trades/${tradeView.id}/confirm`, { method: "POST" }));
+    const after = tradeView.status === "countdown" ? "Обмен через 10 сек — можно отменить" : "Ждём подтверждения партнёра";
+    notify("win", "Трейд", "Вы подтвердили", after, OK_ITEM);
   } catch (e) { tradeErr(e); }
 }
 async function tradeCancel() {
