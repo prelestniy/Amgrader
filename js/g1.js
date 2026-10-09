@@ -38,6 +38,32 @@ function wheelTickTimes(from, to, dur) {
   return times;
 }
 
+/* Подписи призов на секторах (радиально, как на макете). list — 8 призов по секторам */
+function wheelDrawLabels(list) {
+  const svg = document.querySelector("#whDisc svg");
+  if (!svg || !list || !list.length) return;
+  const old = svg.querySelector("#whLabels"); if (old) old.remove();
+  const R = 137 * 0.6;
+  const parts = list.map((p, k) => {
+    const a = k * WHEEL_STEP, rad = a * Math.PI / 180;
+    const x = 160 + R * Math.sin(rad), y = 160 - R * Math.cos(rad);
+    const isG = p.type === "g";
+    const text = isG ? `+${p.amount}G` : esc(String(p.name || "").slice(0, 10));
+    const size = isG ? 14 : 11;
+    return `<text transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a - 90})" text-anchor="middle" ` +
+      `dominant-baseline="middle" style="fill:var(--text);font:800 ${size}px Arteks,Manrope,system-ui,sans-serif">${text}</text>`;
+  }).join("");
+  svg.insertAdjacentHTML("beforeend", `<g id="whLabels">${parts}</g>`);
+}
+/* До первой прокрутки подписи — случайная выборка из того, что может выпасть (только для вида) */
+function wheelPreviewLabels(p) {
+  if (!p) return;
+  const pool = (p.g || []).map(v => ({ type: "g", amount: v })).concat((p.items || []).map(i => ({ type: "item", name: i.name })));
+  if (!pool.length) return;
+  const list = [];
+  for (let k = 0; k < WHEEL_SECTORS; k++) list.push(pool[Math.floor(Math.random() * pool.length)]);
+  wheelDrawLabels(list);
+}
 function wheelSetMsg(text) { const m = document.getElementById("whMsg"); if (m) m.textContent = text; }
 function wheelSetBtn() {
   const b = document.getElementById("whBtn");
@@ -61,13 +87,25 @@ setInterval(wheelRenderTimer, 1000);
 
 function wheelSetReadyIn(secs) { wheelReadyAt = Date.now() + secs * 1000; wheelRenderTimer(); }
 
+function wheelRenderPrizes(p) {
+  const el = document.getElementById("whPrizes");
+  if (!el || !p) return;
+  const gs = (p.g || []).map(v => `<span class="wh-chip gold">${fmt(v)}</span>`).join("");
+  const its = (p.items || []).map(i => `<span class="wh-chip">${esc(i.name)}</span>`).join("");
+  el.innerHTML = `<div class="wh-ph">Может выпасть</div><div class="wh-chips">${gs}${its}</div>`;
+}
 async function initWheel() {
   wheelBuild();
   const disc = document.getElementById("whDisc");
   if (disc) disc.style.transform = wheelRotationFor(wheelUI.angle);
   wheelSetMsg("");
   if (!isLoggedIn()) { wheelReadyAt = Infinity; wheelSetMsg("Войдите, чтобы крутить колесо"); wheelRenderTimer(); return; }
-  try { wheelSetReadyIn((await api("/api/wheel")).secondsLeft); } catch (e) { wheelSetMsg(e.message); }
+  try {
+    const s = await api("/api/wheel");
+    wheelSetReadyIn(s.secondsLeft);
+    wheelRenderPrizes(s.prizes);
+    if (!document.querySelector("#whLabels")) wheelPreviewLabels(s.prizes);
+  } catch (e) { wheelSetMsg(e.message); }
 }
 
 async function wheelSpin() {
@@ -78,7 +116,7 @@ async function wheelSpin() {
   try { audioEnsure(); } catch (e) {}
 
   let res;
-  try { res = await api("/api/wheel/spin", { method: "POST" }); }
+  try { res = await api("/api/wheel/spin", { method: "POST" }); if (res.layout) wheelDrawLabels(res.layout); }
   catch (e) { wheelUI.busy = false; wheelSetMsg(e.message); initWheel(); return; }
 
   const disc = document.getElementById("whDisc");
