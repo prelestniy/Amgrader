@@ -1,0 +1,11 @@
+/* КОЛЕСО БОНУСОВ */
+.wh-wrap { position:relative; width:min(300px,80vw); aspect-ratio:1/1; margin:10px auto 18px; }
+.wh-disc { position:absolute; inset:0; will-change:transform; }
+.wh-disc svg { width:100%; height:100%; display:block; }
+.wh-pointer { position:absolute; inset:0; z-index:3; pointer-events:none; }
+.wh-pointer svg { width:100%; height:100%; display:block; overflow:visible; }
+.wh-hub { position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%;
+  background:var(--accent); z-index:2; pointer-events:none; }
+.wh-btn { display:block; margin:0 auto; min-width:160px; }
+.wh-btn:disabled { opacity:.55; }
+.wh-msg { text-align:center; margin-top:12px; min-height:20px; color:var(--text-mute); font-size:13px; }

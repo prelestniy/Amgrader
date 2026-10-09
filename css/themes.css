@@ -1,0 +1,98 @@
+/* ТЕМЫ ОФОРМЛЕНИЯ: переопределяют цвета. «Лайм» — стандартная (задана в main1.css). */
+:root[data-theme="blue"] {
+  --bg:#030509; --surface-1:#050910; --surface-2:#070C16; --surface-3:#09111D;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#3A68B8;
+}
+:root[data-theme="red"] {
+  --bg:#0B0404; --surface-1:#130607; --surface-2:#1B0909; --surface-3:#250C0C;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#E5484D;
+}
+:root[data-theme="orange"] {
+  --bg:#0D0703; --surface-1:#160C05; --surface-2:#1F1107; --surface-3:#29160A;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#FF8A3D;
+}
+:root[data-theme="yellow"] {
+  --bg:#0C0A03; --surface-1:#151106; --surface-2:#1D1808; --surface-3:#27200B;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#F5C542;
+}
+:root[data-theme="green"] {
+  --bg:#020A06; --surface-1:#04100A; --surface-2:#06170E; --surface-3:#081F12;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#2FBF71;
+}
+:root[data-theme="cyan"] {
+  --bg:#020A0B; --surface-1:#041112; --surface-2:#06181A; --surface-3:#071F22;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#2EC4D6;
+}
+:root[data-theme="violet"] {
+  --bg:#07050C; --surface-1:#0C0815; --surface-2:#110B1E; --surface-3:#160F27;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#8B5CF6;
+}
+:root[data-theme="pink"] {
+  --bg:#0C0508; --surface-1:#15080D; --surface-2:#1D0C13; --surface-3:#271019;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#F2619B;
+}
+:root[data-theme="white"] {
+  --bg:#0C0C0C; --surface-1:#141414; --surface-2:#1C1C1C; --surface-3:#252526;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#E8E8EC;
+}
+:root[data-theme="graphite"] {
+  --bg:#050606; --surface-1:#090A0B; --surface-2:#0D0E0F; --surface-3:#111214;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#6B7280;
+}
+:root[data-theme="brown"] {
+  --bg:#080503; --surface-1:#0E0905; --surface-2:#140D07; --surface-3:#1B110A;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(255,255,255,0.12);
+  --text:#F4F4F5; --text-dim:#8E8E98; --text-mute:#5A5A64; --accent:#A86B3C;
+}
+/* выбор темы: большие квадраты с цветом, название под ним (как в магазине тем) */
+.theme-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px 12px; padding:6px 2px 4px; }
+.theme-item { display:flex; flex-direction:column; align-items:center; gap:10px; background:none; border:none; cursor:pointer;
+  color:var(--text); font-family:"Arteks","Manrope",system-ui,sans-serif; transition:transform .15s var(--ease-out); }
+.theme-item:active { transform:scale(.94); }
+.theme-sw { width:100%; aspect-ratio:1/1; border-radius:24px; background:var(--ta);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 6px 18px rgba(0,0,0,.35); transition:box-shadow .2s ease; }
+.theme-item.on .theme-sw { box-shadow:0 0 0 3px var(--bg), 0 0 0 5px var(--ta), 0 6px 18px rgba(0,0,0,.35); }
+.theme-name { font-size:14px; letter-spacing:.02em; }
+.theme-item.on .theme-name { color:var(--accent); }
+.theme-item { position:relative; }
+.theme-add { background:var(--surface-2); display:flex; align-items:center; justify-content:center;
+  font-size:44px; line-height:1; color:var(--text-dim); box-shadow:inset 0 0 0 2px var(--border-hi); }
+.th-del { position:absolute; top:-4px; right:-2px; z-index:2; width:24px; height:24px; border-radius:50%;
+  background:var(--surface-3); color:var(--text); font-size:12px; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.4); }
+.th-form { margin-top:16px; display:flex; flex-direction:column; gap:12px; }
+.th-row { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--text-dim); font-size:14px; }
+.th-row input[type=text] { flex:1; min-width:0; padding:10px 12px; border-radius:var(--r-btn); border:1px solid var(--border-hi);
+  background:var(--surface-2); color:var(--text); font:inherit; }
+.th-row input[type=color] { width:56px; height:40px; border:none; background:none; padding:0; cursor:pointer; }
+
+/* СВОЙ ЦВЕТ: собственная палитра вместо системного окна */
+.cp { display:flex; flex-direction:column; gap:12px; }
+.cp-prev { height:120px; border-radius:26px; display:flex; align-items:flex-end; padding:14px; background:var(--accent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 10px 30px rgba(0,0,0,.35); transition:background .12s linear; }
+.cp-prev span { font-size:14px; font-weight:700; color:#fff; letter-spacing:.06em; text-shadow:0 1px 4px rgba(0,0,0,.45);
+  background:rgba(0,0,0,.28); padding:6px 12px; border-radius:999px; }
+.cp-presets { display:grid; grid-template-columns:repeat(8,1fr); gap:10px; justify-items:center; padding:4px 0 2px; }
+.cp-dot { width:100%; max-width:34px; aspect-ratio:1/1; border-radius:50%; border:2px solid rgba(255,255,255,.12);
+  cursor:pointer; padding:0; transition:transform .15s var(--ease-out), box-shadow .15s ease; }
+.cp-dot:active { transform:scale(.86); }
+.cp-dot.on { box-shadow:0 0 0 2px var(--surface-1), 0 0 0 4px #fff; }
+.cp-lbl { font-size:13px; color:var(--text-dim); margin-top:6px; }
+.cp-range { -webkit-appearance:none; appearance:none; width:100%; height:28px; border-radius:14px; outline:none; margin:0;
+  background:var(--surface-3); box-shadow:inset 0 0 0 1px var(--border-hi); }
+.cp-hue { background:linear-gradient(90deg,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000) !important; }
+.cp-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:32px; height:32px; border-radius:50%;
+  background:#fff; border:none; box-shadow:0 2px 10px rgba(0,0,0,.5); }
+.cp-range::-moz-range-thumb { width:32px; height:32px; border-radius:50%; background:#fff; border:none; box-shadow:0 2px 10px rgba(0,0,0,.5); }
+.th-name { width:100%; padding:12px 14px; border-radius:var(--r-btn); border:1px solid var(--border-hi); background:var(--surface-2);
+  color:var(--text); font:inherit; font-size:15px; }

@@ -1,0 +1,30 @@
+.tg-react svg{width:17px;height:17px;display:block;filter:drop-shadow(0 0 4px rgba(255,255,255,.12))}
+.tg-react .rav{width:18px;height:18px;border-radius:50%;overflow:hidden;background:var(--accent);color:#0A0A0B;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.tg-react .rav img{width:100%;height:100%;object-fit:cover}
+@keyframes rIn{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.tg-foot.new{overflow:hidden;animation:footIn .34s cubic-bezier(.22,1,.36,1)}
+.tg-foot.new .tg-react,.tg-react.swap{animation:rIn .4s cubic-bezier(.34,1.6,.5,1)}
+.tg-foot.leaving{overflow:hidden;animation:footOut .26s ease-in forwards}
+@keyframes footIn{from{max-height:0;margin-top:0;opacity:0}to{max-height:40px;margin-top:5px;opacity:1}}
+@keyframes footOut{from{max-height:40px;opacity:1}to{max-height:0;margin-top:0;opacity:0}}
+.tg-pop svg{width:56px;height:56px;display:block;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
+.react-pick button svg{width:28px;height:28px;display:block;margin:auto}
+.tg-quote{border-left:3px solid currentColor;background:rgba(255,255,255,.14);border-radius:4px 10px 10px 4px;padding:5px 10px;margin:0 0 4px;font-size:13px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+.tg-qn{font-weight:700;font-size:12px}
+.tg-msg.flash{animation:tgFlash 1s}
+@keyframes tgFlash{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.tg-pop{position:fixed;z-index:300;pointer-events:none;transform:translate(-50%,-50%);animation:tgPopR .75s ease-out forwards}
+@keyframes tgPopR{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}25%{transform:translate(-50%,-60%) scale(1.25);opacity:1}100%{transform:translate(-50%,-150%) scale(1);opacity:0}}
+.tg-swipe-ic{position:fixed;right:14px;z-index:400;width:34px;height:34px;border-radius:50%;background:var(--surface-3);color:var(--accent);display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transform:scale(.4)}
+.chat-replybar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface-1);border-top:1px solid var(--border);flex-shrink:0}
+.chat-replybar[hidden]{display:none}
+.chat-replybar .rb-line{width:3px;align-self:stretch;border-radius:2px;background:var(--accent)}
+.chat-replybar .rb-t{flex:1;min-width:0;font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-replybar .rb-t b{display:block;color:var(--accent);font-weight:700;font-size:12px}
+#userOverlay.over{z-index:170}
+#userOverlay.anim:not([hidden]){animation:peerIn .4s cubic-bezier(.22,1,.36,1);transform-origin:50% 0}
+@keyframes peerIn{from{transform:translateY(60px) scale(.9);opacity:0;border-radius:40px}to{transform:none;opacity:1}}
+.react-pick{display:flex;flex-wrap:wrap;gap:8px}
+.react-pick button{width:46px;height:46px;border-radius:14px;border:1px solid var(--border);background:var(--surface-2);font-size:24px;cursor:pointer}
+.react-pick button.sel{border-color:var(--accent);background:var(--surface-3)}
+.wp-prev{height:110px;border-radius:var(--r-btn);border:1px dashed var(--border-hi);background:var(--surface-2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px}
