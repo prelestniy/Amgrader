@@ -17,6 +17,7 @@ from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, Header, HTTPException, Depends, Response, BackgroundTasks
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import sqlite3
 import httpx
@@ -1244,3 +1245,8 @@ def video(name: str):
 def index():
     return FileResponse(BASE_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
+
+# Статика фронтенда: index.html ссылается на css/, js/ и img/ — без этого страница выглядит голой и не работает.
+for _d in ("css", "js", "img"):
+    if (BASE_DIR / _d).is_dir():
+        app.mount(f"/{_d}", StaticFiles(directory=BASE_DIR / _d), name=f"static_{_d}")
