@@ -207,10 +207,25 @@ function ladderSavePrefs() { try { localStorage.setItem("ladderPrefs", JSON.stri
 function ladderSafeCols() { return LADDER_COLS - ladder.stones; }
 function ladderStepMult() { return LADDER_COLS / ladderSafeCols(); }
 function ladderCurMult(row) { return row <= 0 ? 1 : Math.pow(ladderStepMult(), row) * LADDER_EDGE; }
-function ladderOnBetInput() { ladder.bet = Math.max(1, Math.round(Number($("ladderBetInput").value) || 1)); ladderSavePrefs(); }
+/* Поля ставки и камней: при вводе только цифры, без перезаписи значения на каждом символе; проверка — при уходе из поля */
+function ladderDigitsOnly(el) { el.value = el.value.replace(/\D/g, ""); }
+function ladderBetTyping() {
+  const el = $("ladderBetInput"); ladderDigitsOnly(el);
+  const v = parseInt(el.value, 10); if (v > 0) { ladder.bet = v; ladderSavePrefs(); }
+}
+function ladderOnBetInput() {
+  const el = $("ladderBetInput");
+  const v = Math.max(1, parseInt(el.value, 10) || 1);
+  ladder.bet = v; el.value = v; ladderSavePrefs();
+}
+function ladderStonesTyping() {
+  const el = $("ladderStonesInput"); ladderDigitsOnly(el);
+  const v = parseInt(el.value, 10); if (v >= 1 && v <= 7) { ladder.stones = v; ladderSavePrefs(); }
+}
 function ladderOnStonesInput() {
-  let v = Math.round(Number($("ladderStonesInput").value) || 1); v = Math.max(1, Math.min(7, v));
-  ladder.stones = v; $("ladderStonesInput").value = v; ladderSavePrefs();
+  const el = $("ladderStonesInput");
+  const v = Math.max(1, Math.min(7, parseInt(el.value, 10) || 1));   // 8 колонок на поле — максимум 7 камней
+  ladder.stones = v; el.value = v; ladderSavePrefs();
 }
 function ladderStakeAction(i) {
   if (ladder.phase === "playing") return;
