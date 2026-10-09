@@ -28,6 +28,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 log = logging.getLogger("bot_admin")
+import quests
+
 TOKEN = os.environ.get("ADMIN_BOT_TOKEN", "")
 # бот работает в одном процессе с сервером — ходит к нему по локальному адресу
 BACKEND_URL = os.environ.get("BACKEND_URL", f"http://127.0.0.1:{os.environ.get('PORT', '8000')}").rstrip("/")
@@ -169,7 +171,6 @@ MENUS = {
     "users": ("👤 <b>Игроки</b>", [
         [("🔍 Найти игрока", "go:find")],
         [("🆔 Сменить ID игрока", "go:setpid")],
-        [("🚩 Жалобы", "a:reports")],
         [("🏆 Топ по балансу", "a:top")],
     ]),
     "luck": ("🍀 <b>Скрытая удача</b>\nПока показанный шанс ≤ порога, реальный = показанный + бонус.", [
@@ -181,6 +182,7 @@ MENUS = {
         [("📢 Подписка на канал", "go:task_tg")],
         [("🔗 Задание по ссылке", "go:task_link")],
         [("📃 Список / удалить", "a:tasks")],
+        [("🎯 Новый квест", "go:quest"), ("🎯 Квесты", "a:quests")],
     ]),
 }
 
@@ -510,38 +512,7 @@ async def act_tasks(target):
     await send(target, "📋 <b>Задания</b>\nНажмите на задание, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
 
 
-async def act_reports(target):
-    try:
-        d = await api("GET", "/admin/reports", params={"limit": 8})
-    except ApiError as e:
-        return await send(target, f"❌ {esc(e)}", back_kb("users"))
-    reports = d["reports"]
-    if not reports:
-        return await send(target, "🚩 <b>Жалобы</b>\n\nНовых жалоб нет ✅", back_kb("users"))
-    blocks = []
-    for r in reports:
-        who = lambda u: f"<b>{esc(u['nickname'] or '—')}</b> · ID <code>{esc(u['public_id'] or '—')}</code>"
-        t = [f"🚩 <b>#{r['id']}</b> · {esc(r['reason'])}", f"От: {who(r['reporter'])}", f"На: {who(r['reported'])}"]
-        if r["comment"]:
-            t.append(f"Комментарий: {esc(r['comment'])}")
-        for m in r["context"][-4:]:
-            t.append(f"• <i>{'жалуется' if m['from'] == 'reporter' else 'обвиняемый'}:</i> {esc(m['text'][:100])}")
-        blocks.append("\n".join(t))
-    kb = grid([B(f"✅ Закрыть #{r['id']}", f"rc:{r['id']}") for r in reports], 2)
-    await send(target, f"🚩 <b>Жалобы</b> · новых: <b>{d['total']}</b>\n\n" + "\n\n".join(blocks), back_kb("users", *kb))
-
-
-@admin.callback_query(F.data.startswith("rc:"))
-async def cb_report_close(cb: CallbackQuery):
-    await cb.answer()
-    try:
-        await api("POST", "/admin/reports/close", json={"id": int(cb.data[3:])})
-    except (ApiError, ValueError):
-        pass
-    await act_reports(cb)
-
-
-ACTIONS = {"top": act_top, "promos": act_promos, "delpromo": act_delpromo, "tasks": act_tasks, "reports": act_reports}
+ACTIONS = {"top": act_top, "promos": act_promos, "delpromo": act_delpromo, "tasks": act_tasks, "quests": act_quests}
 
 
 @admin.callback_query(F.data.startswith("a:"))
@@ -597,9 +568,9 @@ COMMAND_FLOWS = {
     "new": "promo", "newpromo": "promo", "newitem": "promo", "items": "items",
     "grant": "grant", "setbal": "setbal", "grantall": "grantall", "setall": "setall",
     "luck": "luck", "gluck": "gluck", "luckoff": "luckoff", "gluckoff": "gluckoff",
-    "find": "find", "setid": "setpid", "addtask": "task_tg",
+    "find": "find", "setid": "setpid", "addtask": "task_tg", "newquest": "quest",
 }
-COMMAND_ACTIONS = {"reports": "reports", "top": "top", "promos": "promos", "delpromo": "delpromo", "tasks": "tasks", "deltask": "tasks"}
+COMMAND_ACTIONS = {"top": "top", "promos": "promos", "delpromo": "delpromo", "tasks": "tasks", "deltask": "tasks"}
 
 
 def cmd_name(message: Message) -> str:
@@ -969,6 +940,96 @@ FLOWS["task_link"] = Flow("task_link", "🔗", "Задание по ссылке
                           again="🔗 Ещё задание")
 
 
+# ---- квесты: создание через мастер (кейсы и апгрейды) и список/удаление ----
+QUEST_RARITIES = [("Обычный", "common"), ("Редкий", "rare"), ("Эпический", "epic"), ("Легендарный", "legendary"),
+                  ("Мифический", "mythic"), ("Секретный", "secret"), ("Галактический", "galactic"), ("Колбасный", "sausage")]
+QUEST_RU = {code: name for name, code in QUEST_RARITIES}
+
+
+def quest_reward(v: dict) -> int:
+    return quests.reward_for({"type": v["type"], "difficulty": int(v["difficulty"])})
+
+
+def quest_steps() -> list:
+    return [
+        Step("type", "Квест на что?", "Тип", lambda t: t,
+             quick=(("📦 Открытие кейсов", "case"), ("🛠 Апгрейды", "upgrade")), strict=True, per=2,
+             fmt=lambda v: "📦 кейсы" if v == "case" else "🛠 апгрейды"),
+        Step("rarity", "Редкость предметов?\n<i>Для апгрейдов — редкость предметов, которые улучшаем.</i>", "Редкость",
+             lambda t: t, quick=(("Любая", "any"),) + tuple(QUEST_RARITIES), strict=True, per=3,
+             fmt=lambda v: "любая" if v == "any" else QUEST_RU.get(v, v)),
+        Step("chance", "Максимальный шанс результата в апгрейде?\n<i>Квест засчитается, если шанс выпавшего предмета не выше этого значения.</i>",
+             "Шанс", int_parser(lo=0, hi=100),
+             quick=(("Без ограничения", "0"), ("50%", "50"), ("30%", "30"), ("20%", "20"), ("10%", "10"), ("5%", "5")),
+             per=3, when=lambda v: v.get("type") == "upgrade",
+             fmt=lambda x: "без ограничения" if x == 0 else f"не выше {x}%"),
+        Step("target", "Сколько раз нужно выполнить?", "Количество", int_parser(lo=1, hi=1000),
+             quick=(("1", "1"), ("3", "3"), ("5", "5"), ("10", "10")), per=4, fmt=lambda x: f"{x} раз"),
+        Step("difficulty", "Сложность квеста от 1 до 5 — от неё зависит награда.", "Сложность", int_parser(lo=1, hi=5),
+             quick=(("1 · легко", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5 · сложно", "5")), per=5,
+             fmt=lambda x: f"{x} из 5"),
+        Step("title", "Напишите <b>название квеста</b> — его увидят игроки.\n<i>Например: Открыть 5 редких кейсов</i>",
+             "Название", p_title),
+    ]
+
+
+def sum_quest(v: dict) -> str:
+    rar = "любая" if v.get("rarity") in (None, "any") else QUEST_RU.get(v["rarity"], v["rarity"])
+    lines = [f"🎯 <b>{esc(v['title'])}</b>",
+             f"📦 Тип: {'кейсы' if v['type'] == 'case' else 'апгрейды'}",
+             f"💎 Редкость: {esc(rar)}"]
+    if v["type"] == "upgrade" and v.get("chance"):
+        lines.append(f"🎲 Шанс выпадения не выше {v['chance']}%")
+    lines += [f"🔢 Нужно: {v['target']} раз",
+              f"⚖️ Сложность: {v['difficulty']} из 5",
+              f"💰 Награда: <b>{fmt_g(quest_reward(v))} G</b>"]
+    return "\n".join(lines)
+
+
+async def run_quest(v: dict, uid: int) -> str:
+    chance = v.get("chance") if v["type"] == "upgrade" else None
+    payload = {"type": v["type"], "title": v["title"], "target": v["target"],
+               "rarity": None if v.get("rarity") in (None, "any") else v["rarity"],
+               "chance_max": chance or None, "difficulty": int(v["difficulty"])}
+    r = await api("POST", "/admin/quest", json=payload)
+    return (f"✅ Квест <b>#{esc((r or {}).get('id'))}</b> добавлен\n{esc(v['title'])} · +{fmt_g(quest_reward(v))} G\n"
+            f"<i>Он будет попадать в ежедневный набор.</i>")
+
+
+FLOWS["quest"] = Flow("quest", "🎯", "Новый квест", "tasks", quest_steps(), run_quest, sum_quest, again="🎯 Ещё квест")
+
+
+async def act_quests(target):
+    try:
+        qs = await api("GET", "/admin/quest")
+    except ApiError as e:
+        return await send(target, f"❌ {esc(e)}", back_kb("tasks"))
+    if not qs:
+        return await send(target, "🎯 Своих квестов пока нет.", back_kb("tasks", [B("🎯 Новый квест", "go:quest")]))
+    lines = [f"#{q['id']} · <b>{esc(q['title'])}</b> · +{fmt_g(quest_reward(q))} G" for q in qs]
+    rows = [[B(f"🗑 #{q['id']} · {q['title'][:28]}", f"dq:{q['id']}")] for q in qs[:40]]
+    await send(target, "🎯 <b>Квесты</b>\nНажмите на квест, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
+
+
+@admin.callback_query(F.data.startswith("dq:"))
+async def cb_dq(cb: CallbackQuery):
+    await cb.answer()
+    qid = cb.data[3:]
+    await send(cb, f"Удалить квест #{esc(qid)}?", KB([B("✅ Да", f"dqc:{qid}"), B("⬅️ Нет", "a:quests")]))
+
+
+@admin.callback_query(F.data.startswith("dqc:"))
+async def cb_dqc(cb: CallbackQuery):
+    await cb.answer()
+    qid = cb.data[4:]
+    try:
+        await api("POST", "/admin/quest/delete", json={"id": qid})
+        text = f"🗑 Квест #{esc(qid)} удалён."
+    except ApiError as e:
+        text = f"❌ {esc(e)}"
+    await send(cb, text, back_kb("tasks", [B("🗑 Ещё один", "a:quests")]))
+
+
 # ---- поиск игрока ----
 async def run_find(v: dict, uid: int) -> str:
     users = await api("GET", "/admin/users", params={"q": v["q"]})
@@ -1029,3 +1090,4 @@ async def run():
             await asyncio.sleep(5)
         finally:
             await bot.session.close()
+
