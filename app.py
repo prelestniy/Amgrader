@@ -15,8 +15,8 @@ from contextlib import closing
 from typing import Optional, List, Dict, Any
 from urllib.parse import parse_qsl
 
-from fastapi import FastAPI, Header, HTTPException, Depends, Response, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Header, HTTPException, Depends, Response, BackgroundTasks, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import sqlite3
@@ -831,33 +831,33 @@ def trades_list(user=Depends(auth_user)):
 
 
 @app.post("/api/trades")
-def trades_create(body: TradeCreateBody, user=Depends(auth_user)):
-    return trade.create(user["id"], body.items, body.g, body.to)
+def trades_create(body: TradeCreateBody, request: Request, user=Depends(auth_user)):
+    return _tr(request, trade.create(user["id"], body.items, body.g, body.to))
 
 
 @app.get("/api/trades/{code}")
-def trades_get(code: str, user=Depends(auth_user)):
-    return trade.get(user["id"], code)
+def trades_get(code: str, request: Request, user=Depends(auth_user)):
+    return _tr(request, trade.get(user["id"], code))
 
 
 @app.post("/api/trades/{code}/join")
-def trades_join(code: str, user=Depends(auth_user)):
-    return trade.join(user["id"], code)
+def trades_join(code: str, request: Request, user=Depends(auth_user)):
+    return _tr(request, trade.join(user["id"], code))
 
 
 @app.post("/api/trades/{code}/set")
-def trades_set(code: str, body: TradeSetBody, user=Depends(auth_user)):
-    return trade.set_side(user["id"], code, body.items, body.g)
+def trades_set(code: str, body: TradeSetBody, request: Request, user=Depends(auth_user)):
+    return _tr(request, trade.set_side(user["id"], code, body.items, body.g))
 
 
 @app.post("/api/trades/{code}/confirm")
-def trades_confirm(code: str, user=Depends(auth_user)):
-    return trade.confirm(user["id"], code)
+def trades_confirm(code: str, request: Request, user=Depends(auth_user)):
+    return _tr(request, trade.confirm(user["id"], code))
 
 
 @app.post("/api/trades/{code}/cancel")
-def trades_cancel(code: str, user=Depends(auth_user)):
-    return trade.cancel(user["id"], code)
+def trades_cancel(code: str, request: Request, user=Depends(auth_user)):
+    return _tr(request, trade.cancel(user["id"], code))
 
 
 @app.post("/admin/quest")
@@ -1241,9 +1241,36 @@ def video(name: str):
     raise HTTPException(404)
 
 
+APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
+
+
+def _index_html() -> str:
+    # <base href="/"> — чтобы css/js грузились и со страницы /t/КОД (ссылка на трейд)
+    html = (BASE_DIR / "index.html").read_text(encoding="utf-8")
+    return html.replace("<head>", '<head>\n<base href="/">', 1)
+
+
+def _base(request: Request) -> str:
+    if APP_URL:
+        return APP_URL
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    return f"{proto}://{request.headers.get('host', request.url.netloc)}"
+
+
+def _tr(request: Request, v):
+    if isinstance(v, dict) and v.get("id"):
+        v["link"] = f"{_base(request)}/t/{v['id']}"
+    return v
+
+
 @app.get("/")
 def index():
-    return FileResponse(BASE_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/t/{code}")
+def trade_link_page(code: str):
+    return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
 
 
 # Статика фронтенда: index.html ссылается на css/, js/ и img/ — без этого страница выглядит голой и не работает.
