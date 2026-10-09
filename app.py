@@ -20,6 +20,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import sqlite3
 import httpx
+import quests
+import wheel
+import theme as themes
+import trade
 
 # ---------------------------------------------------------------------------
 # Настройки (задаются переменными окружения в Railway)
@@ -44,7 +48,16 @@ SPECIAL_ACCOUNTS = {
 
 @asynccontextmanager
 async def lifespan(_app):
-    """Запускает обоих ботов в этом же процессе (если заданы токены)."""
+    """Запускает обоих ботов и планировщик квестов в этом же процессе (если заданы токены)."""
+    quests.setup(db, ITEMS, BOT_TOKEN, user_public)
+    wheel.setup(db, user_public, ITEMS)
+    themes.setup(db)
+    trade.setup(db, ITEMS)
+    with closing(db()) as conn, conn:
+        quests.init_db(conn)
+        wheel.init_db(conn)
+        themes.init_db(conn)
+        trade.init_db(conn)
     tasks = []
     for name in ("bot_user", "bot_admin"):
         try:
@@ -55,6 +68,8 @@ async def lifespan(_app):
                 log.warning("%s: токен не задан — бот не запущен", name)
         except Exception:
             log.exception("не удалось запустить %s", name)
+    tasks.append(asyncio.create_task(quests.scheduler(), name="quests"))
+    tasks.append(asyncio.create_task(trade.sweeper(), name="trades"))
     yield
     for t in tasks:
         t.cancel()
@@ -62,6 +77,11 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="Amgrader Backend", lifespan=lifespan)
+
+# Открытие index.html прямо из папки (file://) и локальные тесты: запросы идут с другого адреса.
+# Авторизация по токену в заголовке, куки не используются, поэтому разрешаем любой источник.
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 # ---------------------------------------------------------------------------
@@ -118,17 +138,8 @@ def init_db():
         conn.execute("""CREATE TABLE IF NOT EXISTS blocks(
             blocker_id INTEGER, blocked_id INTEGER, created_at INTEGER,
             PRIMARY KEY(blocker_id, blocked_id))""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS messages(
-            id INTEGER PRIMARY KEY AUTOINCREMENT, sender_id INTEGER, recipient_id INTEGER,
-            text TEXT, created_at INTEGER, read_at INTEGER)""")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(sender_id, recipient_id, id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_rcpt ON messages(recipient_id, read_at)")
-        conn.execute("""CREATE TABLE IF NOT EXISTS chat_requests(
-            user_a INTEGER, user_b INTEGER, initiator INTEGER, status TEXT, created_at INTEGER,
-            PRIMARY KEY(user_a, user_b))""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS reports(
-            id INTEGER PRIMARY KEY AUTOINCREMENT, reporter_id INTEGER, reported_id INTEGER,
-            reason TEXT, comment TEXT, context TEXT, status TEXT DEFAULT 'new', created_at INTEGER)""")
+        for _t in ("messages", "chat_requests", "reports"):   # переписка и жалобы удалены полностью
+            conn.execute(f"DROP TABLE IF EXISTS {_t}")
         conn.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)")
         conn.execute("""CREATE TABLE IF NOT EXISTS tasks(
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, kind TEXT, url TEXT, chat TEXT,
@@ -414,7 +425,8 @@ def leaderboard(limit: int = 10):
 
 
 @app.get("/api/me")
-def me(user=Depends(auth_user)):
+def me(background: BackgroundTasks, user=Depends(auth_user)):
+    background.add_task(quests.clear_message, user["id"])
     return user_public(user)
 
 
@@ -424,9 +436,6 @@ def delete_me(user=Depends(auth_user)):
         conn.execute("DELETE FROM users WHERE id=?", (user["id"],))
         conn.execute("DELETE FROM friendships WHERE user_a=? OR user_b=?", (user["id"], user["id"]))
         conn.execute("DELETE FROM blocks WHERE blocker_id=? OR blocked_id=?", (user["id"], user["id"]))
-        conn.execute("DELETE FROM messages WHERE sender_id=? OR recipient_id=?", (user["id"], user["id"]))
-        conn.execute("DELETE FROM chat_requests WHERE user_a=? OR user_b=?", (user["id"], user["id"]))
-        conn.execute("DELETE FROM reports WHERE reporter_id=?", (user["id"],))
     return {"ok": True}
 
 
@@ -728,94 +737,146 @@ def admin_top(_=Depends(check_admin)):
 
 
 # ---------------------------------------------------------------------------
-# Бонусы: ежедневная награда и задания
+# Квесты (вместо бывших «Бонусов»): см. quests.py
 # ---------------------------------------------------------------------------
-DAILY_AMOUNT = int(os.environ.get("DAILY_BONUS", "50"))
-TASK_WAIT = 12   # сек. между «Перейти» и «Проверить» для заданий-ссылок
+@app.get("/api/quests")
+def quests_list(user=Depends(auth_user)):
+    return quests.list_for(user["id"])
 
 
-def today() -> int:
-    return int((time.time() + 10800) // 86400)      # сутки по Москве
+class QuestEventBody(BaseModel):
+    type: str
+    inventory: List[int] = []
+    drops: List[int] = []
+    success: bool = False
+    chance: Optional[float] = None
 
 
-def secs_left() -> int:
-    return int((today() + 1) * 86400 - 10800 - time.time())
+@app.post("/api/quests/event")
+def quests_event(body: QuestEventBody, user=Depends(auth_user)):
+    return quests.record_event(user["id"], body.dict())
 
 
-@app.get("/api/bonus")
-def bonus_info(user=Depends(auth_user)):
-    with closing(db()) as conn:
-        tasks = conn.execute("SELECT * FROM tasks WHERE active=1 ORDER BY id").fetchall()
-        cl = {r["task_id"]: r for r in conn.execute("SELECT * FROM task_claims WHERE user_id=?", (user["id"],)).fetchall()}
-        row = conn.execute("SELECT last_daily FROM users WHERE id=?", (user["id"],)).fetchone()
-    return {
-        "daily": {"amount": DAILY_AMOUNT, "available": (row["last_daily"] or 0) < today(), "secondsLeft": secs_left()},
-        "tasks": [{"id": t["id"], "title": t["title"], "kind": t["kind"], "url": t["url"], "reward": t["reward"],
-                   "done": bool(cl.get(t["id"]) and cl[t["id"]]["claimed_at"]), "started": t["id"] in cl} for t in tasks],
-    }
+class QuestAdminBody(BaseModel):
+    type: str
+    title: str
+    target: int
+    rarity: Optional[str] = None
+    chance_max: Optional[float] = None
+    difficulty: int
 
 
-@app.post("/api/bonus/daily")
-def bonus_daily(user=Depends(auth_user)):
-    with closing(db()) as conn, conn:
-        conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-        if (row["last_daily"] or 0) >= today():
-            raise HTTPException(400, "Бонус уже получен — приходите завтра")
-        conn.execute("UPDATE users SET balance=balance+?, last_daily=?, rev=rev+1 WHERE id=?", (DAILY_AMOUNT, today(), row["id"]))
-        new = conn.execute("SELECT * FROM users WHERE id=?", (row["id"],)).fetchone()
-    return user_public(new)
+class QuestDelBody(BaseModel):
+    id: str
 
 
-class TaskClaim(BaseModel):
-    initData: Optional[str] = None
+@app.get("/api/wheel")
+def wheel_status(user=Depends(auth_user)):
+    return wheel.status(user["id"])
 
 
-@app.post("/api/tasks/{task_id}/start")
-def task_start(task_id: int, user=Depends(auth_user)):
-    with closing(db()) as conn, conn:
-        if not conn.execute("SELECT 1 FROM tasks WHERE id=? AND active=1", (task_id,)).fetchone():
-            raise HTTPException(404, "Задание не найдено")
-        conn.execute("INSERT OR IGNORE INTO task_claims(user_id, task_id, started_at) VALUES(?,?,?)", (user["id"], task_id, int(time.time())))
-    return {"ok": True}
+@app.post("/api/wheel/spin")
+def wheel_spin(user=Depends(auth_user)):
+    return wheel.spin(user["id"])
 
 
-@app.post("/api/tasks/{task_id}/claim")
-def task_claim(task_id: int, body: TaskClaim, user=Depends(auth_user)):
-    with closing(db()) as conn:
-        t = conn.execute("SELECT * FROM tasks WHERE id=? AND active=1", (task_id,)).fetchone()
-        c = conn.execute("SELECT * FROM task_claims WHERE user_id=? AND task_id=?", (user["id"], task_id)).fetchone()
-    if not t:
-        raise HTTPException(404, "Задание не найдено")
-    if c and c["claimed_at"]:
-        raise HTTPException(400, "Уже выполнено")
-    if t["kind"] == "tg":
-        tg_id = user["telegram_id"]
-        if not tg_id and body.initData:
-            tg_id = check_telegram_auth(body.initData).get("id")
-        if not tg_id:
-            raise HTTPException(400, "Откройте игру внутри Telegram, чтобы проверить подписку")
-        try:
-            r = httpx.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember", params={"chat_id": t["chat"], "user_id": tg_id}, timeout=8).json()
-        except Exception:
-            raise HTTPException(502, "Telegram не ответил, попробуйте ещё раз")
-        if not r.get("ok"):
-            raise HTTPException(400, "Не удалось проверить подписку (бот должен быть админом канала)")
-        if r["result"]["status"] not in ("member", "administrator", "creator"):
-            raise HTTPException(400, "Подписка не найдена — подпишитесь и нажмите «Проверить» ещё раз")
-    elif not c or time.time() - (c["started_at"] or 0) < TASK_WAIT:
-        raise HTTPException(400, "Сначала выполните задание по ссылке, затем нажмите «Проверить»")
-    with closing(db()) as conn, conn:
-        conn.execute("BEGIN IMMEDIATE")
-        cl = conn.execute("SELECT * FROM task_claims WHERE user_id=? AND task_id=?", (user["id"], task_id)).fetchone()
-        if cl and cl["claimed_at"]:
-            raise HTTPException(400, "Уже выполнено")
-        conn.execute("""INSERT INTO task_claims(user_id, task_id, started_at, claimed_at) VALUES(?,?,?,?)
-                        ON CONFLICT(user_id, task_id) DO UPDATE SET claimed_at=excluded.claimed_at""",
-                     (user["id"], task_id, int(time.time()), int(time.time())))
-        conn.execute("UPDATE users SET balance=balance+?, rev=rev+1 WHERE id=?", (t["reward"], user["id"]))
-        new = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    return user_public(new)
+class ThemeBody(BaseModel):
+    theme: str
+
+
+class ThemeCustomBody(BaseModel):
+    name: str
+    color: str
+
+
+class ThemeDelBody(BaseModel):
+    id: str
+
+
+@app.get("/api/theme")
+def theme_get(user=Depends(auth_user)):
+    return themes.get(user["id"])
+
+
+@app.post("/api/theme")
+def theme_set(body: ThemeBody, user=Depends(auth_user)):
+    return themes.set_theme(user["id"], body.theme)
+
+
+@app.post("/api/theme/custom")
+def theme_custom_add(body: ThemeCustomBody, user=Depends(auth_user)):
+    return themes.add_custom(user["id"], body.name, body.color)
+
+
+@app.post("/api/theme/custom/delete")
+def theme_custom_del(body: ThemeDelBody, user=Depends(auth_user)):
+    return themes.delete_custom(user["id"], body.id)
+
+
+class TradeCreateBody(BaseModel):
+    items: List[int] = []
+    g: int = 0
+    to: Optional[str] = None      # publicId друга; пусто — трейд по ссылке
+
+
+class TradeSetBody(BaseModel):
+    items: List[int] = []
+    g: int = 0
+
+
+@app.get("/api/trades")
+def trades_list(user=Depends(auth_user)):
+    return trade.list_for(user["id"])
+
+
+@app.post("/api/trades")
+def trades_create(body: TradeCreateBody, user=Depends(auth_user)):
+    return trade.create(user["id"], body.items, body.g, body.to)
+
+
+@app.get("/api/trades/{code}")
+def trades_get(code: str, user=Depends(auth_user)):
+    return trade.get(user["id"], code)
+
+
+@app.post("/api/trades/{code}/join")
+def trades_join(code: str, user=Depends(auth_user)):
+    return trade.join(user["id"], code)
+
+
+@app.post("/api/trades/{code}/set")
+def trades_set(code: str, body: TradeSetBody, user=Depends(auth_user)):
+    return trade.set_side(user["id"], code, body.items, body.g)
+
+
+@app.post("/api/trades/{code}/confirm")
+def trades_confirm(code: str, user=Depends(auth_user)):
+    return trade.confirm(user["id"], code)
+
+
+@app.post("/api/trades/{code}/cancel")
+def trades_cancel(code: str, user=Depends(auth_user)):
+    return trade.cancel(user["id"], code)
+
+
+@app.post("/admin/quest")
+def admin_quest_add(body: QuestAdminBody, _=Depends(check_admin)):
+    return quests.add_custom(body.dict())
+
+
+@app.get("/admin/quest")
+def admin_quest_list(_=Depends(check_admin)):
+    return quests.list_custom()
+
+
+@app.post("/admin/quest/delete")
+def admin_quest_del(body: QuestDelBody, _=Depends(check_admin)):
+    return quests.delete_custom(body.id)
+
+
+@app.post("/api/quests/{quest_id}/claim")
+def quests_claim(quest_id: str, user=Depends(auth_user)):
+    return quests.claim(user["id"], quest_id)
 
 
 class TaskBody(BaseModel):
@@ -1153,306 +1214,6 @@ def block_user(body: BlockBody, user=Depends(auth_user)):
     return {"relation": "blocked" if body.block else "none"}
 
 
-# ---------------------------------------------------------------------------
-# Сообщения
-#  • друзьям — без ограничений;
-#  • не другу — одно сообщение (запрос на переписку), дальше — только после принятия.
-#  • в Telegram-бота уходит только уведомление «вам написал …», текст — только в мини-аппе.
-# ---------------------------------------------------------------------------
-MSG_MAX = 500
-MSG_PER_MINUTE = 20
-
-
-class SendBody(BaseModel):
-    text: str
-
-
-def webapp_url() -> str:
-    url = os.environ.get("WEBAPP_URL", "")
-    if not url and os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
-        url = "https://" + os.environ["RAILWAY_PUBLIC_DOMAIN"]
-    return url
-
-
-def notify_telegram(tg_id: int, text: str):
-    """Уведомление в бота (без текста сообщения). Любая ошибка игнорируется."""
-    if not BOT_TOKEN or not tg_id:
-        return
-    payload = {"chat_id": tg_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True}
-    url = webapp_url()
-    if url:
-        payload["reply_markup"] = {"inline_keyboard": [[{"text": "💬 Открыть", "web_app": {"url": url}}]]}
-    try:
-        httpx.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", json=payload, timeout=8)
-    except Exception:
-        log.warning("не удалось отправить уведомление в Telegram")
-
-
-def chat_state(conn, me: int, other: int):
-    """(state, can_send). state: friend | accepted | none | request_in | request_out | declined | blocked_by_me | blocked_me."""
-    if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, other)).fetchone():
-        return "blocked_by_me", False
-    if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (other, me)).fetchone():
-        return "blocked_me", False
-    if relation(conn, me, other) == "friend":
-        return "friend", True
-    x, y = _pair(me, other)
-    c = conn.execute("SELECT initiator, status FROM chat_requests WHERE user_a=? AND user_b=?", (x, y)).fetchone()
-    if not c:
-        return "none", True
-    if c["status"] == "accepted":
-        return "accepted", True
-    if c["status"] == "pending":
-        return ("request_out", False) if c["initiator"] == me else ("request_in", True)
-    # declined
-    return ("declined", False) if c["initiator"] == me else ("request_in", True)
-
-
-def _peer(conn, public_id: str):
-    return _target(conn, public_id)
-
-
-def _msg_json(r, me: int):
-    return {"id": r["id"], "mine": r["sender_id"] == me, "text": r["text"], "at": r["created_at"]}
-
-
-@app.get("/api/chats/unread")
-def chats_unread(user=Depends(auth_user)):
-    with closing(db()) as conn:
-        n = conn.execute("SELECT COUNT(*) FROM messages WHERE recipient_id=? AND read_at IS NULL", (user["id"],)).fetchone()[0]
-    return {"unread": n}
-
-
-@app.get("/api/chats")
-def chats_list(user=Depends(auth_user)):
-    me = user["id"]
-    with closing(db()) as conn:
-        rows = conn.execute(
-            """SELECT partner, MAX(id) AS last_id,
-                      SUM(CASE WHEN recipient_id=? AND read_at IS NULL THEN 1 ELSE 0 END) AS unread
-               FROM (SELECT id, recipient_id, read_at,
-                            CASE WHEN sender_id=? THEN recipient_id ELSE sender_id END AS partner
-                     FROM messages WHERE sender_id=? OR recipient_id=?)
-               GROUP BY partner ORDER BY last_id DESC LIMIT 50""", (me, me, me, me)).fetchall()
-        out, total = [], 0
-        for r in rows:
-            u = conn.execute("SELECT id, public_id, nickname, photo FROM users WHERE id=?", (r["partner"],)).fetchone()
-            m = conn.execute("SELECT * FROM messages WHERE id=?", (r["last_id"],)).fetchone()
-            if not u or not m:
-                continue
-            state, _ = chat_state(conn, me, u["id"])
-            total += r["unread"] or 0
-            out.append({"publicId": u["public_id"], "nickname": u["nickname"] or "Игрок", "photo": u["photo"],
-                        "unread": r["unread"] or 0, "state": state,
-                        "last": {"text": m["text"][:80], "mine": m["sender_id"] == me, "at": m["created_at"]}})
-    return {"chats": out, "unread": total}
-
-
-@app.get("/api/chats/{public_id}")
-def chat_open(public_id: str, after: int = 0, user=Depends(auth_user)):
-    """Сообщения с игроком (после after). Входящие помечаются прочитанными."""
-    me = user["id"]
-    with closing(db()) as conn, conn:
-        p = _peer(conn, public_id)
-        if p["id"] == me:
-            raise HTTPException(400, "Нельзя писать самому себе")
-        state, can = chat_state(conn, me, p["id"])
-        rows = conn.execute(
-            """SELECT * FROM (SELECT * FROM messages
-                  WHERE ((sender_id=? AND recipient_id=?) OR (sender_id=? AND recipient_id=?)) AND id>?
-                  ORDER BY id DESC LIMIT 100) ORDER BY id ASC""", (me, p["id"], p["id"], me, after)).fetchall()
-        conn.execute("UPDATE messages SET read_at=? WHERE recipient_id=? AND sender_id=? AND read_at IS NULL",
-                     (int(time.time()), me, p["id"]))
-    return {"peer": {"publicId": p["public_id"], "nickname": p["nickname"] or "Игрок", "photo": p["photo"]},
-            "state": state, "canSend": can, "messages": [_msg_json(r, me) for r in rows]}
-
-
-@app.post("/api/chats/{public_id}/send")
-def chat_send(public_id: str, body: SendBody, bg: BackgroundTasks, user=Depends(auth_user)):
-    me = user["id"]
-    text = body.text.replace("\r", "").strip()
-    if not text:
-        raise HTTPException(400, "Введите сообщение")
-    if len(text) > MSG_MAX:
-        raise HTTPException(400, f"Не больше {MSG_MAX} символов")
-    now = int(time.time())
-    notify = None
-    with closing(db()) as conn, conn:
-        conn.execute("BEGIN IMMEDIATE")
-        p = _peer(conn, public_id)
-        if p["id"] == me:
-            raise HTTPException(400, "Нельзя писать самому себе")
-        state, can = chat_state(conn, me, p["id"])
-        if state == "blocked_by_me":
-            raise HTTPException(400, "Сначала разблокируйте игрока")
-        if not can:
-            if state == "request_out":
-                raise HTTPException(400, "Дождитесь, пока игрок примет запрос на переписку")
-            raise HTTPException(400, "Не удалось отправить сообщение")
-        if conn.execute("SELECT COUNT(*) FROM messages WHERE sender_id=? AND created_at>?", (me, now - 60)).fetchone()[0] >= MSG_PER_MINUTE:
-            raise HTTPException(429, "Слишком часто — подождите минуту")
-        x, y = _pair(me, p["id"])
-        is_request = False
-        if state == "none":
-            conn.execute("INSERT OR REPLACE INTO chat_requests(user_a, user_b, initiator, status, created_at) VALUES(?,?,?,?,?)",
-                         (x, y, me, "pending", now))
-            is_request = True
-        elif state == "request_in":
-            # ответ на запрос = его принятие
-            conn.execute("UPDATE chat_requests SET status='accepted' WHERE user_a=? AND user_b=?", (x, y))
-        unread_before = conn.execute(
-            "SELECT COUNT(*) FROM messages WHERE sender_id=? AND recipient_id=? AND read_at IS NULL", (me, p["id"])).fetchone()[0]
-        cur = conn.execute("INSERT INTO messages(sender_id, recipient_id, text, created_at) VALUES(?,?,?,?)",
-                           (me, p["id"], text, now))
-        mid = cur.lastrowid
-        new_state, new_can = chat_state(conn, me, p["id"])
-        rcpt = conn.execute("SELECT telegram_id FROM users WHERE id=?", (p["id"],)).fetchone()
-        if unread_before == 0 and rcpt and rcpt["telegram_id"]:
-            notify = (rcpt["telegram_id"], is_request)
-    if notify:
-        name = htmllib.escape(user["nickname"] or "Игрок")
-        msg = (f"💬 <b>{name}</b> хочет начать переписку" if notify[1] else f"💬 Вам написал(а) <b>{name}</b>") + \
-              "\n<i>Сообщение можно прочитать в мини-аппе.</i>"
-        bg.add_task(notify_telegram, notify[0], msg)
-    return {"message": {"id": mid, "mine": True, "text": text, "at": now}, "state": new_state, "canSend": new_can}
-
-
-@app.post("/api/chats/{public_id}/accept")
-def chat_accept(public_id: str, user=Depends(auth_user)):
-    me = user["id"]
-    with closing(db()) as conn, conn:
-        p = _peer(conn, public_id)
-        x, y = _pair(me, p["id"])
-        cur = conn.execute("UPDATE chat_requests SET status='accepted' WHERE user_a=? AND user_b=? AND initiator<>?", (x, y, me))
-        if cur.rowcount == 0:
-            raise HTTPException(404, "Запрос не найден")
-        state, can = chat_state(conn, me, p["id"])
-    return {"state": state, "canSend": can}
-
-
-@app.post("/api/chats/{public_id}/decline")
-def chat_decline(public_id: str, user=Depends(auth_user)):
-    me = user["id"]
-    with closing(db()) as conn, conn:
-        p = _peer(conn, public_id)
-        x, y = _pair(me, p["id"])
-        cur = conn.execute("UPDATE chat_requests SET status='declined' WHERE user_a=? AND user_b=? AND initiator<>? AND status='pending'", (x, y, me))
-        if cur.rowcount == 0:
-            raise HTTPException(404, "Запрос не найден")
-        state, can = chat_state(conn, me, p["id"])
-    return {"state": state, "canSend": can}
-
-
-# ---------------------------------------------------------------------------
-# Жалобы на игроков (приходят админам в админ-бота)
-# ---------------------------------------------------------------------------
-REPORT_REASONS = {"spam": "Спам", "abuse": "Оскорбления", "scam": "Мошенничество", "other": "Другое"}
-REPORT_COMMENT_MAX = 200
-REPORT_CONTEXT_MESSAGES = 10
-ADMIN_BOT_TOKEN = os.environ.get("ADMIN_BOT_TOKEN", "")
-ADMIN_TG_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
-
-
-class ReportBody(BaseModel):
-    publicId: str
-    reason: str
-    comment: str = ""
-
-
-def notify_admins(text: str):
-    if not ADMIN_BOT_TOKEN:
-        return
-    for chat_id in ADMIN_TG_IDS:
-        try:
-            httpx.post(f"https://api.telegram.org/bot{ADMIN_BOT_TOKEN}/sendMessage",
-                       json={"chat_id": chat_id, "text": text[:3900], "parse_mode": "HTML",
-                             "disable_web_page_preview": True}, timeout=8)
-        except Exception:
-            log.warning("не удалось отправить жалобу админу")
-
-
-def report_text(rid, reporter, reported, reason, comment, context) -> str:
-    e = htmllib.escape
-    lines = [f"🚩 <b>Жалоба #{rid}</b> · {e(reason)}",
-             f"От: <b>{e(reporter['nickname'] or '—')}</b> · ID <code>{e(reporter['public_id'] or '—')}</code>",
-             f"На: <b>{e(reported['nickname'] or '—')}</b> · ID <code>{e(reported['public_id'] or '—')}</code>"]
-    if comment:
-        lines.append(f"Комментарий: {e(comment)}")
-    if context:
-        lines.append("\nПоследние сообщения:")
-        for m in context[-6:]:
-            who = "жалуется" if m["from"] == "reporter" else "обвиняемый"
-            lines.append(f"• <i>{who}:</i> {e(m['text'][:120])}")
-    return "\n".join(lines)
-
-
-@app.post("/api/reports")
-def create_report(body: ReportBody, bg: BackgroundTasks, user=Depends(auth_user)):
-    me = user["id"]
-    if body.reason not in REPORT_REASONS:
-        raise HTTPException(400, "Выберите причину жалобы")
-    comment = " ".join(body.comment.split())
-    if len(comment) > REPORT_COMMENT_MAX:
-        raise HTTPException(400, f"Комментарий: не больше {REPORT_COMMENT_MAX} символов")
-    now = int(time.time())
-    with closing(db()) as conn, conn:
-        t = _target(conn, body.publicId)
-        if t["id"] == me:
-            raise HTTPException(400, "Нельзя пожаловаться на себя")
-        if conn.execute("SELECT COUNT(*) FROM reports WHERE reporter_id=? AND created_at>?", (me, now - 86400)).fetchone()[0] >= 10:
-            raise HTTPException(429, "Слишком много жалоб за сутки")
-        if conn.execute("SELECT 1 FROM reports WHERE reporter_id=? AND reported_id=? AND created_at>?", (me, t["id"], now - 3600)).fetchone():
-            raise HTTPException(400, "Вы уже отправили жалобу на этого игрока — модератор её рассмотрит")
-        rows = conn.execute(
-            """SELECT * FROM (SELECT * FROM messages
-                  WHERE (sender_id=? AND recipient_id=?) OR (sender_id=? AND recipient_id=?)
-                  ORDER BY id DESC LIMIT ?) ORDER BY id ASC""", (me, t["id"], t["id"], me, REPORT_CONTEXT_MESSAGES)).fetchall()
-        context = [{"from": "reporter" if r["sender_id"] == me else "reported", "text": r["text"], "at": r["created_at"]} for r in rows]
-        cur = conn.execute(
-            "INSERT INTO reports(reporter_id, reported_id, reason, comment, context, created_at) VALUES(?,?,?,?,?,?)",
-            (me, t["id"], body.reason, comment, json.dumps(context, ensure_ascii=False), now))
-        rid = cur.lastrowid
-        reported = conn.execute("SELECT nickname, public_id FROM users WHERE id=?", (t["id"],)).fetchone()
-        text = report_text(rid, user, reported, REPORT_REASONS[body.reason], comment, context)
-    bg.add_task(notify_admins, text)
-    return {"ok": True}
-
-
-class ReportCloseBody(BaseModel):
-    id: int
-
-
-@app.get("/admin/reports")
-def admin_reports(limit: int = 10, _=Depends(check_admin)):
-    limit = max(1, min(limit, 30))
-    with closing(db()) as conn:
-        rows = conn.execute(
-            """SELECT r.*, a.nickname AS rn, a.public_id AS rp, b.nickname AS tn, b.public_id AS tp
-               FROM reports r LEFT JOIN users a ON a.id=r.reporter_id LEFT JOIN users b ON b.id=r.reported_id
-               WHERE r.status='new' ORDER BY r.id DESC LIMIT ?""", (limit,)).fetchall()
-        total = conn.execute("SELECT COUNT(*) FROM reports WHERE status='new'").fetchone()[0]
-    out = []
-    for r in rows:
-        try:
-            ctx = json.loads(r["context"] or "[]")
-        except ValueError:
-            ctx = []
-        out.append({"id": r["id"], "reason": REPORT_REASONS.get(r["reason"], r["reason"]), "comment": r["comment"] or "",
-                    "created_at": r["created_at"], "context": ctx,
-                    "reporter": {"nickname": r["rn"], "public_id": r["rp"]},
-                    "reported": {"nickname": r["tn"], "public_id": r["tp"]}})
-    return {"reports": out, "total": total}
-
-
-@app.post("/admin/reports/close")
-def admin_report_close(body: ReportCloseBody, _=Depends(check_admin)):
-    with closing(db()) as conn, conn:
-        n = conn.execute("UPDATE reports SET status='closed' WHERE id=?", (body.id,)).rowcount
-    if not n:
-        raise HTTPException(404, "Жалоба не найдена")
-    return {"ok": True}
-
-
 @app.get("/admin/users")
 def admin_search_users(q: str = "", _=Depends(check_admin)):
     like = f"%{q}%"
@@ -1482,3 +1243,4 @@ def video(name: str):
 @app.get("/")
 def index():
     return FileResponse(BASE_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
