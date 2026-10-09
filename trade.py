@@ -3,6 +3,7 @@
 уходит на аккаунт TRADE_FEE_LOGIN (логин администратора). Обмен атомарный: в одной транзакции."""
 import asyncio
 import json
+import re
 import os
 import secrets
 import time
@@ -169,10 +170,13 @@ def create(uid, items, g, to_public_id):
         if _open_count(conn, uid) >= MAX_OPEN:
             raise HTTPException(400, f"Можно вести не больше {MAX_OPEN} трейдов одновременно")
         to_uid = None
-        if to_public_id:
-            r = conn.execute("SELECT id FROM users WHERE public_id=? COLLATE NOCASE", (to_public_id.strip(),)).fetchone()
+        digits = re.sub(r"\D", "", to_public_id or "")
+        if to_public_id and not digits:
+            raise HTTPException(400, "Введите ID друга — цифры из профиля")
+        if digits:
+            r = conn.execute("SELECT id FROM users WHERE public_id=?", (digits,)).fetchone()
             if r is None:
-                raise HTTPException(404, "Игрок не найден")
+                raise HTTPException(404, "Игрок с таким ID не найден")
             if r["id"] == uid:
                 raise HTTPException(400, "Нельзя торговать с самим собой")
             f = conn.execute("""SELECT 1 FROM friendships WHERE status='accepted' AND
