@@ -235,6 +235,9 @@ def set_side(uid, code, items, g):
             raise HTTPException(400, "Трейд уже закрыт")
         side_items, side_g = _check_side(uid, conn, items, g)
         col = "a" if row["from_uid"] == uid else "b"
+        # Если ничего не поменялось, не сбрасываем подтверждения (иначе второй игрок сбивал первого)
+        if sorted(json.loads(row[f"{col}_items"])) == side_items and row[f"{col}_g"] == side_g:
+            return _view(conn, row, uid)
         conn.execute(f"""UPDATE trades SET {col}_items=?, {col}_g=?, a_ok=0, b_ok=0, status='open',
                          exec_at=0, note='', updated_at=? WHERE id=?""",
                      (json.dumps(side_items), side_g, int(time.time()), code))
