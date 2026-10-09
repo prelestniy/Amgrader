@@ -117,9 +117,8 @@ async function tradeConfirm() {
 async function tradeCancel() {
   try { tradeApply(await api(`/api/trades/${tradeView.id}/cancel`, { method: "POST" })); } catch (e) { tradeErr(e); }
 }
-function tradeLink(id) { return location.href.split("?")[0] + "?trade=" + id; }
 async function tradeShare() {
-  const url = tradeLink(tradeView.id);
+  const url = tradeView.link || (location.origin + "/t/" + tradeView.id);
   try {
     if (navigator.share) await navigator.share({ title: "Трейд в Амгрейд", url });
     else if (navigator.clipboard) { await navigator.clipboard.writeText(url); notify("win", "Трейд", "Ссылка скопирована", "", OK_ITEM); }
@@ -158,10 +157,12 @@ async function tradeCreate(friendId) {
 
 /* Приглашение по ссылке: ?trade=КОД. Гость сначала входит, потом трейд откроется сам. */
 function tradeFromUrl() {
-  const p = new URLSearchParams(location.search).get("trade");
+  let p = new URLSearchParams(location.search).get("trade");
+  const m = location.pathname.match(/\/t\/([0-9a-f]{8})\/?$/i);
+  if (!p && m) p = m[1];
   if (!p) return;
   try { localStorage.setItem(TRADE_PENDING_KEY, p); } catch (e) {}
-  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  try { history.replaceState(null, "", "/"); } catch (e) {}
 }
 function tradeCheckPending() {
   if (!isLoggedIn()) return;
