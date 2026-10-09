@@ -1,0 +1,902 @@
+[
+ {
+  "type": "case",
+  "title": "Открыть 2 кейса",
+  "target": 2,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 1,
+  "id": "q001"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 3 кейса",
+  "target": 3,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q002"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 5 кейсов",
+  "target": 5,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q003"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 10 кейсов",
+  "target": 10,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q004"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 15 кейсов",
+  "target": 15,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q005"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 20 кейсов",
+  "target": 20,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q006"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 30 кейсов",
+  "target": 30,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q007"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 50 кейсов",
+  "target": 50,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q008"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 75 кейсов",
+  "target": 75,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q009"
+ },
+ {
+  "type": "case",
+  "title": "Открыть 100 кейсов",
+  "target": 100,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q010"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 1 предмет редкости «Редкий»",
+  "target": 1,
+  "rarity": "rare",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q011"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 3 предмета редкости «Редкий»",
+  "target": 3,
+  "rarity": "rare",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q012"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 5 предметов редкости «Редкий»",
+  "target": 5,
+  "rarity": "rare",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q013"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 1 предмет редкости «Эпический»",
+  "target": 1,
+  "rarity": "epic",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q014"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 3 предмета редкости «Эпический»",
+  "target": 3,
+  "rarity": "epic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q015"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 5 предметов редкости «Эпический»",
+  "target": 5,
+  "rarity": "epic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q016"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 1 предмет редкости «Легендарный»",
+  "target": 1,
+  "rarity": "legendary",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q017"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 3 предмета редкости «Легендарный»",
+  "target": 3,
+  "rarity": "legendary",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q018"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 5 предметов редкости «Легендарный»",
+  "target": 5,
+  "rarity": "legendary",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q019"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 1 предмет редкости «Мифический»",
+  "target": 1,
+  "rarity": "mythic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q020"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 3 предмета редкости «Мифический»",
+  "target": 3,
+  "rarity": "mythic",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q021"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 5 предметов редкости «Мифический»",
+  "target": 5,
+  "rarity": "mythic",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q022"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 1 предмет редкости «Секретный»",
+  "target": 1,
+  "rarity": "secret",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q023"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 3 предмета редкости «Секретный»",
+  "target": 3,
+  "rarity": "secret",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q024"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 5 предметов редкости «Секретный»",
+  "target": 5,
+  "rarity": "secret",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q025"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 1 предмет редкости «Галактический»",
+  "target": 1,
+  "rarity": "galactic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q026"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 3 предмета редкости «Галактический»",
+  "target": 3,
+  "rarity": "galactic",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q027"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 5 предметов редкости «Галактический»",
+  "target": 5,
+  "rarity": "galactic",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q028"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 1 предмет редкости «Колбасный»",
+  "target": 1,
+  "rarity": "sausage",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q029"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 3 предмета редкости «Колбасный»",
+  "target": 3,
+  "rarity": "sausage",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q030"
+ },
+ {
+  "type": "case",
+  "title": "Выбить 5 предметов редкости «Колбасный»",
+  "target": 5,
+  "rarity": "sausage",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q031"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 3 успешных апгрейда",
+  "target": 3,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q032"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 5 успешных апгрейдов",
+  "target": 5,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q033"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 7 успешных апгрейдов",
+  "target": 7,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q034"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 10 успешных апгрейдов",
+  "target": 10,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q035"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 15 успешных апгрейдов",
+  "target": 15,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q036"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 20 успешных апгрейдов",
+  "target": 20,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q037"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 30 успешных апгрейдов",
+  "target": 30,
+  "rarity": null,
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q038"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 3 апгрейда из предметов «Обычный»",
+  "target": 3,
+  "rarity": "common",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q039"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 5 апгрейдов из предметов «Обычный»",
+  "target": 5,
+  "rarity": "common",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q040"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 10 апгрейдов из предметов «Обычный»",
+  "target": 10,
+  "rarity": "common",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q041"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 20 апгрейдов из предметов «Обычный»",
+  "target": 20,
+  "rarity": "common",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q042"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 3 апгрейда из предметов «Редкий»",
+  "target": 3,
+  "rarity": "rare",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q043"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 5 апгрейдов из предметов «Редкий»",
+  "target": 5,
+  "rarity": "rare",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q044"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 10 апгрейдов из предметов «Редкий»",
+  "target": 10,
+  "rarity": "rare",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q045"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 20 апгрейдов из предметов «Редкий»",
+  "target": 20,
+  "rarity": "rare",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q046"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 3 апгрейда из предметов «Эпический»",
+  "target": 3,
+  "rarity": "epic",
+  "chance_max": null,
+  "difficulty": 2,
+  "id": "q047"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 5 апгрейдов из предметов «Эпический»",
+  "target": 5,
+  "rarity": "epic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q048"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 10 апгрейдов из предметов «Эпический»",
+  "target": 10,
+  "rarity": "epic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q049"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 20 апгрейдов из предметов «Эпический»",
+  "target": 20,
+  "rarity": "epic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q050"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 3 апгрейда из предметов «Легендарный»",
+  "target": 3,
+  "rarity": "legendary",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q051"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 5 апгрейдов из предметов «Легендарный»",
+  "target": 5,
+  "rarity": "legendary",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q052"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 10 апгрейдов из предметов «Легендарный»",
+  "target": 10,
+  "rarity": "legendary",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q053"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 20 апгрейдов из предметов «Легендарный»",
+  "target": 20,
+  "rarity": "legendary",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q054"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 3 апгрейда из предметов «Мифический»",
+  "target": 3,
+  "rarity": "mythic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q055"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 5 апгрейдов из предметов «Мифический»",
+  "target": 5,
+  "rarity": "mythic",
+  "chance_max": null,
+  "difficulty": 3,
+  "id": "q056"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 10 апгрейдов из предметов «Мифический»",
+  "target": 10,
+  "rarity": "mythic",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q057"
+ },
+ {
+  "type": "upgrade",
+  "title": "Сделать 20 апгрейдов из предметов «Мифический»",
+  "target": 20,
+  "rarity": "mythic",
+  "chance_max": null,
+  "difficulty": 4,
+  "id": "q058"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% в апгрейде: 1 раз",
+  "target": 1,
+  "rarity": null,
+  "chance_max": 50,
+  "difficulty": 1,
+  "id": "q059"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% в апгрейде: 3 раза",
+  "target": 3,
+  "rarity": null,
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q060"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% в апгрейде: 5 раз",
+  "target": 5,
+  "rarity": null,
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q061"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% в апгрейде: 10 раз",
+  "target": 10,
+  "rarity": null,
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q062"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% в апгрейде: 1 раз",
+  "target": 1,
+  "rarity": null,
+  "chance_max": 30,
+  "difficulty": 2,
+  "id": "q063"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% в апгрейде: 3 раза",
+  "target": 3,
+  "rarity": null,
+  "chance_max": 30,
+  "difficulty": 3,
+  "id": "q064"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% в апгрейде: 5 раз",
+  "target": 5,
+  "rarity": null,
+  "chance_max": 30,
+  "difficulty": 3,
+  "id": "q065"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% в апгрейде: 10 раз",
+  "target": 10,
+  "rarity": null,
+  "chance_max": 30,
+  "difficulty": 4,
+  "id": "q066"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% в апгрейде: 1 раз",
+  "target": 1,
+  "rarity": null,
+  "chance_max": 20,
+  "difficulty": 3,
+  "id": "q067"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% в апгрейде: 3 раза",
+  "target": 3,
+  "rarity": null,
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q068"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% в апгрейде: 5 раз",
+  "target": 5,
+  "rarity": null,
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q069"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% в апгрейде: 10 раз",
+  "target": 10,
+  "rarity": null,
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q070"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 10% в апгрейде: 1 раз",
+  "target": 1,
+  "rarity": null,
+  "chance_max": 10,
+  "difficulty": 4,
+  "id": "q071"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 10% в апгрейде: 3 раза",
+  "target": 3,
+  "rarity": null,
+  "chance_max": 10,
+  "difficulty": 4,
+  "id": "q072"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 10% в апгрейде: 5 раз",
+  "target": 5,
+  "rarity": null,
+  "chance_max": 10,
+  "difficulty": 5,
+  "id": "q073"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 10% в апгрейде: 10 раз",
+  "target": 10,
+  "rarity": null,
+  "chance_max": 10,
+  "difficulty": 5,
+  "id": "q074"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 5% в апгрейде: 1 раз",
+  "target": 1,
+  "rarity": null,
+  "chance_max": 5,
+  "difficulty": 4,
+  "id": "q075"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 5% в апгрейде: 3 раза",
+  "target": 3,
+  "rarity": null,
+  "chance_max": 5,
+  "difficulty": 5,
+  "id": "q076"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 5% в апгрейде: 5 раз",
+  "target": 5,
+  "rarity": null,
+  "chance_max": 5,
+  "difficulty": 5,
+  "id": "q077"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 5% в апгрейде: 10 раз",
+  "target": 10,
+  "rarity": null,
+  "chance_max": 5,
+  "difficulty": 5,
+  "id": "q078"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Обычный»: 3 раза",
+  "target": 3,
+  "rarity": "common",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q079"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Обычный»: 5 раз",
+  "target": 5,
+  "rarity": "common",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q080"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Обычный»: 10 раз",
+  "target": 10,
+  "rarity": "common",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q081"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Обычный»: 3 раза",
+  "target": 3,
+  "rarity": "common",
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q082"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Обычный»: 5 раз",
+  "target": 5,
+  "rarity": "common",
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q083"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Обычный»: 10 раз",
+  "target": 10,
+  "rarity": "common",
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q084"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Редкий»: 3 раза",
+  "target": 3,
+  "rarity": "rare",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q085"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Редкий»: 5 раз",
+  "target": 5,
+  "rarity": "rare",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q086"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Редкий»: 10 раз",
+  "target": 10,
+  "rarity": "rare",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q087"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Редкий»: 3 раза",
+  "target": 3,
+  "rarity": "rare",
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q088"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Редкий»: 5 раз",
+  "target": 5,
+  "rarity": "rare",
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q089"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Редкий»: 10 раз",
+  "target": 10,
+  "rarity": "rare",
+  "chance_max": 20,
+  "difficulty": 5,
+  "id": "q090"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Эпический»: 3 раза",
+  "target": 3,
+  "rarity": "epic",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q091"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Эпический»: 5 раз",
+  "target": 5,
+  "rarity": "epic",
+  "chance_max": 50,
+  "difficulty": 2,
+  "id": "q092"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 50% из «Эпический»: 10 раз",
+  "target": 10,
+  "rarity": "epic",
+  "chance_max": 50,
+  "difficulty": 3,
+  "id": "q093"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Эпический»: 3 раза",
+  "target": 3,
+  "rarity": "epic",
+  "chance_max": 20,
+  "difficulty": 4,
+  "id": "q094"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Эпический»: 5 раз",
+  "target": 5,
+  "rarity": "epic",
+  "chance_max": 20,
+  "difficulty": 5,
+  "id": "q095"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 20% из «Эпический»: 10 раз",
+  "target": 10,
+  "rarity": "epic",
+  "chance_max": 20,
+  "difficulty": 5,
+  "id": "q096"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% из «Легендарный»: 3 раза",
+  "target": 3,
+  "rarity": "legendary",
+  "chance_max": 30,
+  "difficulty": 4,
+  "id": "q097"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% из «Легендарный»: 5 раз",
+  "target": 5,
+  "rarity": "legendary",
+  "chance_max": 30,
+  "difficulty": 4,
+  "id": "q098"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% из «Мифический»: 3 раза",
+  "target": 3,
+  "rarity": "mythic",
+  "chance_max": 30,
+  "difficulty": 4,
+  "id": "q099"
+ },
+ {
+  "type": "upgrade",
+  "title": "Выбить предмет с шансом не выше 30% из «Мифический»: 5 раз",
+  "target": 5,
+  "rarity": "mythic",
+  "chance_max": 30,
+  "difficulty": 4,
+  "id": "q100"
+ }
+]
