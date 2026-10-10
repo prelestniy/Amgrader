@@ -7,10 +7,31 @@ let wheelReadyAt = Infinity;                 // мс: когда снова мо
 
 function wheelEase(t) { return 1 - Math.pow(1 - t, 4); }   // быстрый старт, плавная остановка
 
+let wheelLabelsNow = null;   // текущие 8 призов по секторам (или null — ещё не получено)
+function wheelSvgHtml(list) {
+  const R = 137 * 0.6;
+  const lines = [];
+  for (let k = 0; k < WHEEL_SECTORS; k++) {
+    const a = (k * WHEEL_STEP + WHEEL_STEP / 2) * Math.PI / 180;
+    lines.push(`<line x1="160" y1="160" x2="${(160 + 137 * Math.sin(a)).toFixed(2)}" y2="${(160 - 137 * Math.cos(a)).toFixed(2)}"/>`);
+  }
+  const labels = (list || []).map((p, k) => {
+    const a = k * WHEEL_STEP, rad = a * Math.PI / 180;
+    const x = 160 + R * Math.sin(rad), y = 160 - R * Math.cos(rad);
+    const isG = p.type === "g";
+    const text = isG ? `+${p.amount}G` : esc(String(p.name || "").slice(0, 10));
+    return `<text transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a - 90})" text-anchor="middle" dominant-baseline="middle" ` +
+      `style="fill:var(--text);font:800 ${isG ? 14 : 11}px Arteks,Manrope,system-ui,sans-serif">${text}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 320 320" aria-hidden="true">` +
+    `<circle cx="160" cy="160" r="137" style="fill:var(--surface-2);stroke:var(--border-hi);stroke-width:2"/>` +
+    `<g style="stroke:var(--border-hi);stroke-width:2.5;stroke-linecap:round">${lines.join("")}</g>` +
+    `<g>${labels}</g></svg>`;
+}
 function wheelBuild() {
   const disc = document.getElementById("whDisc");
-  if (!disc || disc.dataset.ready) return;
-  disc.innerHTML = `<svg viewBox="0 0 320 320" aria-hidden="true"><circle cx="160" cy="160" r="137" style="fill:var(--surface-2);stroke:var(--border-hi);stroke-width:2"/><g style="stroke:var(--border-hi);stroke-width:2.5;stroke-linecap:round"><line x1="160" y1="160" x2="212.43" y2="33.43"/><line x1="160" y1="160" x2="286.57" y2="107.57"/><line x1="160" y1="160" x2="286.57" y2="212.43"/><line x1="160" y1="160" x2="212.43" y2="286.57"/><line x1="160" y1="160" x2="107.57" y2="286.57"/><line x1="160" y1="160" x2="33.43" y2="212.43"/><line x1="160" y1="160" x2="33.43" y2="107.57"/><line x1="160" y1="160" x2="107.57" y2="33.43"/></g></svg>`;
+  if (!disc) return;
+  disc.innerHTML = wheelSvgHtml(wheelLabelsNow);
   disc.dataset.ready = "1";
 }
 
@@ -40,26 +61,18 @@ function wheelTickTimes(from, to, dur) {
 
 /* Подписи призов на секторах (радиально, как на макете). list — 8 призов по секторам */
 function wheelDrawLabels(list) {
-  const svg = document.querySelector("#whDisc svg");
-  if (!svg || !list || !list.length) return;
-  const old = svg.querySelector("#whLabels"); if (old) old.remove();
-  const R = 137 * 0.6;
-  const parts = list.map((p, k) => {
-    const a = k * WHEEL_STEP, rad = a * Math.PI / 180;
-    const x = 160 + R * Math.sin(rad), y = 160 - R * Math.cos(rad);
-    const isG = p.type === "g";
-    const text = isG ? `+${p.amount}G` : esc(String(p.name || "").slice(0, 10));
-    const size = isG ? 14 : 11;
-    return `<text transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a - 90})" text-anchor="middle" ` +
-      `dominant-baseline="middle" style="fill:var(--text);font:800 ${size}px Arteks,Manrope,system-ui,sans-serif">${text}</text>`;
-  }).join("");
-  svg.insertAdjacentHTML("beforeend", `<g id="whLabels">${parts}</g>`);
+  if (!list || !list.length) return;
+  wheelLabelsNow = list;
+  const disc = document.getElementById("whDisc");
+  if (!disc) return;
+  disc.innerHTML = wheelSvgHtml(list);
+  disc.dataset.ready = "1";
 }
 /* До первой прокрутки подписи — случайная выборка из того, что может выпасть (только для вида) */
 function wheelPreviewLabels(p) {
   if (!p) return;
   const pool = (p.g || []).map(v => ({ type: "g", amount: v })).concat((p.items || []).map(i => ({ type: "item", name: i.name })));
-  if (!pool.length) return;
+  if (!pool.length || wheelLabelsNow) return;
   const list = [];
   for (let k = 0; k < WHEEL_SECTORS; k++) list.push(pool[Math.floor(Math.random() * pool.length)]);
   wheelDrawLabels(list);
@@ -104,7 +117,7 @@ async function initWheel() {
     const s = await api("/api/wheel");
     wheelSetReadyIn(s.secondsLeft);
     wheelRenderPrizes(s.prizes);
-    if (!document.querySelector("#whLabels")) wheelPreviewLabels(s.prizes);
+    if (!wheelLabelsNow) wheelPreviewLabels(s.prizes);
   } catch (e) { wheelSetMsg(e.message); }
 }
 
