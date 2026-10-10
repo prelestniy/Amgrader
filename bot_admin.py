@@ -183,6 +183,7 @@ MENUS = {
         [("🔗 Задание по ссылке", "go:task_link")],
         [("📃 Список / удалить", "a:tasks")],
         [("🎯 Новый квест", "go:quest"), ("🎯 Квесты", "a:quests")],
+        [("🎡 Выдать прокрутки", "go:spins")],
     ]),
 }
 
@@ -568,7 +569,7 @@ COMMAND_FLOWS = {
     "new": "promo", "newpromo": "promo", "newitem": "promo", "items": "items",
     "grant": "grant", "setbal": "setbal", "grantall": "grantall", "setall": "setall",
     "luck": "luck", "gluck": "gluck", "luckoff": "luckoff", "gluckoff": "gluckoff",
-    "find": "find", "setid": "setpid", "addtask": "task_tg", "newquest": "quest",
+    "find": "find", "setid": "setpid", "addtask": "task_tg", "newquest": "quest", "spins": "spins",
 }
 COMMAND_ACTIONS = {"top": "top", "promos": "promos", "delpromo": "delpromo", "tasks": "tasks", "deltask": "tasks"}
 
@@ -996,6 +997,28 @@ async def run_quest(v: dict, uid: int) -> str:
             f"<i>Он будет попадать в ежедневный набор.</i>")
 
 
+def spin_steps() -> list:
+    return [
+        Step("who", "Кому выдать прокрутки?\n<i>ID игрока (цифры из профиля) или логин.</i>", "Игрок",
+             lambda t: t.strip(), fmt=lambda v: v),
+        Step("count", "Сколько прокруток выдать?", "Количество", int_parser(lo=1, hi=1000),
+             quick=(("1", "1"), ("5", "5"), ("10", "10"), ("50", "50")), per=4, fmt=lambda x: f"{x} шт."),
+    ]
+
+
+def sum_spins(v: dict) -> str:
+    return (f"🎡 <b>Выдать прокрутки</b>\n👤 Игрок: <b>{esc(v['who'])}</b>\n"
+            f"🔢 Количество: <b>{v['count']}</b>")
+
+
+async def run_spins(v: dict, uid: int) -> str:
+    r = await api("POST", "/admin/wheel/grant", json={"who": v["who"], "count": int(v["count"])})
+    return (f"✅ Игроку <b>{esc(r.get('nickname', 'Игрок'))}</b> выдано прокруток: +{r.get('added')}\n"
+            f"В запасе теперь: <b>{r.get('spins')}</b>")
+
+
+FLOWS["spins"] = Flow("spins", "🎡", "Выдать прокрутки", "tasks", spin_steps(), run_spins, sum_spins,
+                      again="🎡 Ещё выдать")
 FLOWS["quest"] = Flow("quest", "🎯", "Новый квест", "tasks", quest_steps(), run_quest, sum_quest, again="🎯 Ещё квест")
 
 
