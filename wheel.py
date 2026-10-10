@@ -16,6 +16,7 @@ _db = None
 _user_public = None
 _pool = []          # [("g", сумма) | ("item", id)]
 _items = {}
+_cheap = []
 
 
 def setup(db, user_public, items=()):
@@ -23,7 +24,9 @@ def setup(db, user_public, items=()):
     _db = db
     _user_public = user_public
     _items = {i["id"]: i for i in items}
+    global _cheap
     cheap = sorted(items, key=lambda i: (i["price"], i["id"]))[:CHEAP_ITEMS]
+    _cheap = [{"id": i["id"], "name": i["name"], "rarity": i["rarity"], "price": i["price"]} for i in cheap]
     _pool = [("g", v) for v in PRIZES_G] + [("item", i["id"]) for i in cheap]
 
 
@@ -37,7 +40,7 @@ def status(uid):
     with closing(_db()) as conn:
         r = conn.execute("SELECT wheel_next_at FROM users WHERE id=?", (uid,)).fetchone()
     left = max(0, int((r["wheel_next_at"] or 0) - time.time()))
-    return {"secondsLeft": left, "sectors": SECTORS}
+    return {"secondsLeft": left, "sectors": SECTORS, "prizes": {"g": PRIZES_G, "items": _cheap}}
 
 
 def spin(uid):
@@ -64,4 +67,11 @@ def spin(uid):
             conn.execute("UPDATE users SET inventory=?, rev=rev+1, wheel_next_at=? WHERE id=?",
                          (json.dumps(inv), now + COOLDOWN, uid))
         row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    return {"sector": sector, "prize": prize, "secondsLeft": COOLDOWN, "user": _user_public(row)}
+    layout_out = []
+    for kind_, value_ in layout:
+        if kind_ == "g":
+            layout_out.append({"type": "g", "amount": value_})
+        else:
+            it = _items[value_]
+            layout_out.append({"type": "item", "id": it["id"], "name": it["name"]})
+    return {"sector": sector, "prize": prize, "layout": layout_out, "secondsLeft": COOLDOWN, "user": _user_public(row)}
