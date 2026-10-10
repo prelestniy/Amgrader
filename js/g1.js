@@ -8,8 +8,18 @@ let wheelReadyAt = Infinity;                 // мс: когда снова мо
 function wheelEase(t) { return 1 - Math.pow(1 - t, 4); }   // быстрый старт, плавная остановка
 
 let wheelLabelsNow = null;   // текущие 8 призов по секторам (или null — ещё не получено)
+const WHEEL_RARITY_COLOR = { common: "#9CA3AF", rare: "#3B82F6", epic: "#A855F7", legendary: "#F59E0B",
+  mythic: "#EF4444", secret: "#10B981", galactic: "#06B6D4", sausage: "#F97316" };
+function wheelWedge(k, fill) {
+  const r = 137;
+  const a1 = (k * WHEEL_STEP - WHEEL_STEP / 2) * Math.PI / 180, a2 = (k * WHEEL_STEP + WHEEL_STEP / 2) * Math.PI / 180;
+  const x1 = 160 + r * Math.sin(a1), y1 = 160 - r * Math.cos(a1), x2 = 160 + r * Math.sin(a2), y2 = 160 - r * Math.cos(a2);
+  return `<path d="M160 160 L${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" style="fill:${fill}"/>`;
+}
 function wheelSvgHtml(list) {
-  const R = 137 * 0.6;
+  const R = 137 * 0.62;
+  const wedges = [];
+  for (let k = 0; k < WHEEL_SECTORS; k++) wedges.push(wheelWedge(k, k % 2 ? "var(--surface-3)" : "var(--surface-2)"));
   const lines = [];
   for (let k = 0; k < WHEEL_SECTORS; k++) {
     const a = (k * WHEEL_STEP + WHEEL_STEP / 2) * Math.PI / 180;
@@ -21,11 +31,15 @@ function wheelSvgHtml(list) {
     const isG = p.type === "g";
     const text = isG ? `+${p.amount}G` : esc(String(p.name || "").slice(0, 10));
     return `<text transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a - 90})" text-anchor="middle" dominant-baseline="middle" ` +
-      `style="fill:var(--text);font:800 ${isG ? 14 : 11}px Arteks,Manrope,system-ui,sans-serif">${text}</text>`;
+      `class="${isG ? "wh-lbl gold" : "wh-lbl"}" style="font-size:${isG ? 15 : 11}px">${text}</text>`;
   }).join("");
   return `<svg viewBox="0 0 320 320" aria-hidden="true">` +
-    `<circle cx="160" cy="160" r="137" style="fill:var(--surface-2);stroke:var(--border-hi);stroke-width:2"/>` +
-    `<g style="stroke:var(--border-hi);stroke-width:2.5;stroke-linecap:round">${lines.join("")}</g>` +
+    `<defs><radialGradient id="whShine" cx="50%" cy="35%" r="70%"><stop offset="0%" stop-color="#fff" stop-opacity=".10"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>` +
+    `<circle cx="160" cy="160" r="140" style="fill:var(--surface-1)"/>` +
+    wedges.join("") +
+    `<circle cx="160" cy="160" r="137" style="fill:url(#whShine)"/>` +
+    `<g style="stroke:var(--border-hi);stroke-width:2;stroke-linecap:round;opacity:.9">${lines.join("")}</g>` +
+    `<circle cx="160" cy="160" r="137" style="fill:none;stroke:var(--accent);stroke-width:3;opacity:.85"/>` +
     `<g>${labels}</g></svg>`;
 }
 function wheelBuild() {
@@ -104,11 +118,22 @@ function wheelRenderPrizes(p) {
   const el = document.getElementById("whPrizes");
   if (!el || !p) return;
   const gs = (p.g || []).map(v => `<span class="wh-chip gold">${fmt(v)}</span>`).join("");
-  const its = (p.items || []).map(i => `<span class="wh-chip">${esc(i.name)}</span>`).join("");
+  const its = (p.items || []).map(i => `<span class="wh-chip" style="--rc:${WHEEL_RARITY_COLOR[i.rarity] || "#9CA3AF"}">${esc(i.name)}</span>`).join("");
   el.innerHTML = `<div class="wh-ph">Может выпасть</div><div class="wh-chips">${gs}${its}</div>`;
+}
+/* Что может выпасть — берём из самой игры (без сервера), чтобы колесо не было пустым до входа */
+const WHEEL_PRIZES_G = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500];
+function wheelLocalPrizes() {
+  const items = (typeof MEMES !== "undefined" ? MEMES : []).slice()
+    .sort((a, b) => (a.price - b.price) || (a.id - b.id)).slice(0, 6)
+    .map(m => ({ id: m.id, name: m.name, rarity: m.rarity, price: m.price }));
+  return { g: WHEEL_PRIZES_G, items };
 }
 async function initWheel() {
   wheelBuild();
+  const local = wheelLocalPrizes();
+  wheelRenderPrizes(local);
+  if (!wheelLabelsNow) wheelPreviewLabels(local);
   const disc = document.getElementById("whDisc");
   if (disc) disc.style.transform = wheelRotationFor(wheelUI.angle);
   wheelSetMsg("");
