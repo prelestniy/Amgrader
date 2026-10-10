@@ -860,6 +860,16 @@ def trades_cancel(code: str, request: Request, user=Depends(auth_user)):
     return _tr(request, trade.cancel(user["id"], code))
 
 
+class WheelGrantBody(BaseModel):
+    who: str          # ID игрока (цифры) или логин
+    count: int
+
+
+@app.post("/admin/wheel/grant")
+def admin_wheel_grant(body: WheelGrantBody, _=Depends(check_admin)):
+    return wheel.grant(body.who, body.count)
+
+
 @app.post("/admin/quest")
 def admin_quest_add(body: QuestAdminBody, _=Depends(check_admin)):
     return quests.add_custom(body.dict())
