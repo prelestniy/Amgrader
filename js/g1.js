@@ -7,7 +7,9 @@ let wheelReadyAt = Infinity;                 // мс: когда снова мо
 
 function wheelEase(t) { return 1 - Math.pow(1 - t, 4); }   // быстрый старт, плавная остановка
 
-let wheelLabelsNow = null;   // текущие 8 призов по секторам (или null — ещё не получено)
+let wheelLabelsNow = null;
+let wheelSpinsNow = 0;   // прокрутки из запаса (выданы админом)
+function wheelCanSpin() { return wheelSpinsNow > 0 || Date.now() >= wheelReadyAt; }   // текущие 8 призов по секторам (или null — ещё не получено)
 const WHEEL_RARITY_COLOR = { common: "#9CA3AF", rare: "#3B82F6", epic: "#A855F7", legendary: "#F59E0B",
   mythic: "#EF4444", secret: "#10B981", galactic: "#06B6D4", sausage: "#F97316" };
 function wheelWedge(k, fill) {
@@ -94,7 +96,7 @@ function wheelPreviewLabels(p) {
 function wheelSetMsg(text) { const m = document.getElementById("whMsg"); if (m) m.textContent = text; }
 function wheelSetBtn() {
   const b = document.getElementById("whBtn");
-  if (b) b.disabled = wheelUI.busy || Date.now() < wheelReadyAt;
+  if (b) b.disabled = wheelUI.busy || !wheelCanSpin();
 }
 function wheelPlayTick(freq, vol) {
   if (!sfx.on || !aud.ac || aud.ac.state !== "running" || sfx.vol.wheel <= 0) return;
@@ -105,8 +107,13 @@ function wheelPlayTick(freq, vol) {
 function wheelRenderTimer() {
   const el = document.getElementById("whTimer");
   if (el) {
-    const left = Math.max(0, Math.ceil((wheelReadyAt - Date.now()) / 1000));
-    el.textContent = !isFinite(wheelReadyAt) ? "" : left > 0 ? "Следующая прокрутка через " + leftText(left) : "Колесо готово";
+    const parts = [];
+    if (wheelSpinsNow > 0) parts.push(`Прокруток в запасе: ${wheelSpinsNow}`);
+    if (isFinite(wheelReadyAt)) {
+      if (Date.now() < wheelReadyAt) parts.push("Бесплатная через " + leftText(Math.ceil((wheelReadyAt - Date.now()) / 1000)));
+      else if (wheelSpinsNow <= 0) parts.push("Колесо готово");
+    }
+    el.textContent = parts.join(" · ");
   }
   wheelSetBtn();
 }
@@ -140,6 +147,7 @@ async function initWheel() {
   if (!isLoggedIn()) { wheelReadyAt = Infinity; wheelSetMsg("Войдите, чтобы крутить колесо"); wheelRenderTimer(); return; }
   try {
     const s = await api("/api/wheel");
+    wheelSpinsNow = s.spins || 0;
     wheelSetReadyIn(s.secondsLeft);
     wheelRenderPrizes(s.prizes);
     if (!wheelLabelsNow) wheelPreviewLabels(s.prizes);
@@ -149,7 +157,7 @@ async function initWheel() {
 async function wheelSpin() {
   if (wheelUI.busy) return;
   if (!isLoggedIn()) { openAuth("Войдите, чтобы крутить колесо"); return; }
-  if (Date.now() < wheelReadyAt) return;
+  if (!wheelCanSpin()) return;
   wheelUI.busy = true; wheelSetBtn(); wheelSetMsg("");
   try { audioEnsure(); } catch (e) {}
 
@@ -180,6 +188,7 @@ async function wheelSpin() {
     try { wheelStop(); } catch (e) {}
     mergeServerUser(res.user);
     wheelUI.busy = false;
+    wheelSpinsNow = res.spins || 0;
     wheelSetReadyIn(res.secondsLeft);
     const p = res.prize;
     if (p.type === "g") {
