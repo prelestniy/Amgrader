@@ -513,7 +513,7 @@ async def act_tasks(target):
     await send(target, "📋 <b>Задания</b>\nНажмите на задание, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
 
 
-ACTIONS = {"top": act_top, "promos": act_promos, "delpromo": act_delpromo, "tasks": act_tasks, "quests": act_quests}
+ACTIONS = {"top": act_top, "promos": act_promos, "delpromo": act_delpromo, "tasks": act_tasks}
 
 
 @admin.callback_query(F.data.startswith("a:"))
@@ -1032,6 +1032,9 @@ async def act_quests(target):
     lines = [f"#{q['id']} · <b>{esc(q['title'])}</b> · +{fmt_g(quest_reward(q))} G" for q in qs]
     rows = [[B(f"🗑 #{q['id']} · {q['title'][:28]}", f"dq:{q['id']}")] for q in qs[:40]]
     await send(target, "🎯 <b>Квесты</b>\nНажмите на квест, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
+
+
+ACTIONS["quests"] = act_quests
 
 
 @admin.callback_query(F.data.startswith("dq:"))
