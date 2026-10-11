@@ -16,7 +16,7 @@ from typing import Optional, List, Dict, Any
 from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, Header, HTTPException, Depends, Response, BackgroundTasks, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import sqlite3
@@ -1278,14 +1278,33 @@ def index():
     return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
 
 
+_PWA_MANIFEST = {
+    "name": "Amgrader", "short_name": "Amgrader",
+    "description": "Амгрейд: кейсы, апгрейды, квесты и колесо бонусов",
+    "start_url": "/", "scope": "/", "display": "standalone", "orientation": "portrait",
+    "background_color": "#09090B", "theme_color": "#09090B",
+    "icons": [
+        {"src": "/img/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        {"src": "/img/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+        {"src": "/img/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    ],
+}
+_PWA_SW = (
+    'self.addEventListener("install", () => self.skipWaiting());\n'
+    'self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));\n'
+    'self.addEventListener("fetch", () => {});\n'
+)
+
+
 @app.get("/manifest.json")
 def pwa_manifest():
-    return FileResponse(BASE_DIR / "manifest.json", media_type="application/manifest+json")
+    # Отдаём из кода, а не из файла: деплой не падает, даже если manifest.json не загружен
+    return JSONResponse(_PWA_MANIFEST, media_type="application/manifest+json")
 
 
 @app.get("/sw.js")
 def pwa_sw():
-    return FileResponse(BASE_DIR / "sw.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+    return Response(_PWA_SW, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/t/{code}")
