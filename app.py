@@ -1307,6 +1307,15 @@ def pwa_sw():
     return Response(_PWA_SW, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/.well-known/assetlinks.json")
+def asset_links():
+    # Файл подтверждает связь сайта с APK (Digital Asset Links): без него приложение показывает адресную строку.
+    f = BASE_DIR / "assetlinks.json"
+    if not f.is_file():
+        raise HTTPException(404, "assetlinks.json не загружен")
+    return FileResponse(f, media_type="application/json")
+
+
 @app.get("/t/{code}")
 def trade_link_page(code: str):
     return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
