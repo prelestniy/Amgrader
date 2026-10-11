@@ -1278,6 +1278,16 @@ def index():
     return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/manifest.json")
+def pwa_manifest():
+    return FileResponse(BASE_DIR / "manifest.json", media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def pwa_sw():
+    return FileResponse(BASE_DIR / "sw.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/t/{code}")
 def trade_link_page(code: str):
     return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
