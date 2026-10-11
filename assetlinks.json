@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.railway.up.amgrader_production.twa",
+        "sha256_cert_fingerprints": ["14:70:BB:84:54:B9:97:5F:65:51:E2:87:4D:49:E0:45:02:C4:5C:99:C4:51:DE:F0:15:EE:B1:10:3C:EA:63:B3"]
+      }
+    }]
