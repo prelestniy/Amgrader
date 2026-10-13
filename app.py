@@ -58,7 +58,7 @@ async def lifespan(_app):
     themes.setup(db)
     trade.setup(db, ITEMS)
     webauth.setup(db, user_public, _web_upsert_tg)
-    style.setup(db, check_telegram_auth)
+    style.setup(db, check_telegram_auth_any)
     with closing(db()) as conn, conn:
         quests.init_db(conn)
         wheel.init_db(conn)
@@ -392,6 +392,32 @@ def check_telegram_auth(init_data: str) -> dict:
     if calc_hash != recv_hash:
         raise HTTPException(401, "bad signature")
     return json.loads(pairs.get("user", "{}"))
+
+
+def _verify_init_with(init_data: str, token: str) -> dict:
+    pairs = dict(parse_qsl(init_data, strict_parsing=False))
+    recv_hash = pairs.pop("hash", None)
+    if not recv_hash:
+        raise ValueError("no hash")
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret_key = hmac.new(b"WebAppData", token.encode(), hashlib.sha256).digest()
+    calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if calc_hash != recv_hash:
+        raise ValueError("bad signature")
+    return json.loads(pairs.get("user", "{}"))
+
+
+def check_telegram_auth_any(init_data: str) -> dict:
+    """Мини-апп может быть открыт от основного бота или от админ-бота: проверяем подпись обоими токенами."""
+    tokens = [t for t in (BOT_TOKEN, os.environ.get("ADMIN_BOT_TOKEN", "")) if t]
+    if not tokens:
+        raise HTTPException(500, "Токены ботов не заданы")
+    for tok in tokens:
+        try:
+            return _verify_init_with(init_data or "", tok)
+        except ValueError:
+            continue
+    raise HTTPException(401, "bad signature")
 
 
 @app.post("/api/auth/telegram")
