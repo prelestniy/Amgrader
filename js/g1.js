@@ -11,7 +11,7 @@ let wheelLabelsNow = null;
 let wheelSpinsNow = 0;   // прокрутки из запаса (выданы админом)
 function wheelCanSpin() { return wheelSpinsNow > 0 || Date.now() >= wheelReadyAt; }   // текущие 8 призов по секторам (или null — ещё не получено)
 const WHEEL_RARITY_COLOR = { common: "#9CA3AF", rare: "#3B82F6", epic: "#A855F7", legendary: "#F59E0B",
-  mythic: "#EF4444", secret: "#10B981", galactic: "#06B6D4", sausage: "#F97316", eldovaya: "#FF6F91", sasnaya: "#F5D547", rubinovaya: "#E0115F", kratnost: "#8B5CF6" };
+  mythic: "#EF4444", secret: "#10B981", galactic: "#06B6D4", sausage: "#F97316", eldovaya: "#FF6F91", sasnaya: "#F5D547", rubinovaya: "#E0115F", krasnost: "#FF0000" };
 function wheelWedge(k, fill) {
   const r = 137;
   const a1 = (k * WHEEL_STEP - WHEEL_STEP / 2) * Math.PI / 180, a2 = (k * WHEEL_STEP + WHEEL_STEP / 2) * Math.PI / 180;
