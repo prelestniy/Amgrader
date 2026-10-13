@@ -6,7 +6,7 @@
 .nk-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nk > .nk-prefix { flex: none; }
 .nk > .vbadge { flex: none; }
-.vbadge { width: 1.05em; height: 1.05em; flex: none; display: inline-block; vertical-align: -0.12em; }
+.vbadge { width: .78em; height: .78em; flex: none; display: inline-block; vertical-align: .02em; margin-left: 1px; }
 
 /* МАГАЗИН ПРЕФИКСОВ */
 .shop-bal { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
