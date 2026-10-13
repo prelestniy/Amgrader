@@ -184,8 +184,8 @@ def admin_prefix_save(body):
     color = body.get("color") or "#B6F24A"
     price = int(body.get("price") or 0)
     active = 1 if body.get("active", True) else 0
-    if not 1 <= len(text) <= 12:
-        raise HTTPException(400, "Префикс: от 1 до 12 символов")
+    if not 1 <= len(text) <= 24:
+        raise HTTPException(400, "Префикс: от 1 до 24 символов")
     if not HEX.match(color):
         raise HTTPException(400, "Цвет в формате #RRGGBB")
     if price < 0 or price > 10**12:
