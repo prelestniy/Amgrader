@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Админка Amgrader</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#09090B;--s1:#141418;--s2:#1c1c22;--s3:#26262e;--tx:#F4F4F5;--dim:#8E8E98;--acc:#B6F24A;--bad:#FF6B6B;--bd:rgba(255,255,255,.08)}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:14px 14px 40px}
+h1{font-size:20px;margin:6px 0 12px} .tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{flex:1;padding:10px;border-radius:12px;background:var(--s2);border:0;color:var(--dim);font:inherit;cursor:pointer;transition:transform .15s,background .2s}
+.tab.on{background:var(--acc);color:#0A0A0B;font-weight:700} .tab:active{transform:scale(.96)}
+input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--bd);background:var(--s2);color:var(--tx);font:inherit}
+.row{display:flex;gap:8px;margin:8px 0}.btn{padding:12px;border-radius:12px;border:0;background:var(--acc);color:#0A0A0B;font:inherit;font-weight:700;cursor:pointer;transition:transform .15s}
+.btn:active{transform:scale(.97)} .btn.ghost{background:var(--s3);color:var(--tx)}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;animation:fade .35s ease both;transition:transform .15s,border-color .2s}
+.card:active{transform:scale(.98)} .card:hover{border-color:var(--acc)}
+.nm{font-weight:700} .sub{color:var(--dim);font-size:12px}
+.plaque{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;margin-right:6px;background:rgba(255,255,255,.08)}
+.badge{display:inline-block;width:16px;height:16px;vertical-align:-3px;margin-left:4px}
+.sheet{position:fixed;inset:auto 0 0 0;background:var(--s1);border-radius:22px 22px 0 0;padding:18px;max-height:85vh;overflow:auto;transform:translateY(100%);transition:transform .35s cubic-bezier(.22,1,.36,1);box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+.sheet.on{transform:none} .scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim.on{opacity:1;pointer-events:auto}
+.lbl{font-size:12px;color:var(--dim);margin:10px 0 4px}
+.toggle{display:flex;justify-content:space-between;align-items:center;padding:10px 0}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg{min-height:20px;color:var(--dim);font-size:13px;margin-top:8px}
+</style></head>
+<body>
+<h1>Админка</h1>
+<div class="tabs"><button class="tab on" id="tUsers" onclick="show('users')">Игроки</button><button class="tab" id="tPre" onclick="show('pre')">Префиксы</button></div>
+
+<section id="secUsers">
+  <input id="q" placeholder="Поиск: ID, ник или логин" oninput="onSearch()">
+  <div id="list"></div>
+  <div class="row"><button class="btn ghost" onclick="more()">Ещё</button></div>
+</section>
+
+<section id="secPre" hidden>
+  <div id="preList"></div>
+  <div class="lbl">Новый или изменить</div>
+  <input id="pId" type="hidden">
+  <input id="pText" maxlength="12" placeholder="Текст префикса (до 12 символов)">
+  <div class="row"><input id="pColor" value="#B6F24A" style="flex:1"><input id="pPrice" type="number" min="0" placeholder="Цена G" style="flex:1"></div>
+  <label class="toggle"><span>Активен (виден в магазине)</span><input id="pActive" type="checkbox" checked style="width:auto"></label>
+  <div class="row"><button class="btn" onclick="savePrefix()">Сохранить</button><button class="btn ghost" onclick="clearPrefix()">Очистить</button></div>
+  <div class="msg" id="pMsg"></div>
+</section>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div id="sheetBody"></div>
+</div>
+
+<script>
+const INIT = (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) || "";
+if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
+const VERIFIED = '<svg class="badge" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#4FEAFF"/><polyline points="29,50 47.8,68 81,32" fill="none" stroke="#fff" stroke-width="7.2"/></svg>';
+let offset = 0, qv = "", prefixes = [], curUser = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { method: opts.method || "GET", headers: { "Content-Type": "application/json", "X-Init-Data": INIT }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || "Ошибка");
+  return j;
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function plaque(p) { return p ? `<span class="plaque" style="color:${esc(p.color)}">${esc(p.text)}</span>` : ""; }
+
+function show(which) {
+  document.getElementById("secUsers").hidden = which !== "users";
+  document.getElementById("secPre").hidden = which !== "pre";
+  document.getElementById("tUsers").classList.toggle("on", which === "users");
+  document.getElementById("tPre").classList.toggle("on", which === "pre");
+  if (which === "pre") loadPrefixes();
+}
+let st = null;
+function onSearch() { clearTimeout(st); st = setTimeout(() => { qv = document.getElementById("q").value.trim(); offset = 0; loadUsers(true); }, 300); }
+async function loadUsers(reset) {
+  try {
+    const rows = await api(`/api/admin/users?q=${encodeURIComponent(qv)}&offset=${offset}`);
+    const box = document.getElementById("list");
+    if (reset) box.innerHTML = "";
+    rows.forEach((u, i) => {
+      const d = document.createElement("div"); d.className = "card"; d.style.animationDelay = (i * 0.03) + "s";
+      d.innerHTML = `<div><div class="nm" style="${u.nameColor ? "color:" + esc(u.nameColor) : ""}">${esc(u.nickname || "Игрок")}${u.verified ? VERIFIED : ""}</div><div class="sub">ID ${esc(u.publicId)} · ${esc(u.login || "")} · ${u.balance} G</div></div><span>›</span>`;
+      d.onclick = () => openUser(u);
+      box.appendChild(d);
+    });
+    offset += rows.length;
+  } catch (e) { document.getElementById("list").innerHTML = `<div class="msg">${esc(e.message)}</div>`; }
+}
+function more() { loadUsers(false); }
+
+function openUser(u) {
+  curUser = u;
+  const opts = prefixes.map(p => `<option value="${p.id}" ${u.prefixId === p.id ? "selected" : ""}>${esc(p.text)} (${p.price} G)</option>`).join("");
+  document.getElementById("sheetBody").innerHTML = `
+    <div class="nm" style="font-size:18px">${esc(u.nickname)}</div>
+    <div class="sub">ID ${esc(u.publicId)} · ${esc(u.login || "")}</div>
+    <div class="toggle"><span>Верифицирован</span><input id="uVer" type="checkbox" ${u.verified ? "checked" : ""} style="width:auto"></div>
+    <div class="lbl">Цвет ника (#RRGGBB, пусто — обычный)</div>
+    <input id="uColor" value="${esc(u.nameColor || "")}" placeholder="#4FEAFF">
+    <div class="lbl">Префикс</div>
+    <select id="uPre"><option value="">Без префикса</option>${opts}</select>
+    <div class="row"><button class="btn" onclick="saveUser()">Сохранить</button><button class="btn ghost" onclick="closeSheet()">Закрыть</button></div>
+    <div class="msg" id="uMsg"></div>`;
+  openSheet();
+}
+async function saveUser() {
+  const body = { verified: document.getElementById("uVer").checked, nameColor: document.getElementById("uColor").value.trim() || null, prefixId: Number(document.getElementById("uPre").value) || null };
+  try { await api(`/api/admin/user/${encodeURIComponent(curUser.publicId)}`, { method: "POST", body }); document.getElementById("uMsg").textContent = "Сохранено ✓"; offset = 0; loadUsers(true); }
+  catch (e) { document.getElementById("uMsg").textContent = e.message; }
+}
+function openSheet() { document.getElementById("sheet").classList.add("on"); document.getElementById("scrim").classList.add("on"); }
+function closeSheet() { document.getElementById("sheet").classList.remove("on"); document.getElementById("scrim").classList.remove("on"); }
+
+async function loadPrefixes() {
+  try {
+    prefixes = await api("/api/admin/prefixes");
+    document.getElementById("preList").innerHTML = prefixes.map(p => `
+      <div class="card" onclick='editPrefix(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+        <div>${plaque(p)}<span class="sub">${p.price} G${p.active ? "" : " · скрыт"}</span></div><span>›</span></div>`).join("") || `<div class="msg">Префиксов пока нет</div>`;
+  } catch (e) { document.getElementById("pMsg").textContent = e.message; }
+}
+function editPrefix(p) {
+  document.getElementById("pId").value = p.id; document.getElementById("pText").value = p.text;
+  document.getElementById("pColor").value = p.color; document.getElementById("pPrice").value = p.price;
+  document.getElementById("pActive").checked = p.active;
+}
+function clearPrefix() { editPrefix({ id: "", text: "", color: "#B6F24A", price: 0, active: true }); }
+async function savePrefix() {
+  const body = { id: document.getElementById("pId").value || null, text: document.getElementById("pText").value.trim(),
+    color: document.getElementById("pColor").value.trim(), price: Number(document.getElementById("pPrice").value || 0), active: document.getElementById("pActive").checked };
+  try { await api("/api/admin/prefixes", { method: "POST", body }); document.getElementById("pMsg").textContent = "Сохранено ✓"; clearPrefix(); loadPrefixes(); }
+  catch (e) { document.getElementById("pMsg").textContent = e.message; }
+}
+loadUsers(true);
+loadPrefixes();
+</script>
+</body></html>
