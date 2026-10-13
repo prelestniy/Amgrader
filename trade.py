@@ -83,15 +83,16 @@ def _load(conn, code):
 
 def _names(conn, uid):
     if uid is None:
-        return None, None
-    r = conn.execute("SELECT public_id, nickname FROM users WHERE id=?", (uid,)).fetchone()
-    return (r["public_id"], r["nickname"] or "Игрок") if r else (None, None)
+        return None, None, None
+    import style
+    r = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    return (r["public_id"], r["nickname"] or "Игрок", style.style_fields(r)) if r else (None, None, None)
 
 
 def _view(conn, row, me):
     now = int(time.time())
-    a_pid, a_nick = _names(conn, row["from_uid"])
-    b_pid, b_nick = _names(conn, row["to_uid"])
+    a_pid, a_nick, a_style = _names(conn, row["from_uid"])
+    b_pid, b_nick, b_style = _names(conn, row["to_uid"])
     a_items, b_items = json.loads(row["a_items"]), json.loads(row["b_items"])
     enabled = bool(FEE_LOGIN and _admin(conn))
     return {
@@ -101,9 +102,9 @@ def _view(conn, row, me):
         "you": "a" if row["from_uid"] == me else "b",
         "secondsLeft": max(0, row["exec_at"] - now) if row["status"] == "countdown" else 0,
         "feePct": FEE_PCT if enabled else 0,
-        "a": {"items": a_items, "g": row["a_g"], "ok": bool(row["a_ok"]), "publicId": a_pid, "nickname": a_nick,
+        "a": {"items": a_items, "g": row["a_g"], "ok": bool(row["a_ok"]), "publicId": a_pid, "nickname": a_nick, "style": a_style,
               "fee": _fee(a_items, row["a_g"], enabled)},
-        "b": {"items": b_items, "g": row["b_g"], "ok": bool(row["b_ok"]), "publicId": b_pid, "nickname": b_nick,
+        "b": {"items": b_items, "g": row["b_g"], "ok": bool(row["b_ok"]), "publicId": b_pid, "nickname": b_nick, "style": b_style,
               "fee": _fee(b_items, row["b_g"], enabled)},
     }
 
