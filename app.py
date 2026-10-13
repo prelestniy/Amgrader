@@ -1078,7 +1078,7 @@ def admin_items(q: str = "", _=Depends(check_admin)):
     return [i for i in ITEMS if not q or q in i["name"].lower() or q in i["nameEn"].lower() or q == str(i["id"])][:8]
 
 
-PUBLIC_ID_RE = re.compile(r"[A-Za-z0-9_]{3,16}")
+PUBLIC_ID_RE = re.compile(r"[\w]{3,16}")
 
 
 class PublicIdBody(BaseModel):
