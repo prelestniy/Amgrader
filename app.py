@@ -25,6 +25,8 @@ import quests
 import wheel
 import theme as themes
 import trade
+import webauth
+import auth_bot
 
 # ---------------------------------------------------------------------------
 # Настройки (задаются переменными окружения в Railway)
@@ -54,13 +56,15 @@ async def lifespan(_app):
     wheel.setup(db, user_public, ITEMS)
     themes.setup(db)
     trade.setup(db, ITEMS)
+    webauth.setup(db, user_public, _web_upsert_tg)
     with closing(db()) as conn, conn:
         quests.init_db(conn)
         wheel.init_db(conn)
         themes.init_db(conn)
         trade.init_db(conn)
+        webauth.init_db(conn)
     tasks = []
-    for name in ("bot_user", "bot_admin"):
+    for name in ("bot_user", "bot_admin", "auth_bot"):
         try:
             mod = __import__(name)
             if mod.enabled():
@@ -401,6 +405,38 @@ def telegram_auth(body: TelegramBody):
     row = create_user(telegram_id=tid, nickname=nickname, username=tg_user.get("username"),
                        photo=tg_user.get("photo_url"), source="telegram", ref_code_used=body.ref)
     return user_public(row)
+
+
+def _web_upsert_tg(tg_user: dict, ref):
+    """Пользователь Telegram для входа из приложения: создаём, если его ещё нет (реферал учитывается)."""
+    tid = tg_user.get("id")
+    with closing(db()) as conn:
+        row = conn.execute("SELECT * FROM users WHERE telegram_id=?", (tid,)).fetchone()
+    if row:
+        return row
+    nickname = " ".join(filter(None, [tg_user.get("first_name"), tg_user.get("last_name")])) \
+        or tg_user.get("username") or ""
+    return create_user(telegram_id=tid, nickname=nickname, username=tg_user.get("username"),
+                       photo=None, source="telegram", ref_code_used=ref)
+
+
+class WebLoginStartBody(BaseModel):
+    ref: Optional[str] = None
+
+
+@app.post("/api/web-login/start")
+def web_login_start(body: WebLoginStartBody):
+    token, ref = webauth.start(body.ref)
+    name = os.environ.get("AUTH_BOT_USERNAME", "").lstrip("@")
+    if not name:
+        raise HTTPException(503, "Бот входа ещё не запущен")
+    link = f"https://t.me/{name}?start=w_{token}" + (f"_{ref}" if ref else "")
+    return {"token": token, "link": link}
+
+
+@app.get("/api/web-login/{token}")
+def web_login_status(token: str):
+    return webauth.status(token)
 
 
 @app.get("/api/config")
