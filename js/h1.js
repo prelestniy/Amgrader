@@ -157,7 +157,7 @@ async function addCustomTheme() {
   } catch (e) { themeMsg(e.message); }
 }
 async function delCustomTheme(id) {
-  if (!confirm("Удалить тему?")) return;
+  if (!(await askConfirm("Удалить тему?"))) return;
   try {
     const d = await api("/api/theme/custom/delete", { method: "POST", body: { id } });
     themeCustom = d.custom || [];
