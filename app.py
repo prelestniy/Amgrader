@@ -1106,11 +1106,11 @@ def search_users_by_public_id(q: str = "", user=Depends(auth_user)):
     if not q or len(q) > 16:
         return {"users": []}
     with closing(db()) as conn:
-        r = conn.execute("SELECT id, public_id, nickname, photo FROM users WHERE public_id=? COLLATE NOCASE", (q,)).fetchone()
+        r = conn.execute("SELECT * FROM users WHERE public_id=? COLLATE NOCASE", (q,)).fetchone()
     if not r:
         return {"users": []}
     return {"users": [{"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок",
-                       "photo": r["photo"], "isMe": r["id"] == user["id"]}]}
+                       "photo": r["photo"], "isMe": r["id"] == user["id"], "style": style.style_fields(r)}]}
 
 
 ABOUT_MAX = 20
@@ -1241,7 +1241,7 @@ def public_profile(public_id: str, user=Depends(auth_user)):
     with closing(db()) as conn:
         r = _target_full(conn, public_id)
         rel = "none" if r["id"] == user["id"] else relation(conn, user["id"], r["id"])
-    return {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"],
+    return {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"], "style": style.style_fields(r),
             "about": r["about"] or "", "createdAt": r["created_at"], "balance": r["balance"],
             "inventory": json.loads(r["inventory"] or "[]"), "isMe": r["id"] == user["id"], "relation": rel}
 
