@@ -1,0 +1,36 @@
+/* НИКИ: префикс-плашка, цвет ника, галочка */
+.nk { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nk-prefix { font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 3px 9px; border-radius: 999px;
+  color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 45%, transparent); }
+.nk-name { font-weight: 700; }
+.vbadge { width: 1.05em; height: 1.05em; flex: none; display: inline-block; vertical-align: -0.12em; }
+
+/* МАГАЗИН ПРЕФИКСОВ */
+.shop-bal { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+.shop-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px;
+  background: var(--surface-2); border-radius: var(--r-btn); animation: nkIn .35s ease both; }
+.shop-btn { border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 800; font-size: 13px;
+  background: var(--surface-3); color: var(--text); cursor: pointer; transition: transform .15s; }
+.shop-btn:active { transform: scale(.94); }
+.shop-btn.buy { background: var(--accent); color: var(--bg); }
+.shop-btn.on { background: color-mix(in srgb, var(--accent) 25%, var(--surface-3)); color: var(--accent); }
+@keyframes nkIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .shop-card { animation: none; } }
+
+/* СПИСОК ИГРОКОВ */
+.pl-wrap { display: flex; flex-direction: column; gap: 12px; }
+.pl-search { width: 100%; padding: 12px 14px; border-radius: var(--r-btn); border: 1px solid var(--border-hi);
+  background: var(--surface-2); color: var(--text); font: inherit; transition: border-color .2s, box-shadow .2s; }
+.pl-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+.pl-list { display: flex; flex-direction: column; gap: 8px; }
+.pl-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-btn);
+  background: var(--surface-2); cursor: pointer; animation: nkIn .35s ease both; transition: transform .15s, background .2s; }
+.pl-card:active { transform: scale(.98); }
+.pl-card:hover { background: var(--surface-3); }
+.pl-av { width: 40px; height: 40px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; }
+.pl-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pl-id { font-size: 12px; color: var(--text-mute); }
+.pl-hint { text-align: center; color: var(--text-dim); padding: 18px 0; font-size: 14px; }
+.pl-more { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .pl-card { animation: none; } }
