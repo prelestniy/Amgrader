@@ -35,6 +35,11 @@
   .nk-prefix{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:var(--pc,var(--tx));background:color-mix(in srgb,var(--pc,#fff) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pc,#fff) 40%,transparent)}
   .vbadge{width:17px;height:17px;flex:none;display:inline-block}
   .chev{color:var(--mute);font-size:20px}
+  .av img{width:100%;height:100%;object-fit:cover}
+  .vbadge{width:.78em;height:.78em;flex:none;display:inline-block;vertical-align:.02em;margin-left:1px}
+  .pal{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:6px}
+  .pal button{aspect-ratio:1;border-radius:8px;border:2px solid transparent;cursor:pointer;padding:0}
+  .pal button.on{border-color:var(--tx)}
   .empty{text-align:center;color:var(--dim);padding:40px 10px;font-size:14px}
   .lbl{font-size:12px;color:var(--dim);margin:14px 0 6px;font-weight:700}
   .inp{width:100%;padding:13px 14px;border-radius:14px;border:1px solid var(--bd);background:var(--s2);outline:none;transition:border-color .2s,box-shadow .2s}
@@ -95,12 +100,15 @@
       <div class="lbl" style="margin-top:18px">Префикс: создать или изменить</div>
       <input type="hidden" id="pId">
       <input class="inp" id="pText" maxlength="12" placeholder="Текст, например VIP">
+      <div class="lbl" style="margin-top:10px">Цвет префикса</div>
+      <div class="pal" id="prePal"></div>
       <div class="row" style="margin-top:10px">
-        <div><div class="lbl" style="margin-top:0">Цвет</div><input class="inp" id="pColor" value="#B6F24A"></div>
+        <div><div class="lbl" style="margin-top:0">Цвет (#RRGGBB)</div><input class="inp" id="pColor" value="#B6F24A" oninput="markPalColor()"></div>
         <div><div class="lbl" style="margin-top:0">Цена, G</div><input class="inp" id="pPrice" type="number" min="0" value="0"></div>
       </div>
       <label class="sw" style="margin-top:12px"><span>Показывать в магазине</span><input id="pActive" type="checkbox" checked></label>
       <div class="row" style="margin-top:14px"><button class="btn" onclick="savePrefix()">Сохранить</button><button class="btn ghost" onclick="clearPrefix()">Новый</button></div>
+      <button class="btn ghost" id="pDel" style="width:100%;margin-top:10px;color:#F87171;display:none" onclick="deletePrefix()">Удалить префикс</button>
       <div class="msg" id="pMsg"></div>
     </section>
 
@@ -182,7 +190,7 @@ async function loadUsers(reset){
     rows.forEach((u, i) => {
       const d = document.createElement("div");
       d.className = "card"; d.style.animationDelay = (i * 0.035) + "s";
-      d.innerHTML = `<div class="av">${initials(u.nickname)}</div>
+      d.innerHTML = `<div class="av">${u.photo ? `<img src="${u.photo}" alt="">` : initials(u.nickname)}</div>
         <div class="info">${nk({ nickname: u.nickname, verified: u.verified, nameColor: u.nameColor, prefix: u.prefix })}
         <div class="sub">ID ${esc(u.publicId)} · ${esc(u.login || "—")} · ${u.balance} G</div></div><span class="chev">›</span>`;
       d.onclick = () => openUser(u); box.appendChild(d);
@@ -205,6 +213,7 @@ function openUser(u){
   const pre = [`<button class="pre-pick" data-id="" onclick="pickPrefix(null)">Без префикса</button>`]
     .concat(prefixes.map(p => `<button class="pre-pick" data-id="${p.id}" style="--pc:${esc(p.color)}" onclick="pickPrefix(${p.id})">${esc(p.text)}</button>`)).join("");
   document.getElementById("shBody").innerHTML = `
+    <div class="av" style="width:64px;height:64px;margin:0 0 12px">${cur.photo ? `<img src="${cur.photo}" alt="">` : initials(cur.nickname)}</div>
     <div class="prev-box"><div class="prev-lbl">Предпросмотр</div><div id="prevNick" class="prev-nick"></div>
       <div class="prev-sub" id="prevSub"></div></div>
     <label class="sw"><span>Галочка (верифицирован)</span><input id="dVer" type="checkbox" ${draft.verified ? "checked" : ""} onchange="draft.verified=this.checked;renderPreview()"></label>
@@ -260,15 +269,34 @@ async function loadPrefixes(){
   const box = document.getElementById("preList");
   try {
     prefixes = await api("/api/admin/prefixes");
+    renderPrePal();
     box.innerHTML = prefixes.map((p, i) => `<div class="pre-card ${p.active ? "" : "off"}" style="animation-delay:${i * 0.04}s" onclick='editPrefix(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
         <span class="nk-prefix" style="--pc:${esc(p.color)}">${esc(p.text)}</span>
         <span class="sub" style="margin:0">${p.price} G${p.active ? "" : " · скрыт"}</span></div>`).join("") || '<div class="empty">Префиксов пока нет</div>';
   } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
+function renderPrePal(){
+  const box = document.getElementById("prePal"); if (!box) return;
+  box.innerHTML = PALETTE.map(c => `<button style="background:${c}" data-c="${c}" onclick="setPrefColor('${c}')" aria-label="${c}"></button>`).join("");
+  markPalColor();
+}
+function setPrefColor(c){ document.getElementById("pColor").value = c; markPalColor(); }
+function markPalColor(){
+  const v = (document.getElementById("pColor").value || "").trim().toUpperCase();
+  document.querySelectorAll("#prePal button").forEach(b => b.classList.toggle("on", b.dataset.c.toUpperCase() === v));
+}
+async function deletePrefix(){
+  const id = document.getElementById("pId").value, msg = document.getElementById("pMsg");
+  if (!id || !confirm("Удалить префикс? Он снимется со всех игроков.")) return;
+  try { await api("/api/admin/prefixes", { method: "POST", body: { id, delete: true } }); msg.textContent = "Удалено ✓"; clearPrefix(); loadPrefixes(); }
+  catch (e) { msg.textContent = e.message; }
+}
 function editPrefix(p){
+  document.getElementById("pDel").style.display = p.id ? "block" : "none";
   document.getElementById("pId").value = p.id; document.getElementById("pText").value = p.text;
   document.getElementById("pColor").value = p.color; document.getElementById("pPrice").value = p.price;
   document.getElementById("pActive").checked = p.active; document.getElementById("pMsg").textContent = "";
+  markPalColor();
   document.querySelector(".main").scrollTop = 0;
 }
 function clearPrefix(){ editPrefix({ id: "", text: "", color: "#B6F24A", price: 0, active: true }); }
