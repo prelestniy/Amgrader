@@ -49,6 +49,18 @@
 
 /* ТОП: карточки шире, ник и галочка не сжимаются */
 .top-card { width: 132px !important; }
-.top-card .top-nick { white-space: normal; }
+
 .top-card .top-nick .nk { flex-wrap: nowrap; max-width: 100%; justify-content: center; }
 .top-card .top-nick .nk-name { white-space: nowrap; }
+
+/* ТОП: без префиксов, ник полностью (переносится на несколько строк) */
+.top-card .top-nick { white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+  line-height: 1.25; text-align: center; overflow-wrap: anywhere; word-break: break-word; width: 100%; }
+.top-card .nk-top { display: inline; }
+.top-card .nk-top .nk-name { white-space: normal; overflow: visible; text-overflow: clip; }
+.top-card .nk-top .vbadge { display: inline-block; vertical-align: .02em; }
+
+/* ПРОФИЛЬ ИГРОКА: листается до конца, под ним не мешает нижняя панель */
+#userOverlay { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; touch-action: pan-y; }
+#userOverlay .user-ov-body { min-height: 100%; padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
