@@ -29,9 +29,15 @@ function closeUserProfile() { gid("userOverlay").hidden = true; }
 
 function askConfirm(text) {
   return new Promise(res => {
-    const tg = tgApp();
-    try { if (tg && tg.showConfirm && tg.isVersionAtLeast && tg.isVersionAtLeast("6.2")) { tg.showConfirm(text, ok => res(!!ok)); return; } } catch (e) {}
-    res(window.confirm(text));
+    openMisc(miscHead(ic("gift", 24), "Подтвердите", "") +
+      `<div class="reg-body"><div class="misc-hint" style="font-size:15px;line-height:1.5">${esc(text)}</div>` +
+      `<div class="tr-btns" style="margin-top:14px"><button class="primary-btn" id="cfOk">Да</button>` +
+      `<button class="ghost-btn" id="cfNo">Отмена</button></div></div>`);
+    setTimeout(() => {
+      const ok = document.getElementById("cfOk"), no = document.getElementById("cfNo");
+      if (ok) ok.onclick = () => { closeMisc(); res(true); };
+      if (no) no.onclick = () => { closeMisc(); res(false); };
+    }, 0);
   });
 }
 async function userAct(kind, pid) {
