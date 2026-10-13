@@ -64,3 +64,27 @@
 #userOverlay { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; touch-action: pan-y; }
 #userOverlay .user-ov-body { min-height: 100%; padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+
+/* ТРЕЙД: полноэкранный, по наброску */
+.tr-screen { display:flex; flex-direction:column; gap:14px; padding:4px 0 calc(130px + env(safe-area-inset-bottom,0px)); }
+.tr-status { text-align:center; font-weight:700; color:var(--text-dim); font-size:13px; }
+.tr-panels { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:stretch; }
+.tr-panel { border:1px solid var(--border); border-radius:20px; padding:12px; min-height:150px; background:var(--surface-1); min-width:0; }
+.tr-panel.mine { background:color-mix(in srgb, #9a9a9a 14%, var(--surface-1)); }
+.tr-panel.theirs { background:color-mix(in srgb, #c77a86 16%, var(--surface-1)); }
+.tr-arrows { display:flex; align-items:center; justify-content:center; color:var(--text-dim); }
+.tr-who { text-align:center; font-size:13px; color:var(--text-dim); }
+.tr-gbox { display:flex; flex-direction:column; gap:10px; }
+.tr-gbar { position:relative; height:46px; border-radius:16px; background:var(--surface-2); overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.tr-gfill { position:absolute; left:0; top:0; bottom:0; background:color-mix(in srgb, var(--accent) 45%, transparent); transition:width .08s linear; }
+.tr-gbar span { position:relative; font-weight:800; font-size:16px; }
+.tr-range { width:100%; accent-color: var(--accent); }
+.tr-tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; }
+.tr-tile { position:relative; border:1px solid var(--border); border-radius:16px; background:var(--surface-1); }
+.tr-tile.on { border-color:var(--accent); }
+.tr-tile-main { width:100%; text-align:left; padding:12px; background:none; border:0; color:var(--text); font:inherit; cursor:pointer; }
+.tr-tile-main:disabled { opacity:.5; cursor:default; }
+.tr-tile-main b { display:block; font-size:13px; }
+.tr-tile-main small { display:block; margin-top:4px; color:var(--text-dim); font-size:11px; }
+.tr-tile-minus { position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%; border:0; background:var(--surface-2); color:var(--text); font-size:16px; cursor:pointer; }
+.tr-btns { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
