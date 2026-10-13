@@ -280,7 +280,7 @@ function openLocalProfile(u) {
     <div class="profile-card">
       <div class="profile-avatar">${avatarHTML(u.photo || (u.me ? p.photo : ""), u.nickname)}</div>
       <div class="profile-info">
-        <div class="profile-name">${esc(u.nickname)}</div>
+        <div class="profile-name">${nickHTML(u)}</div>
         <div class="profile-sub">${pid ? "ID: " + esc(pid) : "Игрок из топа"}</div>
       </div>
     </div>
@@ -324,7 +324,7 @@ function renderTopBalanceSlider() {
     return `<div class="top-card ${u.me ? "me" : ""} ${rank <= 3 ? "top" + rank : ""}" onclick="openTopUser(${i})" role="button">` +
       `<div class="top-rank">#${rank}${u.me ? " · вы" : ""}</div>` +
       `<div class="top-av">${av}</div>` +
-      `<div class="top-nick">${esc(u.nickname)}</div>` +
+      `<div class="top-nick">${nickHTML(u.raw || u)}</div>` +
       `<div class="top-bal">${fmt(u.balance)}</div>` +
       `</div>`;
   }).join("");
