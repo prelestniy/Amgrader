@@ -3,7 +3,7 @@ const ICO = {"gift": "<rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/>
    V6: экраны и переходы, кейсы, крафт, бонусы, скрытая удача
    ============================================================ */
 const $ = id => document.getElementById(id);
-const RAR_ORDER = ["common", "rare", "epic", "legendary", "mythic", "secret", "galactic", "sausage", "eldovaya", "sasnaya", "rubinovaya", "kratnost"];
+const RAR_ORDER = ["common", "rare", "epic", "legendary", "mythic", "secret", "galactic", "sausage", "eldovaya", "sasnaya", "rubinovaya", "krasnost"];
 const delay = ms => new Promise(r => setTimeout(r, ms));
 function ic(n, s) {
   s = s || 20;
