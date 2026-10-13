@@ -11,7 +11,7 @@ async function openUserProfile(pid, silent) {
       <div class="profile-card">
         <div class="profile-avatar">${avatarHTML(u.photo, u.nickname)}</div>
         <div class="profile-info">
-          <div class="profile-name">${nickHTML(u)}</div>
+          <div class="profile-name">${nickHTML({ nickname: u.nickname, style: u.me ? (state.profile && state.profile.style) : (u.style || (u.raw && u.raw.style)) })}</div>
           <div class="profile-sub">ID: ${esc(u.publicId)}${since ? " · в игре с " + since : ""}</div>
           ${u.about ? `<div class="profile-about">${esc(u.about)}</div>` : ""}
         </div>
