@@ -63,7 +63,8 @@ def shop(uid):
     with closing(_db()) as conn:
         u = conn.execute("SELECT balance, prefix_id, owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
         owned = set(json.loads(u["owned_prefixes"] or "[]"))
-        rows = conn.execute("SELECT * FROM prefixes WHERE active=1 ORDER BY price, id").fetchall()
+        rows = [r for r in conn.execute("SELECT * FROM prefixes ORDER BY price, id").fetchall()
+                if r["active"] or r["id"] in owned]
     return {"balance": u["balance"] or 0, "equipped": u["prefix_id"],
             "items": [{"id": r["id"], "text": r["text"], "color": r["color"], "price": r["price"],
                        "owned": r["id"] in owned} for r in rows]}
