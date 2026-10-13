@@ -4,6 +4,7 @@
     games: { title: "Игры", btn: "navGames", screens: ["ladder", "mines", "craft"], items: [
       { screen: "ladder", name: "Лесенка", tone: "#FFB020", tag: "Поднимайся выше", ico: "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 20V4M4 4h4M4 9h5M4 14h6M4 19h7M20 4v16M20 20h-4M20 15h-5M20 10h-6M20 5h-7\"/></svg>" },
       { screen: "mines",  name: "Мины", tone: "#FF5A4F", tag: "Обходи ловушки", ico: "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"6.2\"/><path d=\"M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6\"/></svg>" },
+      { fn: "openTrades", name: "Трейды", sub: "обмен с друзьями", tone: "#4FC3F7", tag: "Меняйся предметами", ico: "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" width=\"22\" height=\"22\"><path d=\"M7 7h11l-3-3M17 17H6l3 3\"/></svg>" },
       { screen: "craft",  name: "Крафт", tone: "#B26BFF", tag: "Собери новое", ico: "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 3l9 5-9 5-9-5z\"/><path d=\"M3 13l9 5 9-5M3 17.5l9 5 9-5\"/></svg>" }
     ]},
     bonus: { title: "Квесты", btn: "navBonus", screens: ["bonus", "wheel"], items: [
@@ -21,7 +22,7 @@
       const cls = "gb-item" + (it.soon ? " soon" : "") + (!it.soon && it.screen === cur ? " current" : "");
       const sub = it.sub ? `<small>${it.sub}</small>` : "";
       const pill = it.soon ? `<span class="gb-pill">в разработке</span>` : "";
-      const act = it.soon ? `onclick="bubbleSoon(this)"` : `onclick="bubbleGo('${it.screen}', this)"`;
+      const act = it.soon ? `onclick="bubbleSoon(this)"` : it.fn ? `onclick="bubbleFn('${it.fn}')"` : `onclick="bubbleGo('${it.screen}', this)"`;
       return `<button class="${cls}" style="--i:${i}" role="menuitem" ${act}><span class="gb-ico">${it.ico}</span><span class="gb-txt"><b>${it.name}</b>${sub}</span>${pill}</button>`;
     }).join("");
   }
@@ -52,6 +53,7 @@
     $id("glassScrim").classList.remove("on");
     document.querySelectorAll(".nav-btn[aria-expanded]").forEach(x => { x.setAttribute("aria-expanded", "false"); x.classList.remove("open"); });
   };
+  window.bubbleFn = function (fn) { closeBubble(); if (typeof window[fn] === "function") window[fn](); };
   window.bubbleGo = function (screen, el) {
     const g = Object.values(BUBBLES).flatMap(b => b.items).find(i => i.screen === screen && i.tone);
     const fx = $id("modeFx");
