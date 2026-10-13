@@ -221,8 +221,8 @@ function renderProfile() {
     chip.classList.remove("guest");
     chip.classList.add("logged");
     chip.innerHTML = p.photo
-      ? `<span class="auth-chip-avatar"><img src="${p.photo}" alt=""></span><span>${esc(p.nickname || "Профиль")}</span>`
-      : `<span class="auth-chip-avatar">${initials(p.nickname)}</span><span>${esc(p.nickname || "Профиль")}</span>`;
+      ? `<span class="auth-chip-avatar"><img src="${p.photo}" alt=""></span><span>${topNickHTML(p)}</span>`
+      : `<span class="auth-chip-avatar">${initials(p.nickname)}</span><span>${topNickHTML(p)}</span>`;
   } else {
     chip.classList.add("guest");
     chip.classList.remove("logged");
@@ -406,3 +406,20 @@ document.getElementById("spinBtn").addEventListener("click", onSpinClick);
 initBubbleSwipe();
 document.getElementById("buyOverlay").addEventListener("click", e => { if (e.target === e.currentTarget) closeBuy(); });
 document.getElementById("authOverlay").addEventListener("click", e => { if (e.target === e.currentTarget) closeAuth(); });
+
+/* Галочка верификации: по нажатию на 2 секунды показываем «Официальный аккаунт» */
+document.addEventListener("click", e => {
+  const b = e.target && e.target.closest && e.target.closest(".vbadge");
+  if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  document.querySelectorAll(".vtip").forEach(n => n.remove());
+  const r = b.getBoundingClientRect();
+  const t = document.createElement("div");
+  t.className = "vtip";
+  t.textContent = "Официальный аккаунт";
+  document.body.appendChild(t);
+  const w = t.offsetWidth;
+  t.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+  t.style.top = Math.max(8, r.top - t.offsetHeight - 8) + "px";
+  setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 300); }, 2000);
+}, true);
