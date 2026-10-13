@@ -33,6 +33,7 @@ const cap = s => s[0].toUpperCase() + s.slice(1);
 let screenToken = 0, bonusTimer = 0;
 function showScreen(name) {
   if (state.spinning) return;
+  { const uo = document.getElementById("userOverlay"); if (uo && !uo.hidden && typeof closeUserProfile === "function") closeUserProfile(); }
   if (demo.on && !["cases", "mines", "ladder"].includes(name)) setDemo(false);
   syncDemoUI();
   const els = SCREENS.map(s => $("screen" + cap(s))).filter(Boolean);   // экран может отсутствовать в старой index.html
