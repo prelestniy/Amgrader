@@ -84,6 +84,7 @@ async function api(path, opts) {
 function mergeServerUser(u) {
   state.balance = u.balance; state.rev = u.rev || 0; state.luck = u.luck || [];
   setInventoryFromIds(u.inventory || []);
+  if (state.profile && u.style) state.profile.style = u.style;
   if (state.profile) { state.profile.referralCode = u.referralCode; state.profile.referredBy = u.referredBy;
     if (u.publicId) { state.profile.publicId = u.publicId; state.profile.about = u.about || ""; } }
   renderAll(); renderProfile(); pulseBalance();
