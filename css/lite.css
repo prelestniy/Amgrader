@@ -1,0 +1,8 @@
+/* ЛЁГКИЙ РЕЖИМ: для слабых телефонов. Без блюра, теней, бесконечных анимаций и тяжёлого эффекта входа в игру. */
+.lite *, .lite *::before, .lite *::after {
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  filter: none !important; text-shadow: none !important; box-shadow: none !important;
+  animation-iteration-count: 1 !important; transition-duration: .12s !important;
+}
+.lite .mode-fx { display: none !important; }
+.lite #whDisc svg { filter: none !important; }
