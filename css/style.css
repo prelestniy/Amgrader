@@ -3,7 +3,9 @@
 .nk-prefix { font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 3px 9px; border-radius: 999px;
   color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 45%, transparent); }
-.nk-name { font-weight: 700; }
+.nk-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nk > .nk-prefix { flex: none; }
+.nk > .vbadge { flex: none; }
 .vbadge { width: 1.05em; height: 1.05em; flex: none; display: inline-block; vertical-align: -0.12em; }
 
 /* МАГАЗИН ПРЕФИКСОВ */
@@ -34,3 +36,19 @@
 .pl-hint { text-align: center; color: var(--text-dim); padding: 18px 0; font-size: 14px; }
 .pl-more { width: 100%; }
 @media (prefers-reduced-motion: reduce) { .pl-card { animation: none; } }
+
+/* ПРЕФИКСЫ: крупнее плашка, выбор в редактировании профиля */
+.nk-prefix { font-size: 12px; padding: 4px 10px; }
+.shop-info { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.shop-price { font-size: 12px; color: var(--text-dim); font-weight: 700; }
+.ep-prefix-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.ep-pref { border: 1px solid var(--border-hi); background: var(--surface-2); border-radius: 999px; padding: 6px 10px;
+  font: inherit; color: var(--text); cursor: pointer; }
+.ep-pref.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.profile-row.shop-top { border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* ТОП: карточки шире, ник и галочка не сжимаются */
+.top-card { width: 132px !important; }
+.top-card .top-nick { white-space: normal; }
+.top-card .top-nick .nk { flex-wrap: nowrap; max-width: 100%; justify-content: center; }
+.top-card .top-nick .nk-name { white-space: nowrap; }
