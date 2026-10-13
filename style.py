@@ -130,6 +130,14 @@ def admin_user_update(who, body):
         conn.execute("BEGIN IMMEDIATE")
         u = _find_user(conn, who)
         sets, args = [], []
+        if "publicId" in body:
+            pid = str(body.get("publicId") or "").strip().lstrip("#")
+            if not re.fullmatch(r"[\w]{3,16}", pid):
+                raise HTTPException(400, "ID: от 3 до 16 символов — буквы, цифры, _")
+            taken = conn.execute("SELECT 1 FROM users WHERE public_id=? AND id!=?", (pid, u["id"])).fetchone()
+            if taken:
+                raise HTTPException(400, "Такой ID уже занят")
+            sets.append("public_id=?"); args.append(pid)
         if "verified" in body:
             sets.append("verified=?"); args.append(1 if body["verified"] else 0)
         if "nameColor" in body:
