@@ -89,6 +89,7 @@ function openAuth(message) {
   document.getElementById("authPassword").value = "";
   document.getElementById("authConfirm").value = "";
   setAuthTab("login");
+  if (typeof webTgUpdate === "function") webTgUpdate();
   if (message) document.getElementById("authSub").textContent = message;
   ov.classList.add("open");
   setTimeout(() => document.getElementById("authLogin").focus(), 350);
