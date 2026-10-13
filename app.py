@@ -26,6 +26,7 @@ import wheel
 import theme as themes
 import trade
 import webauth
+import style
 import auth_bot
 
 # ---------------------------------------------------------------------------
@@ -57,12 +58,14 @@ async def lifespan(_app):
     themes.setup(db)
     trade.setup(db, ITEMS)
     webauth.setup(db, user_public, _web_upsert_tg)
+    style.setup(db, check_telegram_auth)
     with closing(db()) as conn, conn:
         quests.init_db(conn)
         wheel.init_db(conn)
         themes.init_db(conn)
         trade.init_db(conn)
         webauth.init_db(conn)
+        style.init_db(conn)
     tasks = []
     for name in ("bot_user", "bot_admin", "auth_bot"):
         try:
@@ -237,6 +240,7 @@ def user_public(row) -> dict:
         "inventory": json.loads(row["inventory"] or "[]"),
         "referralCode": row["referral_code"],
         "referredBy": row["referred_by"],
+        "style": style.style_fields(row),
         "token": row["token"],
     }
 
@@ -439,6 +443,66 @@ def web_login_status(token: str):
     return webauth.status(token)
 
 
+class ShopBuyBody(BaseModel):
+    id: int
+
+
+class ShopEquipBody(BaseModel):
+    id: Optional[int] = None
+
+
+@app.get("/api/players")
+def players_list(q: str = "", offset: int = 0, user=Depends(auth_user)):
+    return style.players(q, offset)
+
+
+@app.get("/api/shop")
+def shop_get(user=Depends(auth_user)):
+    return style.shop(user["id"])
+
+
+@app.post("/api/shop/buy")
+def shop_buy(body: ShopBuyBody, user=Depends(auth_user)):
+    return style.buy(user["id"], body.id)
+
+
+@app.post("/api/shop/equip")
+def shop_equip(body: ShopEquipBody, user=Depends(auth_user)):
+    return style.equip(user["id"], body.id)
+
+
+@app.get("/admin/app")
+def admin_app_page():
+    f = BASE_DIR / "admin.html"
+    if not f.is_file():
+        raise HTTPException(404, "admin.html не загружен")
+    return FileResponse(f, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/admin/users")
+def admin_users_list(q: str = "", offset: int = 0, x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
+    style.admin_uid(x_init_data)
+    return style.admin_users(q, offset)
+
+
+@app.post("/api/admin/user/{who}")
+def admin_user_set(who: str, body: dict, x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
+    style.admin_uid(x_init_data)
+    return style.admin_user_update(who, body)
+
+
+@app.get("/api/admin/prefixes")
+def admin_prefixes_list(x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
+    style.admin_uid(x_init_data)
+    return style.admin_prefixes()
+
+
+@app.post("/api/admin/prefixes")
+def admin_prefixes_save(body: dict, x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
+    style.admin_uid(x_init_data)
+    return style.admin_prefix_save(body)
+
+
 @app.get("/api/config")
 def public_config():
     return {"botUsername": os.environ.get("BOT_USERNAME", ""),
@@ -452,11 +516,11 @@ def leaderboard(limit: int = 10):
     limit = max(1, min(limit, 50))
     with closing(db()) as conn:
         rows = conn.execute(
-            "SELECT public_id, nickname, photo, balance FROM users ORDER BY balance DESC LIMIT ?",
+            "SELECT * FROM users ORDER BY balance DESC LIMIT ?",
             (limit,),
         ).fetchall()
     return {"top": [
-        {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "balance": r["balance"], "photo": r["photo"]}
+        {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "balance": r["balance"], "photo": r["photo"], "style": style.style_fields(r)}
         for r in rows
     ]}
 
@@ -1167,13 +1231,13 @@ def friends_list(user=Depends(auth_user)):
     me = user["id"]
     with closing(db()) as conn:
         rows = conn.execute(
-            """SELECT f.status, f.requester, u.public_id, u.nickname, u.photo
+            """SELECT f.status, f.requester, u.*
                FROM friendships f
                JOIN users u ON u.id = CASE WHEN f.user_a=? THEN f.user_b ELSE f.user_a END
                WHERE f.user_a=? OR f.user_b=? ORDER BY f.created_at DESC""", (me, me, me)).fetchall()
     out = {"friends": [], "incoming": [], "outgoing": []}
     for r in rows:
-        item = {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"]}
+        item = {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"], "style": style.style_fields(r)}
         if r["status"] == "accepted":
             out["friends"].append(item)
         elif r["requester"] == me:
