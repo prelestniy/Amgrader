@@ -1,66 +1,233 @@
-/* НИКИ: префикс-плашка, цвет ника, галочка */
-.nk { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.nk-prefix { font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 3px 9px; border-radius: 999px;
-  color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 45%, transparent); }
-.nk-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nk > .nk-prefix { flex: none; }
-.nk > .vbadge { flex: none; }
-.vbadge { width: .78em; height: .78em; flex: none; display: inline-block; vertical-align: .02em; margin-left: 1px; }
+"""Префиксы (покупаются за G, цену ставит админ), верификация и цвет ника. Админка через мини-апп."""
+import json
+import os
+import re
+from contextlib import closing
 
-/* МАГАЗИН ПРЕФИКСОВ */
-.shop-bal { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
-.shop-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px;
-  background: var(--surface-2); border-radius: var(--r-btn); animation: nkIn .35s ease both; }
-.shop-btn { border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 800; font-size: 13px;
-  background: var(--surface-3); color: var(--text); cursor: pointer; transition: transform .15s; }
-.shop-btn:active { transform: scale(.94); }
-.shop-btn.buy { background: var(--accent); color: var(--bg); }
-.shop-btn.on { background: color-mix(in srgb, var(--accent) 25%, var(--surface-3)); color: var(--accent); }
-@keyframes nkIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .shop-card { animation: none; } }
+from fastapi import HTTPException
 
-/* СПИСОК ИГРОКОВ */
-.pl-wrap { display: flex; flex-direction: column; gap: 12px; }
-.pl-search { width: 100%; padding: 12px 14px; border-radius: var(--r-btn); border: 1px solid var(--border-hi);
-  background: var(--surface-2); color: var(--text); font: inherit; transition: border-color .2s, box-shadow .2s; }
-.pl-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
-.pl-list { display: flex; flex-direction: column; gap: 8px; }
-.pl-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-btn);
-  background: var(--surface-2); cursor: pointer; animation: nkIn .35s ease both; transition: transform .15s, background .2s; }
-.pl-card:active { transform: scale(.98); }
-.pl-card:hover { background: var(--surface-3); }
-.pl-av { width: 40px; height: 40px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; }
-.pl-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.pl-id { font-size: 12px; color: var(--text-mute); }
-.pl-hint { text-align: center; color: var(--text-dim); padding: 18px 0; font-size: 14px; }
-.pl-more { width: 100%; }
-@media (prefers-reduced-motion: reduce) { .pl-card { animation: none; } }
+_db = None
+_verify = None          # функция: initData -> dict пользователя Telegram (с проверкой подписи)
+HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
-/* ПРЕФИКСЫ: крупнее плашка, выбор в редактировании профиля */
-.nk-prefix { font-size: 12px; padding: 4px 10px; }
-.shop-info { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
-.shop-price { font-size: 12px; color: var(--text-dim); font-weight: 700; }
-.ep-prefix-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.ep-pref { border: 1px solid var(--border-hi); background: var(--surface-2); border-radius: 999px; padding: 6px 10px;
-  font: inherit; color: var(--text); cursor: pointer; }
-.ep-pref.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
-.profile-row.shop-top { border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
 
-/* ТОП: карточки шире, ник и галочка не сжимаются */
-.top-card { width: 132px !important; }
+def setup(db, verify_init_data):
+    global _db, _verify
+    _db = db
+    _verify = verify_init_data
 
-.top-card .top-nick .nk { flex-wrap: nowrap; max-width: 100%; justify-content: center; }
-.top-card .top-nick .nk-name { white-space: nowrap; }
 
-/* ТОП: без префиксов, ник полностью (переносится на несколько строк) */
-.top-card .top-nick { white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
-  line-height: 1.25; text-align: center; overflow-wrap: anywhere; word-break: break-word; width: 100%; }
-.top-card .nk-top { display: inline; }
-.top-card .nk-top .nk-name { white-space: normal; overflow: visible; text-overflow: clip; }
-.top-card .nk-top .vbadge { display: inline-block; vertical-align: .02em; }
+def init_db(conn):
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    for col, typ in (("verified", "INTEGER DEFAULT 0"), ("name_color", "TEXT"),
+                     ("prefix_id", "INTEGER"), ("owned_prefixes", "TEXT DEFAULT '[]'")):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
+    conn.execute("""CREATE TABLE IF NOT EXISTS prefixes(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, color TEXT NOT NULL,
+        price INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1)""")
 
-/* ПРОФИЛЬ ИГРОКА: листается до конца, под ним не мешает нижняя панель */
-#userOverlay { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain; touch-action: pan-y; }
-#userOverlay .user-ov-body { min-height: 100%; padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+
+def admin_ids():
+    raw = os.environ.get("ADMIN_IDS", "")
+    return {int(x) for x in re.split(r"[,\s]+", raw) if x.isdigit()}
+
+
+def admin_uid(init_data):
+    tg = _verify(init_data or "")
+    tid = int(tg.get("id", 0) or 0)
+    if tid not in admin_ids():
+        raise HTTPException(403, "Нет доступа")
+    return tid
+
+
+def _prefix(conn, pid):
+    if not pid:
+        return None
+    p = conn.execute("SELECT * FROM prefixes WHERE id=?", (pid,)).fetchone()
+    return {"id": p["id"], "text": p["text"], "color": p["color"]} if p else None
+
+
+def style_fields(row):
+    with closing(_db()) as conn:
+        return {
+            "verified": bool(row["verified"]),
+            "nameColor": row["name_color"] or None,
+            "prefix": _prefix(conn, row["prefix_id"]),
+            "ownedPrefixes": json.loads(row["owned_prefixes"] or "[]"),
+        }
+
+
+# ---------- для игрока ----------
+def shop(uid):
+    with closing(_db()) as conn:
+        u = conn.execute("SELECT balance, prefix_id, owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
+        owned = set(json.loads(u["owned_prefixes"] or "[]"))
+        rows = conn.execute("SELECT * FROM prefixes WHERE active=1 ORDER BY price, id").fetchall()
+    return {"balance": u["balance"] or 0, "equipped": u["prefix_id"],
+            "items": [{"id": r["id"], "text": r["text"], "color": r["color"], "price": r["price"],
+                       "owned": r["id"] in owned} for r in rows]}
+
+
+def buy(uid, pid):
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        u = conn.execute("SELECT balance, owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
+        p = conn.execute("SELECT * FROM prefixes WHERE id=? AND active=1", (pid,)).fetchone()
+        if p is None:
+            raise HTTPException(404, "Префикс не найден")
+        owned = json.loads(u["owned_prefixes"] or "[]")
+        if pid in owned:
+            raise HTTPException(400, "Этот префикс уже куплен")
+        if (u["balance"] or 0) < p["price"]:
+            raise HTTPException(400, "Не хватает G")
+        owned.append(pid)
+        conn.execute("UPDATE users SET balance=balance-?, owned_prefixes=?, rev=rev+1 WHERE id=?",
+                     (p["price"], json.dumps(owned), uid))
+    return {"ok": True}
+
+
+def equip(uid, pid):
+    with closing(_db()) as conn, conn:
+        u = conn.execute("SELECT owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
+        if pid is not None and pid not in json.loads(u["owned_prefixes"] or "[]"):
+            raise HTTPException(400, "Сначала купите префикс")
+        conn.execute("UPDATE users SET prefix_id=?, rev=rev+1 WHERE id=?", (pid, uid))
+    return {"ok": True}
+
+
+# ---------- для админа ----------
+def _find_user(conn, who):
+    who = (who or "").strip()
+    r = conn.execute("SELECT * FROM users WHERE public_id=? COLLATE NOCASE", (who,)).fetchone()
+    if r:
+        return r
+    r = conn.execute("SELECT * FROM users WHERE LOWER(login)=?", (who.lower(),)).fetchone()
+    if r is None:
+        raise HTTPException(404, "Игрок не найден")
+    return r
+
+
+def admin_users(q, offset):
+    q = (q or "").strip()
+    like = f"%{q}%"
+    with closing(_db()) as conn:
+        rows = conn.execute("""SELECT id, public_id, nickname, login, balance, verified, name_color, prefix_id, photo
+            FROM users WHERE (?='' OR public_id LIKE ? OR nickname LIKE ? OR login LIKE ?)
+            ORDER BY id DESC LIMIT 30 OFFSET ?""", (q, like, like, like, max(0, offset))).fetchall()
+    with closing(_db()) as conn:
+        out = []
+        for r in rows:
+            out.append({"id": r["id"], "publicId": r["public_id"], "nickname": r["nickname"], "login": r["login"],
+                        "balance": r["balance"] or 0, "verified": bool(r["verified"]), "nameColor": r["name_color"],
+                        "prefixId": r["prefix_id"], "photo": r["photo"], "prefix": _prefix(conn, r["prefix_id"])})
+    return out
+
+
+def admin_user_update(who, body):
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        u = _find_user(conn, who)
+        sets, args = [], []
+        if "publicId" in body:
+            pid = str(body.get("publicId") or "").strip().lstrip("#")
+            if not re.fullmatch(r"[\w]{3,16}", pid):
+                raise HTTPException(400, "ID: от 3 до 16 символов — буквы, цифры, _")
+            taken = conn.execute("SELECT 1 FROM users WHERE public_id=? AND id!=?", (pid, u["id"])).fetchone()
+            if taken:
+                raise HTTPException(400, "Такой ID уже занят")
+            sets.append("public_id=?"); args.append(pid)
+        if "verified" in body:
+            sets.append("verified=?"); args.append(1 if body["verified"] else 0)
+        if "nameColor" in body:
+            c = body["nameColor"] or None
+            if c and not HEX.match(c):
+                raise HTTPException(400, "Цвет в формате #RRGGBB")
+            sets.append("name_color=?"); args.append(c)
+        if "prefixId" in body:
+            pid = body["prefixId"] or None
+            if pid:
+                if conn.execute("SELECT 1 FROM prefixes WHERE id=?", (pid,)).fetchone() is None:
+                    raise HTTPException(404, "Такого префикса нет")
+                owned = json.loads(u["owned_prefixes"] or "[]")
+                if pid not in owned:
+                    owned.append(pid)
+                    sets.append("owned_prefixes=?"); args.append(json.dumps(owned))
+            sets.append("prefix_id=?"); args.append(pid)
+        if body.get("grantPrefix") and "prefixId" not in body:
+            gp = int(body["grantPrefix"])
+            if conn.execute("SELECT 1 FROM prefixes WHERE id=?", (gp,)).fetchone() is None:
+                raise HTTPException(404, "Такого префикса нет")
+            owned = json.loads(u["owned_prefixes"] or "[]")
+            if gp not in owned:
+                owned.append(gp)
+                sets.append("owned_prefixes=?"); args.append(json.dumps(owned))
+        if sets:
+            conn.execute(f"UPDATE users SET {', '.join(sets)}, rev=rev+1 WHERE id=?", (*args, u["id"]))
+    return {"ok": True}
+
+
+def admin_prefixes():
+    with closing(_db()) as conn:
+        rows = conn.execute("SELECT * FROM prefixes ORDER BY id").fetchall()
+    return [{"id": r["id"], "text": r["text"], "color": r["color"], "price": r["price"], "active": bool(r["active"])}
+            for r in rows]
+
+
+def admin_prefix_delete(pid):
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        for u in conn.execute("SELECT id, owned_prefixes FROM users").fetchall():
+            owned = [x for x in json.loads(u["owned_prefixes"] or "[]") if x != pid]
+            conn.execute("UPDATE users SET owned_prefixes=?, prefix_id=CASE WHEN prefix_id=? THEN NULL ELSE prefix_id END WHERE id=?",
+                         (json.dumps(owned), pid, u["id"]))
+        conn.execute("DELETE FROM prefixes WHERE id=?", (pid,))
+    return {"ok": True}
+
+
+def admin_prefix_save(body):
+    if body.get("delete") and body.get("id"):
+        return admin_prefix_delete(int(body["id"]))
+    text = (body.get("text") or "").strip()
+    color = body.get("color") or "#B6F24A"
+    price = int(body.get("price") or 0)
+    active = 1 if body.get("active", True) else 0
+    if not 1 <= len(text) <= 24:
+        raise HTTPException(400, "Префикс: от 1 до 24 символов")
+    if not HEX.match(color):
+        raise HTTPException(400, "Цвет в формате #RRGGBB")
+    if price < 0 or price > 10**12:
+        raise HTTPException(400, "Некорректная цена")
+    with closing(_db()) as conn, conn:
+        if body.get("id"):
+            conn.execute("UPDATE prefixes SET text=?, color=?, price=?, active=? WHERE id=?",
+                         (text, color, price, active, int(body["id"])))
+        else:
+            conn.execute("INSERT INTO prefixes(text, color, price, active) VALUES(?,?,?,?)",
+                         (text, color, price, active))
+    return {"ok": True}
+
+
+# ---------- список игроков (поиск + подгрузка) ----------
+def players(q, offset):
+    q = (q or "").strip()
+    like = f"%{q}%"
+    with closing(_db()) as conn:
+        rows = conn.execute("""SELECT * FROM users
+            WHERE (?='' OR public_id LIKE ? OR nickname LIKE ?)
+            ORDER BY id DESC LIMIT 30 OFFSET ?""", (q, like, like, max(0, offset))).fetchall()
+        out = []
+        for r in rows:
+            out.append({"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок",
+                        "photo": r["photo"], "style": style_fields(r)})
+    return out
+
+
+def admin_grant_g(who, amount):
+    if not 1 <= amount <= 10**12:
+        raise HTTPException(400, "Сумма G: от 1 до 10^12")
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        u = _find_user(conn, who)
+        conn.execute("UPDATE users SET balance=COALESCE(balance,0)+?, rev=rev+1 WHERE id=?", (amount, u["id"]))
+        return {"nickname": u["nickname"] or "Игрок"}
