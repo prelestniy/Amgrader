@@ -83,7 +83,7 @@ const CASES = [
   { id: "c11", name: "Колбасный тайник", tone: "#FF8A4C", w: { galactic: 75, sausage: 25 } },
   { id: "c12", name: "Колбасный Король", tone: "#D4A017", w: { galactic: 60, sausage: 40 } },
   { id: "c13", name: "Елдовая вечеринка", tone: "#FF6F91", w: { eldovaya: 75, sasnaya: 25 } },
-  { id: "c14", name: "Полная кратность", tone: "#8B5CF6", w: { rubinovaya: 60, kratnost: 40 } }
+  { id: "c14", name: "Полная кратность", tone: "#8B5CF6", w: { rubinovaya: 60, krasnost: 40 } }
 ];
 /* ---------- иллюстрации кейсов: блоки в изометрии, в стиле иконок предметов ---------- */
 function shade(hex, pct) {
