@@ -104,7 +104,7 @@ function setInventoryFromIds(ids) {
   fixSelection();
 }
 function applyServerUser(u) {
-  state.profile = { accountKey: String(u.id), nickname: u.nickname || u.login || "Игрок", username: u.username || null,
+  state.profile = { accountKey: String(u.id), style: u.style || null, nickname: u.nickname || u.login || "Игрок", username: u.username || null,
     photo: u.photo || null, source: u.source, login: u.login, referralCode: u.referralCode, referredBy: u.referredBy,
     publicId: u.publicId, about: u.about || "", hasPassword: !!u.hasPassword };
   state.balance = u.balance; state.rev = u.rev || 0; state.luck = u.luck || [];
