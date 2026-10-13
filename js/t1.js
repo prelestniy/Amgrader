@@ -26,25 +26,36 @@ function tradeHTML() {
   const mine = v.you === "a" ? v.a : v.b, other = v.you === "a" ? v.b : v.a;
   const editable = v.status === "open";
   const owned = tOwned();
-  const ownedRows = Object.keys(owned).map(k => {
-    const id = +k, have = owned[k], mineN = tradeDraft.items[id] || 0;
-    return `<div class="tr-own"><span>${esc(tItem(id).name)} <small>${have} шт.</small></span>` +
-      `<div class="tr-step"><button onclick="tradeAdd(${id},-1)" ${mineN ? "" : "disabled"}>−</button><b>${mineN}</b>` +
-      `<button onclick="tradeAdd(${id},1)" ${mineN < have ? "" : "disabled"}>+</button></div></div>`;
+  const tiles = Object.keys(owned).map(k => {
+    const id = +k, have = owned[k], n = tradeDraft.items[id] || 0, m = tItem(id);
+    return `<div class="tr-tile${n ? " on" : ""}">` +
+      `<button class="tr-tile-main" onclick="tradeAdd(${id},1)" ${editable && n < have ? "" : "disabled"}>` +
+      `<b>${esc(m.name)}</b><small>в трейде ${n} из ${have}</small></button>` +
+      (editable && n ? `<button class="tr-tile-minus" onclick="tradeAdd(${id},-1)" aria-label="убрать">−</button>` : "") + `</div>`;
   }).join("") || `<div class="tr-empty">В инвентаре нет предметов</div>`;
+  const max = Math.max(0, state.balance || 0), step = Math.max(1, Math.floor(max / 400));
+  const pctFill = max ? Math.min(100, tradeDraft.g / max * 100) : 0;
+  const slider = editable
+    ? `<input class="tr-range" type="range" min="0" max="${max}" step="${step}" value="${tradeDraft.g}" ` +
+      `oninput="tradeLiveG(this.value)" onchange="tradeSetG(this.value)" ${max ? "" : "disabled"}>` : "";
   const unsaved = JSON.stringify(tFlat(tradeDraft.items).sort()) !== JSON.stringify((mine.items || []).slice().sort()) || tradeDraft.g !== mine.g;
   const who = other.publicId ? `${esc(other.nickname)} <small>#${esc(other.publicId)}</small>` : "ждём второго игрока";
-  const shareBtn = !other.publicId && v.status === "open" ? `<button class="ghost-btn" onclick="tradeShare()">Поделиться ссылкой</button>` : "";
-  return `<div class="reg-body tr-wrap">
-    <div class="tr-status">${v.status === "open" && mine.ok ? "Вы подтвердили · ждём партнёра" : tStatusText(v)}</div>
-    <div class="tr-cols">
-      <div class="tr-col"><div class="tr-h">Вы отдаёте${unsaved ? ' <small class="tr-unsaved">не сохранено</small>' : ""}</div>${tSideList(tFlat(tradeDraft.items), tradeDraft.g)}</div>
-      <div class="tr-col"><div class="tr-h">Вы получаете</div>${tSideList(other.items, other.g)}</div>
+  const shareBtn = !other.publicId && editable ? `<button class="ghost-btn" onclick="tradeShare()">Поделиться ссылкой</button>` : "";
+  const status = v.status === "open" && mine.ok ? "Вы подтвердили · ждём партнёра" : tStatusText(v);
+  return `<div class="tr-screen">
+    <div class="tr-status">${status}</div>
+    <div class="tr-panels">
+      <div class="tr-panel mine"><div class="tr-h">Вы отдаёте${unsaved ? ' <small class="tr-unsaved">не сохранено</small>' : ""}</div>${tSideList(tFlat(tradeDraft.items), tradeDraft.g)}</div>
+      <div class="tr-arrows" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h15l-4-4M20 15H5l4 4"/></svg></div>
+      <div class="tr-panel theirs"><div class="tr-h">Вы получаете</div>${tSideList(other.items, other.g)}</div>
     </div>
     <div class="tr-who">Партнёр: ${who}</div>
-    ${editable ? `<div class="tr-h">Ваши предметы</div><div class="tr-list">${ownedRows}</div>
-      <label class="th-row"><span>G сверху</span><input type="number" min="0" value="${tradeDraft.g}" onchange="tradeSetG(this.value)"></label>
-      <div class="tr-fee">Комиссия ${v.feePct || 0}%: ${fmt(tDraftFee())}</div>` : ""}
+    <div class="tr-gbox">
+      <div class="tr-gbar"><div class="tr-gfill" id="trGFill" style="width:${pctFill}%"></div><span id="trGVal">${fmt(tradeDraft.g)} G</span></div>
+      ${slider}
+    </div>
+    ${editable ? `<div class="tr-h">Ваш инвентарь</div><div class="tr-tiles">${tiles}</div>` : ""}
+    ${editable ? `<div class="tr-fee">Комиссия ${v.feePct || 0}%: ${fmt(tDraftFee())}</div>` : ""}
     ${v.note ? `<div class="tr-note">${esc(v.note)}</div>` : ""}
     <div class="tr-btns">
       ${editable ? `<button class="ghost-btn" onclick="tradeSave()">Сохранить</button><button class="primary-btn" onclick="tradeConfirm()">Подтвердить</button>` : ""}
@@ -55,7 +66,17 @@ function tradeHTML() {
 }
 function renderTrade() {
   if (!tradeView) return;
-  openMisc(miscHead(ic("gift", 24), "Трейд", "Обмен предметами с игроком") + tradeHTML());
+  closeMisc();
+  document.getElementById("tradeBody").innerHTML = tradeHTML();
+  const ov = document.getElementById("tradeOverlay"); ov.hidden = false; ov.scrollTop = 0;
+}
+function closeTrade() { const ov = document.getElementById("tradeOverlay"); if (ov) ov.hidden = true; }
+function tradeLiveG(v) {
+  const max = Math.max(0, state.balance || 0);
+  tradeDraft.g = Math.max(0, Math.min(max, Math.floor(+v || 0)));
+  const f = document.getElementById("trGFill"), t = document.getElementById("trGVal");
+  if (f) f.style.width = (max ? Math.min(100, tradeDraft.g / max * 100) : 0) + "%";
+  if (t) t.textContent = fmt(tradeDraft.g) + " G";
 }
 function tradeAdd(id, d) {
   const owned = tOwned()[id] || 0, cur = tradeDraft.items[id] || 0;
