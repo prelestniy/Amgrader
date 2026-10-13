@@ -4,118 +4,139 @@
 <meta name="theme-color" content="#09090B">
 <title>Amgrader · Админка</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="css/fonts.css?v=34">
-<link rel="stylesheet" href="css/main1.css?v=34">
-<link rel="stylesheet" href="css/main2.css?v=34">
-<link rel="stylesheet" href="css/main3.css?v=34">
-<link rel="stylesheet" href="css/main4.css?v=34">
-<link rel="stylesheet" href="css/themes.css?v=34">
-<link rel="stylesheet" href="css/anim.css?v=34">
-<link rel="stylesheet" href="css/style.css?v=34">
 <style>
-  /* База: страница выглядит правильно сама по себе, даже если css-файлы игры не загрузились */
-  :root{--bg:#09090B;--surface-1:#141418;--surface-2:#1c1c22;--surface-3:#26262e;--text:#F4F4F5;--text-dim:#8E8E98;--text-mute:#5A5A64;--accent:#B6F24A;--border-hi:rgba(255,255,255,.12);--r-btn:14px;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
-  html,body{background:var(--bg);color:var(--text);margin:0;font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-  button{font:inherit;color:inherit}
-  .primary-btn{background:var(--accent);color:#0A0A0B;border:0;border-radius:14px;padding:12px 16px;font-weight:800;cursor:pointer}
-  .ghost-btn{background:var(--surface-3);color:var(--text);border:0;border-radius:14px;padding:12px 16px;font-weight:700;cursor:pointer}
-  .brand{font-size:20px;font-weight:800;letter-spacing:.01em}
-  .pg-title{font-size:18px;font-weight:800}
-  .nk{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
-  .nk-name{font-weight:700;color:var(--text)}
-  .nk-prefix{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:var(--pc,var(--text));background:rgba(255,255,255,.07)}
-  .vbadge{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px}
-  .adm-page{padding-top:calc(14px + var(--safe-top))}
-  .adm-page{padding:calc(14px + var(--safe-top)) 16px calc(96px + var(--safe-bottom));min-height:100dvh}
-  .adm-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-  .adm-badge{font-size:11px;font-weight:800;letter-spacing:.06em;padding:4px 10px;border-radius:999px;background:var(--accent);color:var(--bg)}
-  .adm-tabs{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;padding:10px 12px calc(10px + var(--safe-bottom));background:var(--surface-1);border-top:1px solid var(--border-hi);z-index:50}
-  .adm-tab{flex:1;max-width:160px;border:0;background:none;color:var(--text-dim);font:inherit;font-size:12px;font-weight:700;padding:8px;border-radius:14px;cursor:pointer;transition:color .2s,background .2s,transform .15s}
-  .adm-tab.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
-  .adm-tab:active{transform:scale(.95)}
-  .adm-screen{display:none;animation:admIn .35s ease both}
-  .adm-screen.on{display:block}
-  @keyframes admIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .adm-search{width:100%;padding:13px 14px;border-radius:var(--r-btn);border:1px solid var(--border-hi);background:var(--surface-2);color:var(--text);font:inherit;margin-bottom:12px}
-  .adm-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:var(--r-btn);background:var(--surface-2);margin-bottom:8px;cursor:pointer;animation:admIn .35s ease both;transition:transform .15s,background .2s}
-  .adm-card:active{transform:scale(.98)} .adm-card:hover{background:var(--surface-3)}
-  .adm-sub{font-size:12px;color:var(--text-mute);margin-top:2px}
-  .adm-field{margin:12px 0 6px;font-size:12px;color:var(--text-dim)}
-  .adm-input{width:100%;padding:12px 14px;border-radius:var(--r-btn);border:1px solid var(--border-hi);background:var(--surface-2);color:var(--text);font:inherit}
-  .adm-row{display:flex;gap:8px}
-  .adm-row>*{flex:1}
-  .adm-toggle{display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-weight:700}
-  .adm-toggle input{width:44px;height:26px;accent-color:var(--accent)}
-  .adm-msg{min-height:20px;font-size:13px;color:var(--text-dim);margin-top:10px;text-align:center}
-  .adm-scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .3s;z-index:60}
-  .adm-scrim.on{opacity:1;pointer-events:auto}
-  .adm-sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;overflow:auto;background:var(--surface-1);border-radius:24px 24px 0 0;padding:18px 18px calc(18px + var(--safe-bottom));transform:translateY(105%);transition:transform .38s cubic-bezier(.22,1,.36,1);z-index:70;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
-  .adm-sheet.on{transform:none}
-  .adm-sheet-title{font-size:18px;font-weight:800;margin-bottom:4px}
-  .adm-grant{font-size:12px;color:var(--text-mute)}
-  .adm-empty{text-align:center;color:var(--text-dim);padding:24px 0;font-size:14px}
-  .adm-gate{text-align:center;padding:60px 18px;color:var(--text-dim)}
-  .adm-link{display:block;text-align:center;margin-top:16px;color:var(--accent);font-weight:700;text-decoration:none}
-  .pre-chip{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.07);color:var(--pc,var(--text))}
+  :root{--bg:#09090B;--s1:#121216;--s2:#1a1a20;--s3:#25252d;--tx:#F4F4F5;--dim:#9A9AA6;--mute:#5E5E6A;--acc:#B6F24A;--bd:rgba(255,255,255,.08);--r:18px;--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+  button,input,select{font:inherit;color:inherit}
+  .app{position:fixed;inset:0;display:flex;flex-direction:column}
+  .top{flex:none;padding:calc(12px + var(--safe-t)) 16px 10px;display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-bottom:1px solid var(--bd)}
+  .title{font-size:20px;font-weight:800;letter-spacing:.01em}
+  .tag{font-size:10px;font-weight:900;letter-spacing:.08em;padding:4px 9px;border-radius:999px;background:var(--acc);color:#0A0A0B}
+  .game{font-size:13px;font-weight:700;color:var(--dim);text-decoration:none;padding:8px 12px;border-radius:12px;background:var(--s2)}
+  .main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 14px 18px}
+  .screen{display:none;animation:in .35s cubic-bezier(.22,1,.36,1) both}
+  .screen.on{display:block}
+  @keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .bottom{flex:none;display:flex;gap:6px;padding:8px 10px calc(8px + var(--safe-b));background:var(--s1);border-top:1px solid var(--bd)}
+  .tab{flex:1;border:0;background:none;color:var(--mute);padding:10px 4px;border-radius:14px;font-weight:700;font-size:12px;cursor:pointer;transition:color .2s,background .25s,transform .15s}
+  .tab.on{color:var(--acc);background:color-mix(in srgb,var(--acc) 13%,transparent)}
+  .tab:active{transform:scale(.95)}
+  .search{width:100%;padding:14px 16px;border-radius:var(--r);border:1px solid var(--bd);background:var(--s2);margin-bottom:12px;outline:none;transition:border-color .2s,box-shadow .2s}
+  .search:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 18%,transparent)}
+  .card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-radius:var(--r);background:var(--s2);border:1px solid var(--bd);margin-bottom:9px;cursor:pointer;animation:in .35s ease both;transition:transform .15s,border-color .2s}
+  .card:active{transform:scale(.98)} .card:hover{border-color:color-mix(in srgb,var(--acc) 40%,transparent)}
+  .av{width:44px;height:44px;flex:none;border-radius:14px;background:var(--s3);display:grid;place-items:center;font-weight:800;color:var(--dim);overflow:hidden}
+  .av img{width:100%;height:100%;object-fit:cover}
+  .info{min-width:0;flex:1}
+  .sub{font-size:12px;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nk{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%}
+  .nk-name{font-weight:800}
+  .nk-prefix{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:var(--pc,var(--tx));background:color-mix(in srgb,var(--pc,#fff) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pc,#fff) 40%,transparent)}
+  .vbadge{width:17px;height:17px;flex:none;display:inline-block}
+  .chev{color:var(--mute);font-size:20px}
+  .empty{text-align:center;color:var(--dim);padding:40px 10px;font-size:14px}
+  .lbl{font-size:12px;color:var(--dim);margin:14px 0 6px;font-weight:700}
+  .inp{width:100%;padding:13px 14px;border-radius:14px;border:1px solid var(--bd);background:var(--s2);outline:none;transition:border-color .2s,box-shadow .2s}
+  .inp:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 18%,transparent)}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  .btn{padding:14px;border-radius:14px;border:0;font-weight:800;cursor:pointer;transition:transform .15s,opacity .2s;background:var(--acc);color:#0A0A0B}
+  .btn:active{transform:scale(.97)} .btn.ghost{background:var(--s3);color:var(--tx)}
+  .btn:disabled{opacity:.5}
+  .sw{display:flex;justify-content:space-between;align-items:center;padding:14px 0;font-weight:700;border-bottom:1px solid var(--bd)}
+  .sw input{width:46px;height:28px;accent-color:var(--acc);cursor:pointer}
+  .msg{min-height:20px;font-size:13px;color:var(--dim);margin-top:12px;text-align:center}
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .3s;z-index:40}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;top:6vh;background:var(--s1);border-radius:26px 26px 0 0;display:flex;flex-direction:column;transform:translateY(104%);transition:transform .4s cubic-bezier(.22,1,.36,1);z-index:50;box-shadow:0 -14px 40px rgba(0,0,0,.55)}
+  .sheet.on{transform:none}
+  .sh-head{flex:none;padding:16px 18px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)}
+  .sh-title{font-size:18px;font-weight:800}
+  .sh-x{width:36px;height:36px;border-radius:12px;border:0;background:var(--s3);cursor:pointer;font-size:18px}
+  .sh-body{flex:1;overflow-y:auto;padding:14px 18px calc(18px + var(--safe-b));-webkit-overflow-scrolling:touch}
+  .hero{display:flex;align-items:center;gap:14px;padding:14px;border-radius:var(--r);background:var(--s2);border:1px solid var(--bd);margin-bottom:6px}
+  .hero .av{width:58px;height:58px;border-radius:18px}
+  .pill{display:inline-block;font-size:12px;color:var(--dim);margin-top:4px}
+  .pre-card{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:var(--r);background:var(--s2);border:1px solid var(--bd);margin-bottom:9px;cursor:pointer;animation:in .35s ease both}
+  .pre-card:active{transform:scale(.98)}
+  .off{opacity:.55}
+  .gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--dim)}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
-<div class="adm-page">
-  <div class="adm-head">
-    <div class="brand">Amgrader <span class="adm-badge">ADMIN</span></div>
-    <a class="adm-link" style="margin:0;font-size:13px" href="/">В игру →</a>
-  </div>
+<div class="app">
+  <header class="top">
+    <div class="row" style="align-items:center;flex:none"><span class="title">Amgrader</span><span class="tag">ADMIN</span></div>
+    <a class="game" href="/">В игру</a>
+  </header>
 
-  <div id="gate" class="adm-gate" style="display:none">Откройте админку внутри Telegram.</div>
+  <main class="main">
+    <section class="screen on" id="sUsers">
+      <input class="search" id="q" placeholder="Поиск: ник, ID или логин" oninput="onSearch()" autocomplete="off">
+      <div id="list"></div>
+      <div class="empty" id="listEmpty" style="display:none">Никого не нашли</div>
+      <div class="row" style="margin-top:6px"><button class="btn ghost" onclick="loadUsers(false)">Загрузить ещё</button></div>
+    </section>
 
-  <section class="adm-screen on" id="scrUsers">
-    <input class="adm-search" id="q" placeholder="Поиск по нику, ID или логину" oninput="onSearch()">
-    <div id="list"></div>
-    <button class="ghost-btn" style="width:100%;margin-top:6px" onclick="loadUsers(false)">Ещё</button>
-  </section>
+    <section class="screen" id="sPre">
+      <div id="preList"></div>
+      <div class="lbl" style="margin-top:18px">Префикс: создать или изменить</div>
+      <input type="hidden" id="pId">
+      <input class="inp" id="pText" maxlength="12" placeholder="Текст, например VIP">
+      <div class="row" style="margin-top:10px">
+        <div><div class="lbl" style="margin-top:0">Цвет</div><input class="inp" id="pColor" value="#B6F24A"></div>
+        <div><div class="lbl" style="margin-top:0">Цена, G</div><input class="inp" id="pPrice" type="number" min="0" value="0"></div>
+      </div>
+      <label class="sw" style="margin-top:12px"><span>Показывать в магазине</span><input id="pActive" type="checkbox" checked></label>
+      <div class="row" style="margin-top:14px"><button class="btn" onclick="savePrefix()">Сохранить</button><button class="btn ghost" onclick="clearPrefix()">Новый</button></div>
+      <div class="msg" id="pMsg"></div>
+    </section>
 
-  <section class="adm-screen" id="scrPre">
-    <div id="preList"></div>
-    <div class="pg-title" style="margin:18px 0 10px">Префикс</div>
-    <input type="hidden" id="pId">
-    <div class="adm-field">Текст (до 12 символов)</div>
-    <input class="adm-input" id="pText" maxlength="12" placeholder="VIP">
-    <div class="adm-row">
-      <div><div class="adm-field">Цвет</div><input class="adm-input" id="pColor" value="#B6F24A"></div>
-      <div><div class="adm-field">Цена, G</div><input class="adm-input" id="pPrice" type="number" min="0" value="0"></div>
-    </div>
-    <label class="adm-toggle"><span>Показывать в магазине</span><input id="pActive" type="checkbox" checked></label>
-    <div class="adm-row"><button class="primary-btn" onclick="savePrefix()">Сохранить</button><button class="ghost-btn" onclick="clearPrefix()">Новый</button></div>
-    <div class="adm-msg" id="pMsg"></div>
-  </section>
+    <section class="screen" id="sGrant">
+      <div class="lbl" style="margin-top:0">ID игрока или логин</div>
+      <input class="inp" id="gWho" placeholder="например 123456">
+      <div class="row" style="margin-top:10px">
+        <div><div class="lbl" style="margin-top:0">G</div><input class="inp" id="gG" type="number" min="0" value="0"></div>
+        <div><div class="lbl" style="margin-top:0">Прокрутки</div><input class="inp" id="gSpins" type="number" min="0" value="0"></div>
+      </div>
+      <button class="btn" style="width:100%;margin-top:18px" onclick="grant()">Выдать</button>
+      <div class="msg" id="gMsg"></div>
+    </section>
+  </main>
 
-  <section class="adm-screen" id="scrGrant">
-    <div class="pg-title" style="margin-bottom:10px">Выдать</div>
-    <div class="adm-field">Игрок: ID или логин</div>
-    <input class="adm-input" id="gWho" placeholder="123456 или login">
-    <div class="adm-row">
-      <div><div class="adm-field">G</div><input class="adm-input" id="gG" type="number" min="0" value="0"></div>
-      <div><div class="adm-field">Прокрутки</div><input class="adm-input" id="gSpins" type="number" min="0" value="0"></div>
-    </div>
-    <div class="adm-grant" style="margin-top:8px">Выдача пополняет баланс и запас прокруток.</div>
-    <button class="primary-btn" style="width:100%;margin-top:14px" onclick="grant()">Выдать</button>
-    <div class="adm-msg" id="gMsg"></div>
-  </section>
+  <nav class="bottom">
+    <button class="tab on" id="tUsers" onclick="show('users')">Игроки</button>
+    <button class="tab" id="tPre" onclick="show('pre')">Префиксы</button>
+    <button class="tab" id="tGrant" onclick="show('grant')">Выдать</button>
+  </nav>
 </div>
 
-<nav class="adm-tabs">
-  <button class="adm-tab on" id="tUsers" onclick="show('users')">Игроки</button>
-  <button class="adm-tab" id="tPre" onclick="show('pre')">Префиксы</button>
-  <button class="adm-tab" id="tGrant" onclick="show('grant')">Выдать</button>
-</nav>
-
-<div class="adm-scrim" id="scrim" onclick="closeSheet()"></div>
-<div class="adm-sheet" id="sheet"><div id="sheetBody"></div></div>
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sh-head"><span class="sh-title" id="shTitle">Игрок</span><button class="sh-x" onclick="closeSheet()">✕</button></div>
+  <div class="sh-body" id="shBody"></div>
+</div>
+<div class="gate" id="gate">Откройте админку внутри Telegram.</div>
 
 <script>
 const INIT = (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) || "";
-if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
-const VERIFIED = '<svg class="vbadge" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#4FEAFF"/><polyline points="29,50 47.8,68 81,32" fill="none" stroke="#FFFFFF" stroke-width="7.2"/></svg>';
+if (window.Telegram && Telegram.WebApp) { try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch (e) {} }
+
+/* Цвет акцента — как в игре (тема из localStorage), чтобы админка выглядела так же */
+(function applyTheme() {
+  const TH = { lime:"#B6F24A", blue:"#3A68B8", red:"#E5484D", orange:"#FF8A3D", yellow:"#F5C542", green:"#2FBF71",
+    cyan:"#2EC4D6", violet:"#8B5CF6", pink:"#F2619B", white:"#E8E8EC", graphite:"#6B7280", brown:"#A86B3C" };
+  let v = "lime";
+  try { v = localStorage.getItem("amg_theme") || "lime"; } catch (e) {}
+  let acc = TH[v] || (/^#[0-9a-f]{6}$/i.test(v) ? v : null);
+  if (!acc && v.startsWith("c")) {
+    try { const c = (JSON.parse(localStorage.getItem("amg_theme_custom") || "[]")).find(x => x.id === v); if (c) acc = c.color; } catch (e) {}
+  }
+  if (acc) document.documentElement.style.setProperty("--acc", acc);
+})();
+
+const VERIFIED = '<svg class="vbadge" viewBox="0 0 100 100" aria-label="Верифицирован"><circle cx="50" cy="50" r="50" fill="#4FEAFF"/><polyline points="29,50 47.8,68 81,32" fill="none" stroke="#FFFFFF" stroke-width="7.2"/></svg>';
 let offset = 0, qv = "", prefixes = [], cur = null, st = null;
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
@@ -125,81 +146,100 @@ async function api(path, opts = {}) {
   if (!r.ok) throw new Error(j.detail || "Ошибка");
   return j;
 }
-function nk(u){
-  const s=u.style||{}; const pre=s.prefix?`<span class="nk-prefix" style="--pc:${esc(s.prefix.color)}">${esc(s.prefix.text)}</span>`:"";
-  const col=s.nameColor?` style="color:${esc(s.nameColor)}"`:"";
-  return `<span class="nk">${pre}<span class="nk-name"${col}>${esc(u.nickname||"Игрок")}</span>${u.verified?VERIFIED:""}</span>`;
+function nk(u, pre){
+  const p = u.prefix || null;
+  const pr = p ? `<span class="nk-prefix" style="--pc:${esc(p.color)}">${esc(p.text)}</span>` : "";
+  const col = u.nameColor ? ` style="color:${esc(u.nameColor)}"` : "";
+  return `<span class="nk">${pr}<span class="nk-name"${col}>${esc(u.nickname || "Игрок")}</span>${u.verified ? VERIFIED : ""}</span>`;
 }
+function initials(n){ return esc((n || "?").trim().charAt(0).toUpperCase()); }
+
 function show(which){
-  ["users","pre","grant"].forEach(k=>{
-    document.getElementById(k==="users"?"scrUsers":k==="pre"?"scrPre":"scrGrant").classList.toggle("on",k===which);
-    document.getElementById("t"+(k==="users"?"Users":k==="pre"?"Pre":"Grant")).classList.toggle("on",k===which);
-  });
-  if(which==="pre") loadPrefixes();
+  const map = { users: ["sUsers","tUsers"], pre: ["sPre","tPre"], grant: ["sGrant","tGrant"] }[which];
+  Object.values({users:0,pre:0,grant:0}) ;
+  ["sUsers","sPre","sGrant"].forEach(id => document.getElementById(id).classList.toggle("on", id === map[0]));
+  ["tUsers","tPre","tGrant"].forEach(id => document.getElementById(id).classList.toggle("on", id === map[1]));
+  document.querySelector(".main").scrollTop = 0;
+  if (which === "pre") loadPrefixes();
 }
-function onSearch(){ clearTimeout(st); st=setTimeout(()=>{ qv=document.getElementById("q").value.trim(); offset=0; loadUsers(true); },300); }
+function onSearch(){ clearTimeout(st); st = setTimeout(() => { qv = document.getElementById("q").value.trim(); offset = 0; loadUsers(true); }, 280); }
 async function loadUsers(reset){
-  const box=document.getElementById("list");
-  try{
-    const rows=await api(`/api/admin/users?q=${encodeURIComponent(qv)}&offset=${offset}`);
-    if(reset) box.innerHTML="";
-    if(reset&&!rows.length) box.innerHTML='<div class="adm-empty">Никого не нашли</div>';
-    rows.forEach((u,i)=>{
-      const d=document.createElement("div"); d.className="adm-card"; d.style.animationDelay=(i*0.03)+"s";
-      d.innerHTML=`<div style="min-width:0"><div>${nk({nickname:u.nickname,verified:u.verified,style:{nameColor:u.nameColor,prefix:u.prefix}})}</div><div class="adm-sub">ID ${esc(u.publicId)} · ${esc(u.login||"")} · ${u.balance} G</div></div><span style="color:var(--text-mute)">›</span>`;
-      d.onclick=()=>openUser(u); box.appendChild(d);
+  const box = document.getElementById("list"), empty = document.getElementById("listEmpty");
+  try {
+    const rows = await api(`/api/admin/users?q=${encodeURIComponent(qv)}&offset=${offset}`);
+    if (reset) box.innerHTML = "";
+    rows.forEach((u, i) => {
+      const d = document.createElement("div");
+      d.className = "card"; d.style.animationDelay = (i * 0.035) + "s";
+      d.innerHTML = `<div class="av">${initials(u.nickname)}</div>
+        <div class="info">${nk({ nickname: u.nickname, verified: u.verified, nameColor: u.nameColor, prefix: u.prefix })}
+        <div class="sub">ID ${esc(u.publicId)} · ${esc(u.login || "—")} · ${u.balance} G</div></div><span class="chev">›</span>`;
+      d.onclick = () => openUser(u); box.appendChild(d);
     });
-    offset+=rows.length;
-  }catch(e){ if(reset) box.innerHTML=`<div class="adm-empty">${esc(e.message)}</div>`; }
+    offset += rows.length;
+    empty.style.display = (reset && !rows.length) ? "block" : "none";
+  } catch (e) { if (reset) { box.innerHTML = ""; empty.style.display = "block"; empty.textContent = e.message; } }
 }
+
 function openUser(u){
-  cur=u;
-  const opts=prefixes.map(p=>`<option value="${p.id}" ${u.prefixId===p.id?"selected":""}>${esc(p.text)} · ${p.price} G</option>`).join("");
-  document.getElementById("sheetBody").innerHTML=`
-    <div class="adm-sheet-title">${esc(u.nickname||"Игрок")}</div>
-    <div class="adm-sub">ID ${esc(u.publicId)} · ${esc(u.login||"")}</div>
-    <label class="adm-toggle"><span>Верифицирован</span><input id="uVer" type="checkbox" ${u.verified?"checked":""}></label>
-    <div class="adm-field">Цвет ника (#RRGGBB, пусто — обычный)</div>
-    <input class="adm-input" id="uColor" value="${esc(u.nameColor||"")}" placeholder="#4FEAFF">
-    <div class="adm-field">Префикс</div>
-    <select class="adm-input" id="uPre"><option value="">Без префикса</option>${opts}</select>
-    <div class="adm-row" style="margin-top:14px"><button class="primary-btn" onclick="saveUser()">Сохранить</button><button class="ghost-btn" onclick="closeSheet()">Закрыть</button></div>
-    <div class="adm-msg" id="uMsg"></div>`;
+  cur = u;
+  document.getElementById("shTitle").textContent = "Игрок";
+  const opts = prefixes.map(p => `<option value="${p.id}" ${u.prefixId === p.id ? "selected" : ""}>${esc(p.text)} · ${p.price} G</option>`).join("");
+  document.getElementById("shBody").innerHTML = `
+    <div class="hero"><div class="av">${initials(u.nickname)}</div>
+      <div class="info">${nk(u)}<span class="pill">ID ${esc(u.publicId)} · ${esc(u.login || "—")}</span></div></div>
+    <label class="sw"><span>Верифицирован</span><input id="uVer" type="checkbox" ${u.verified ? "checked" : ""}></label>
+    <div class="lbl">Цвет ника (#RRGGBB, пусто — обычный)</div>
+    <input class="inp" id="uColor" value="${esc(u.nameColor || "")}" placeholder="#4FEAFF">
+    <div class="lbl">Префикс</div>
+    <select class="inp" id="uPre"><option value="">Без префикса</option>${opts}</select>
+    <div class="row" style="margin-top:18px"><button class="btn" onclick="saveUser()">Сохранить</button><button class="btn ghost" onclick="closeSheet()">Закрыть</button></div>
+    <div class="msg" id="uMsg"></div>`;
   openSheet();
 }
 async function saveUser(){
-  const body={verified:document.getElementById("uVer").checked,nameColor:document.getElementById("uColor").value.trim()||null,prefixId:Number(document.getElementById("uPre").value)||null};
-  try{ await api(`/api/admin/user/${encodeURIComponent(cur.publicId)}`,{method:"POST",body}); document.getElementById("uMsg").textContent="Сохранено ✓"; offset=0; loadUsers(true); }
-  catch(e){ document.getElementById("uMsg").textContent=e.message; }
+  const body = { verified: document.getElementById("uVer").checked,
+    nameColor: document.getElementById("uColor").value.trim() || null,
+    prefixId: Number(document.getElementById("uPre").value) || null };
+  const msg = document.getElementById("uMsg");
+  try { await api(`/api/admin/user/${encodeURIComponent(cur.publicId)}`, { method: "POST", body }); msg.textContent = "Сохранено ✓"; offset = 0; loadUsers(true); }
+  catch (e) { msg.textContent = e.message; }
 }
 function openSheet(){ document.getElementById("sheet").classList.add("on"); document.getElementById("scrim").classList.add("on"); }
 function closeSheet(){ document.getElementById("sheet").classList.remove("on"); document.getElementById("scrim").classList.remove("on"); }
 
 async function loadPrefixes(){
-  const box=document.getElementById("preList");
-  try{
-    prefixes=await api("/api/admin/prefixes");
-    box.innerHTML=prefixes.map(p=>`<div class="adm-card" onclick='editPrefix(${JSON.stringify(p).replace(/'/g,"&#39;")})'><div><span class="nk-prefix" style="--pc:${esc(p.color)}">${esc(p.text)}</span> <span class="adm-sub">${p.price} G${p.active?"":" · скрыт"}</span></div><span style="color:var(--text-mute)">›</span></div>`).join("")||'<div class="adm-empty">Префиксов пока нет</div>';
-  }catch(e){ box.innerHTML=`<div class="adm-empty">${esc(e.message)}</div>`; }
+  const box = document.getElementById("preList");
+  try {
+    prefixes = await api("/api/admin/prefixes");
+    box.innerHTML = prefixes.map((p, i) => `<div class="pre-card ${p.active ? "" : "off"}" style="animation-delay:${i * 0.04}s" onclick='editPrefix(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+        <span class="nk-prefix" style="--pc:${esc(p.color)}">${esc(p.text)}</span>
+        <span class="sub" style="margin:0">${p.price} G${p.active ? "" : " · скрыт"}</span></div>`).join("") || '<div class="empty">Префиксов пока нет</div>';
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 function editPrefix(p){
-  document.getElementById("pId").value=p.id; document.getElementById("pText").value=p.text;
-  document.getElementById("pColor").value=p.color; document.getElementById("pPrice").value=p.price;
-  document.getElementById("pActive").checked=p.active; document.getElementById("pMsg").textContent="";
+  document.getElementById("pId").value = p.id; document.getElementById("pText").value = p.text;
+  document.getElementById("pColor").value = p.color; document.getElementById("pPrice").value = p.price;
+  document.getElementById("pActive").checked = p.active; document.getElementById("pMsg").textContent = "";
+  document.querySelector(".main").scrollTop = 0;
 }
-function clearPrefix(){ editPrefix({id:"",text:"",color:"#B6F24A",price:0,active:true}); }
+function clearPrefix(){ editPrefix({ id: "", text: "", color: "#B6F24A", price: 0, active: true }); }
 async function savePrefix(){
-  const body={id:document.getElementById("pId").value||null,text:document.getElementById("pText").value.trim(),color:document.getElementById("pColor").value.trim(),price:Number(document.getElementById("pPrice").value||0),active:document.getElementById("pActive").checked};
-  try{ await api("/api/admin/prefixes",{method:"POST",body}); document.getElementById("pMsg").textContent="Сохранено ✓"; clearPrefix(); loadPrefixes(); }
-  catch(e){ document.getElementById("pMsg").textContent=e.message; }
+  const body = { id: document.getElementById("pId").value || null, text: document.getElementById("pText").value.trim(),
+    color: document.getElementById("pColor").value.trim(), price: Number(document.getElementById("pPrice").value || 0),
+    active: document.getElementById("pActive").checked };
+  const msg = document.getElementById("pMsg");
+  try { await api("/api/admin/prefixes", { method: "POST", body }); msg.textContent = "Сохранено ✓"; clearPrefix(); loadPrefixes(); }
+  catch (e) { msg.textContent = e.message; }
 }
 async function grant(){
-  const body={who:document.getElementById("gWho").value.trim(),g:Number(document.getElementById("gG").value||0),spins:Number(document.getElementById("gSpins").value||0)};
-  try{ const r=await api("/api/admin/grant",{method:"POST",body}); document.getElementById("gMsg").textContent=`Готово: ${r.nickname} — G +${r.g}, прокруток +${r.spins}`; }
-  catch(e){ document.getElementById("gMsg").textContent=e.message; }
+  const body = { who: document.getElementById("gWho").value.trim(), g: Number(document.getElementById("gG").value || 0), spins: Number(document.getElementById("gSpins").value || 0) };
+  const msg = document.getElementById("gMsg");
+  try { const r = await api("/api/admin/grant", { method: "POST", body }); msg.textContent = `Готово: ${r.nickname} — G +${r.g}, прокруток +${r.spins}`; }
+  catch (e) { msg.textContent = e.message; }
 }
 
-if(!INIT){ document.getElementById("gate").style.display="block"; document.getElementById("scrUsers").style.display="none"; }
+if (!INIT) { document.getElementById("gate").style.display = "flex"; document.querySelector(".app").style.display = "none"; }
 else { loadUsers(true); loadPrefixes(); }
 </script>
 </body></html>
