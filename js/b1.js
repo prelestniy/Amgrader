@@ -198,20 +198,20 @@ async function telegramLoginRequest() {
 }
 async function loginWithTelegram() {
   const tg = tgApp();
-  if (!tg || !tg.initData) { showAuthError("Откройте Amgrader внутри Telegram, чтобы войти через него"); return; }
+  if (!tg || !tg.initData) { webLoginStart(); return; }
   try { await telegramLoginRequest(); closeAuth(); renderAll(); renderProfile(); pulseBalance(); }
   catch (e) { showAuthError(e.message); }
 }
 
 async function logoutAccount() {
   if (!isLoggedIn()) return;
-  if (!confirm("Выйти из аккаунта? Прогресс сохранён на сервере и ждёт вас при следующем входе.")) return;
+  if (!(await askConfirm("Выйти из аккаунта? Прогресс сохранён на сервере и ждёт вас при следующем входе."))) return;
   saveGame(); setToken(""); state.profile = null; resetGuestState();
   showScreen("profile"); renderAll(); renderProfile();
 }
 async function resetProfile() {
   if (!isLoggedIn()) { openAuth(); return; }
-  if (!confirm("Удалить аккаунт и весь прогресс безвозвратно?")) return;
+  if (!(await askConfirm("Удалить аккаунт и весь прогресс безвозвратно?"))) return;
   try { await api("/api/me", { method: "DELETE" }); } catch (e) { alert(e.message); return; }
   setToken(""); location.reload();
 }
