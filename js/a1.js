@@ -81,7 +81,7 @@ const MEMES = [
   { id: 73, name: "Маленький Вкусненький Малышочек", nameEn: "", rarity: "eldovaya", price: 240000, video: "маленький_вкусненький_малышочек.mp4" },
   { id: 74, name: "День 6", nameEn: "", rarity: "eldovaya", price: 258000, video: "день_6.mp4" },
   { id: 75, name: "Да Иди Нафиг Всмысле", nameEn: "", rarity: "eldovaya", price: 276000, video: "да_иди_нафиг_всмысле.mp4" },
-  { id: 76, name: "Ты Че Сука", nameEn: "", rarity: "eldovaya", price: 294000, video: "ты_че_сука.mp4" },
+  { id: 76, name: "Ты Что Сука", nameEn: "", rarity: "eldovaya", price: 294000, video: "ты_че_сука.mp4" },
   { id: 77, name: "Какой Универ Ты Закончила", nameEn: "", rarity: "eldovaya", price: 312000, video: "какой_univer_ты_закончила.MP4" },
   { id: 78, name: "Дай Лапу", nameEn: "", rarity: "eldovaya", price: 330000, video: "дай_лапу.MP4" },
   { id: 79, name: "Сливы Пж 2 Штуки", nameEn: "", rarity: "eldovaya", price: 348000, video: "сливы_пж_2_штуки.MP4" },
@@ -90,13 +90,13 @@ const MEMES = [
   { id: 82, name: "Сморкается", nameEn: "", rarity: "eldovaya", price: 402000, video: "сморкается.mp4" },
   { id: 83, name: "Ну Ты Серьезно", nameEn: "", rarity: "sasnaya", price: 450000, video: "ну_ты_серьезно.mp4" },
   { id: 84, name: "Кушает И Танцует", nameEn: "", rarity: "sasnaya", price: 486000, video: "кушает_и_танцует.mp4" },
-  { id: 85, name: "Монитор", nameEn: "", rarity: "sasnaya", price: 522000, video: "-монитор.mp4" },
+  { id: 85, name: "-Монитор", nameEn: "", rarity: "sasnaya", price: 522000, video: "-монитор.mp4" },
   { id: 86, name: "Пьет Водицу", nameEn: "", rarity: "sasnaya", price: 558000, video: "пьет_водицу.mp4" },
   { id: 87, name: "Все Отлично", nameEn: "", rarity: "sasnaya", price: 594000, video: "все_отлично.mp4" },
   { id: 88, name: "Я Мама Птица", nameEn: "", rarity: "sasnaya", price: 630000, video: "я_мама_птица.MP4" },
   { id: 89, name: "Что Ты Несешь", nameEn: "", rarity: "sasnaya", price: 666000, video: "что_ты_несешь.mp4" },
   { id: 90, name: "Ты Как Мама Птица", nameEn: "", rarity: "sasnaya", price: 702000, video: "ты_как_мама_птица.mp4" },
-  { id: 91, name: "И Че Ничо", nameEn: "", rarity: "sasnaya", price: 738000, video: "и_че,_ничо.MP4" },
+  { id: 91, name: "И Че, Ничо", nameEn: "", rarity: "sasnaya", price: 738000, video: "и_че,_ничо.MP4" },
   { id: 92, name: "Завтра", nameEn: "", rarity: "sasnaya", price: 774000, video: "завтра.mp4" },
   { id: 93, name: "Есть", nameEn: "", rarity: "sasnaya", price: 810000, video: "есть.mp4" },
   { id: 94, name: "Я Помылся", nameEn: "", rarity: "sasnaya", price: 846000, video: "я_помылся.mp4" },
@@ -116,20 +116,20 @@ const MEMES = [
   { id: 108, name: "Учись", nameEn: "", rarity: "rubinovaya", price: 1825000, video: "учись.mp4" },
   { id: 109, name: "Моё Тело Моё Дело", nameEn: "", rarity: "rubinovaya", price: 1900000, video: "моё_тело_моё_дело.MP4" },
   { id: 110, name: "Причина Тряски", nameEn: "", rarity: "rubinovaya", price: 1975000, video: "причина_тряски.mp4" },
-  { id: 111, name: "Он Ебать Красавчик", nameEn: "", rarity: "kratnost", price: 2500000, video: "он_ебать_красавчик.mp4" },
-  { id: 112, name: "Разминается", nameEn: "", rarity: "kratnost", price: 2700000, video: "разминается.mp4" },
-  { id: 113, name: "На Лодочке", nameEn: "", rarity: "kratnost", price: 2900000, video: "на_лодочке.mp4" },
-  { id: 114, name: "Я Гей", nameEn: "", rarity: "kratnost", price: 3100000, video: "я_гей.mp4" },
-  { id: 115, name: "Злость", nameEn: "", rarity: "kratnost", price: 3300000, video: "злость.mp4" },
-  { id: 116, name: "Ест Шаурму", nameEn: "", rarity: "kratnost", price: 3500000, video: "ест_шаурму.MP4" },
-  { id: 117, name: "Крушимость", nameEn: "", rarity: "kratnost", price: 3700000, video: "крушимость.mp4" },
-  { id: 118, name: "Бурмалда Или Говнолда", nameEn: "", rarity: "kratnost", price: 3900000, video: "бурмалда_или_говнолда.mp4" },
-  { id: 119, name: "Смешно Пошутил", nameEn: "", rarity: "kratnost", price: 4100000, video: "смешно_пошутил.mp4" },
-  { id: 120, name: "Куда Ты Переехал", nameEn: "", rarity: "kratnost", price: 4300000, video: "куда_ты_переехал.mp4" },
-  { id: 121, name: "Пойду Руки Вытру", nameEn: "", rarity: "kratnost", price: 4500000, video: "пойду_руки_вытру.mp4" },
-  { id: 122, name: "Да Пошла Нафиг Дура", nameEn: "", rarity: "kratnost", price: 4700000, video: "Да_пошла_нафиг_дура.MP4" },
-  { id: 123, name: "Я Помытый", nameEn: "", rarity: "kratnost", price: 4900000, video: "Я_помытый.mp4" },
-  { id: 124, name: "Это Реальный Рофл", nameEn: "", rarity: "kratnost", price: 5100000, video: "Это_реальный_рофл.MP4" },
+  { id: 111, name: "Он Ебать Красавчик", nameEn: "", rarity: "krasnost", price: 2500000, video: "он_ебать_красавчик.mp4" },
+  { id: 112, name: "Разминается", nameEn: "", rarity: "krasnost", price: 2700000, video: "разминается.mp4" },
+  { id: 113, name: "На Лодочке", nameEn: "", rarity: "krasnost", price: 2900000, video: "на_лодочке.mp4" },
+  { id: 114, name: "Я Гей", nameEn: "", rarity: "krasnost", price: 3100000, video: "я_гей.mp4" },
+  { id: 115, name: "Злость", nameEn: "", rarity: "krasnost", price: 3300000, video: "злость.mp4" },
+  { id: 116, name: "Ест Шаурму", nameEn: "", rarity: "krasnost", price: 3500000, video: "ест_шаурму.MP4" },
+  { id: 117, name: "Крушимость", nameEn: "", rarity: "krasnost", price: 3700000, video: "крушимость.mp4" },
+  { id: 118, name: "Бурмалда Или Говнолда", nameEn: "", rarity: "krasnost", price: 3900000, video: "бурмалда_или_говнолда.mp4" },
+  { id: 119, name: "Смешно Пошутил", nameEn: "", rarity: "krasnost", price: 4100000, video: "смешно_пошутил.mp4" },
+  { id: 120, name: "Куда Ты Переехал", nameEn: "", rarity: "krasnost", price: 4300000, video: "куда_ты_переехал.mp4" },
+  { id: 121, name: "Пойду Руки Вытру", nameEn: "", rarity: "krasnost", price: 4500000, video: "пойду_руки_вытру.mp4" },
+  { id: 122, name: "Да Пошла Нафиг Дура", nameEn: "", rarity: "krasnost", price: 4700000, video: "Да_пошла_нафиг_дура.MP4" },
+  { id: 123, name: "Я Помытый", nameEn: "", rarity: "krasnost", price: 4900000, video: "Я_помытый.mp4" },
+  { id: 124, name: "Это Реальный Рофл", nameEn: "", rarity: "krasnost", price: 5100000, video: "Это_реальный_рофл.MP4" },
 ];
 
 /* ============================================================
@@ -157,7 +157,7 @@ function getRarityHex(rarity) {
     case "eldovaya":  return "#FF6F91";
     case "sasnaya":   return "#F5D547";
     case "rubinovaya":return "#E0115F";
-    case "kratnost":  return "#8B5CF6";
+    case "krasnost":  return "#FF0000";
     default:          return "#6B6B75";
   }
 }
