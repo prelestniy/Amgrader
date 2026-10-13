@@ -257,9 +257,19 @@ function copyMyId() {
 }
 
 /* ---------- редактирование своего профиля ---------- */
-function openEditProfile() {
+async function openEditProfile() {
   if (!isLoggedIn()) { openAuth("Войдите, чтобы редактировать профиль"); return; }
   const p = state.profile;
+  let shop = null;
+  try { shop = await api("/api/shop"); } catch (e) {}
+  const owned = shop ? shop.items.filter(x => x.owned) : [];
+  const cur = shop ? shop.equipped : null;
+  const prefBlock = owned.length
+    ? `<div class="reg-field"><label>Префикс</label><div class="ep-prefix-list" id="epPrefixList" data-cur="${cur == null ? "" : cur}">`
+      + `<button type="button" class="ep-pref${cur == null ? " on" : ""}" data-id="" onclick="pickEpPrefix(this)">Без префикса</button>`
+      + owned.map(x => `<button type="button" class="ep-pref${cur === x.id ? " on" : ""}" data-id="${x.id}" onclick="pickEpPrefix(this)"><span class="nk-prefix" style="--pc:${esc(x.color)}">${esc(x.text)}</span></button>`).join("")
+      + `</div></div>`
+    : `<div class="misc-hint">Купите префикс в разделе «Префиксы», и он появится здесь.</div>`;
   const pwBlock = p.hasPassword
     ? `<div class="reg-field"><label>Текущий пароль (нужен, чтобы сменить логин или пароль)</label><input id="epCurPw" type="password" maxlength="64" autocomplete="current-password"></div>`
     : `<div class="misc-hint">Задайте логин и пароль — тогда можно будет входить не только через Telegram.</div>`;
@@ -274,6 +284,7 @@ function openEditProfile() {
         <input id="epAbout" type="text" maxlength="20" value="${esc(p.about || "")}" placeholder="Например, коллекционер" autocomplete="off"></div>
       <div class="reg-field"><label>Логин</label>
         <input id="epLogin" type="text" maxlength="32" value="${esc(p.login || "")}" placeholder="Придумайте логин" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+      ${prefBlock}
       ${pwBlock}
       <div class="reg-field"><label>${p.hasPassword ? "Новый пароль (если нужно сменить)" : "Пароль"}</label>
         <input id="epNewPw" type="password" maxlength="64" autocomplete="new-password"></div>
@@ -311,6 +322,11 @@ async function saveProfile() {
   const login = gid("epLogin").value.trim().toLowerCase();
   const newPw = gid("epNewPw").value;
   const curEl = gid("epCurPw"), curPw = curEl ? curEl.value : "";
+  const pl = gid("epPrefixList");
+  const curPid = pl ? (pl.dataset.cur === "" ? null : Number(pl.dataset.cur)) : undefined;
+  const selBtn = pl ? pl.querySelector(".ep-pref.on") : null;
+  const newPid = selBtn ? (selBtn.dataset.id === "" ? null : Number(selBtn.dataset.id)) : undefined;
+  const prefChanged = pl && newPid !== curPid;
   const loginChanged = !!login && login !== (p.login || "");
   if (about.length > 20) return miscMsg("«О себе»: не больше 20 символов");
   if (loginChanged && login.length < 3) return miscMsg("Логин слишком короткий");
@@ -321,9 +337,14 @@ async function saveProfile() {
     if (about !== (p.about || "")) applyProfileFields(await api("/api/me/profile", { method: "POST", body: { about } }));
     if (loginChanged || newPw) applyProfileFields(await api("/api/me/credentials", { method: "POST",
       body: { login: loginChanged ? login : undefined, new_password: newPw || undefined, current_password: curPw || undefined } }));
+    if (prefChanged) { await api("/api/shop/equip", { method: "POST", body: { id: newPid } }); await refreshMeFromServer(); }
     closeMisc();
     notify("win", "Профиль сохранён", "Изменения применены", "OK", OK_ITEM);
   } catch (e) { btn.disabled = false; miscMsg(e.message); }
+}
+
+function pickEpPrefix(btn) {
+  document.querySelectorAll("#epPrefixList .ep-pref").forEach(b => b.classList.toggle("on", b === btn));
 }
 
 /* ---------- поиск игрока по ID ---------- */
