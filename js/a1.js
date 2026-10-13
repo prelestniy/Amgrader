@@ -81,7 +81,7 @@ const MEMES = [
   { id: 73, name: "Маленький Вкусненький Малышочек", nameEn: "", rarity: "eldovaya", price: 240000, video: "маленький_вкусненький_малышочек.mp4" },
   { id: 74, name: "День 6", nameEn: "", rarity: "eldovaya", price: 258000, video: "день_6.mp4" },
   { id: 75, name: "Да Иди Нафиг Всмысле", nameEn: "", rarity: "eldovaya", price: 276000, video: "да_иди_нафиг_всмысле.mp4" },
-  { id: 76, name: "Ты Что Сука", nameEn: "", rarity: "eldovaya", price: 294000, video: "ты_че_сука.mp4" },
+  { id: 76, name: "Ты Че Сука", nameEn: "", rarity: "eldovaya", price: 294000, video: "ты_че_сука.mp4" },
   { id: 77, name: "Какой Универ Ты Закончила", nameEn: "", rarity: "eldovaya", price: 312000, video: "какой_univer_ты_закончила.MP4" },
   { id: 78, name: "Дай Лапу", nameEn: "", rarity: "eldovaya", price: 330000, video: "дай_лапу.MP4" },
   { id: 79, name: "Сливы Пж 2 Штуки", nameEn: "", rarity: "eldovaya", price: 348000, video: "сливы_пж_2_штуки.MP4" },
