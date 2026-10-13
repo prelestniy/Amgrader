@@ -187,6 +187,14 @@ async function resetProfile() {
   location.reload();
 }
 
+/* ник в топе: без префикса, перенос по словам, чтобы весь ник влезал */
+function topNickHTML(u) {
+  const s = (u && u.style) || {};
+  const col = s.nameColor ? ` style="color:${esc(s.nameColor)}"` : "";
+  const badge = s.verified ? VERIFIED_BADGE : "";
+  return `<span class="nk nk-top"><span class="nk-name"${col}>${esc((u && u.nickname) || "Игрок")}</span>${badge}</span>`;
+}
+
 function renderProfile() {
   const p = state.profile || {};
   const loggedIn = isLoggedIn();
@@ -324,7 +332,7 @@ function renderTopBalanceSlider() {
     return `<div class="top-card ${u.me ? "me" : ""} ${rank <= 3 ? "top" + rank : ""}" onclick="openTopUser(${i})" role="button">` +
       `<div class="top-rank">#${rank}${u.me ? " · вы" : ""}</div>` +
       `<div class="top-av">${av}</div>` +
-      `<div class="top-nick">${nickHTML(u.raw || u)}</div>` +
+      `<div class="top-nick">${topNickHTML(u.raw || u)}</div>` +
       `<div class="top-bal">${fmt(u.balance)}</div>` +
       `</div>`;
   }).join("");
