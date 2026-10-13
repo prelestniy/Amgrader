@@ -99,10 +99,9 @@ def equip(uid, pid):
 # ---------- для админа ----------
 def _find_user(conn, who):
     who = (who or "").strip()
-    if who.isdigit():
-        r = conn.execute("SELECT * FROM users WHERE public_id=?", (who,)).fetchone()
-        if r:
-            return r
+    r = conn.execute("SELECT * FROM users WHERE public_id=? COLLATE NOCASE", (who,)).fetchone()
+    if r:
+        return r
     r = conn.execute("SELECT * FROM users WHERE LOWER(login)=?", (who.lower(),)).fetchone()
     if r is None:
         raise HTTPException(404, "Игрок не найден")
@@ -113,7 +112,7 @@ def admin_users(q, offset):
     q = (q or "").strip()
     like = f"%{q}%"
     with closing(_db()) as conn:
-        rows = conn.execute("""SELECT id, public_id, nickname, login, balance, verified, name_color, prefix_id
+        rows = conn.execute("""SELECT id, public_id, nickname, login, balance, verified, name_color, prefix_id, photo
             FROM users WHERE (?='' OR public_id LIKE ? OR nickname LIKE ? OR login LIKE ?)
             ORDER BY id DESC LIMIT 30 OFFSET ?""", (q, like, like, like, max(0, offset))).fetchall()
     with closing(_db()) as conn:
@@ -121,7 +120,7 @@ def admin_users(q, offset):
         for r in rows:
             out.append({"id": r["id"], "publicId": r["public_id"], "nickname": r["nickname"], "login": r["login"],
                         "balance": r["balance"] or 0, "verified": bool(r["verified"]), "nameColor": r["name_color"],
-                        "prefixId": r["prefix_id"], "prefix": _prefix(conn, r["prefix_id"])})
+                        "prefixId": r["prefix_id"], "photo": r["photo"], "prefix": _prefix(conn, r["prefix_id"])})
     return out
 
 
@@ -167,7 +166,20 @@ def admin_prefixes():
             for r in rows]
 
 
+def admin_prefix_delete(pid):
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        for u in conn.execute("SELECT id, owned_prefixes FROM users").fetchall():
+            owned = [x for x in json.loads(u["owned_prefixes"] or "[]") if x != pid]
+            conn.execute("UPDATE users SET owned_prefixes=?, prefix_id=CASE WHEN prefix_id=? THEN NULL ELSE prefix_id END WHERE id=?",
+                         (json.dumps(owned), pid, u["id"]))
+        conn.execute("DELETE FROM prefixes WHERE id=?", (pid,))
+    return {"ok": True}
+
+
 def admin_prefix_save(body):
+    if body.get("delete") and body.get("id"):
+        return admin_prefix_delete(int(body["id"]))
     text = (body.get("text") or "").strip()
     color = body.get("color") or "#B6F24A"
     price = int(body.get("price") or 0)
