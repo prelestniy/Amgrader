@@ -145,7 +145,7 @@ function submitAuth() {
 
 function loginWithTelegram() {
   const tgProfile = tryTelegramAuth();
-  if (!tgProfile) { showAuthError("Откройте Amgrader внутри Telegram, чтобы войти через него"); return; }
+  if (!tgProfile) { webLoginStart(); return; }
   const accounts = getAccounts();
   const key = "tg_" + tgProfile.id;
   let acc = accounts[key];
@@ -163,9 +163,9 @@ function loginWithTelegram() {
   pulseBalance();
 }
 
-function logoutAccount() {
+async function logoutAccount() {
   if (!isLoggedIn()) return;
-  if (!confirm("Выйти из аккаунта? Прогресс сохранится и будет ждать вас при следующем входе.")) return;
+  if (!(await askConfirm("Выйти из аккаунта? Прогресс сохранится и будет ждать вас при следующем входе."))) return;
   saveGame();
   saveSession(null);
   state.profile = null;
@@ -175,9 +175,9 @@ function logoutAccount() {
   renderProfile();
 }
 
-function resetProfile() {
+async function resetProfile() {
   if (!isLoggedIn()) { openAuth(); return; }
-  if (!confirm("Удалить аккаунт и весь прогресс безвозвратно?")) return;
+  if (!(await askConfirm("Удалить аккаунт и весь прогресс безвозвратно?"))) return;
   try {
     const accounts = getAccounts();
     delete accounts[state.profile.accountKey];
