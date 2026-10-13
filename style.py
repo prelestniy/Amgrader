@@ -116,9 +116,13 @@ def admin_users(q, offset):
         rows = conn.execute("""SELECT id, public_id, nickname, login, balance, verified, name_color, prefix_id
             FROM users WHERE (?='' OR public_id LIKE ? OR nickname LIKE ? OR login LIKE ?)
             ORDER BY id DESC LIMIT 30 OFFSET ?""", (q, like, like, like, max(0, offset))).fetchall()
-    return [{"id": r["id"], "publicId": r["public_id"], "nickname": r["nickname"], "login": r["login"],
-             "balance": r["balance"] or 0, "verified": bool(r["verified"]), "nameColor": r["name_color"],
-             "prefixId": r["prefix_id"]} for r in rows]
+    with closing(_db()) as conn:
+        out = []
+        for r in rows:
+            out.append({"id": r["id"], "publicId": r["public_id"], "nickname": r["nickname"], "login": r["login"],
+                        "balance": r["balance"] or 0, "verified": bool(r["verified"]), "nameColor": r["name_color"],
+                        "prefixId": r["prefix_id"], "prefix": _prefix(conn, r["prefix_id"])})
+    return out
 
 
 def admin_user_update(who, body):
@@ -189,3 +193,13 @@ def players(q, offset):
             out.append({"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок",
                         "photo": r["photo"], "style": style_fields(r)})
     return out
+
+
+def admin_grant_g(who, amount):
+    if not 1 <= amount <= 10**12:
+        raise HTTPException(400, "Сумма G: от 1 до 10^12")
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        u = _find_user(conn, who)
+        conn.execute("UPDATE users SET balance=COALESCE(balance,0)+?, rev=rev+1 WHERE id=?", (amount, u["id"]))
+        return {"nickname": u["nickname"] or "Игрок"}
