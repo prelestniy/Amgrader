@@ -403,8 +403,7 @@ function pickByChance(pct, btnEl) {
   if (state.mainTab !== "wish") setMain("wish"); else renderAll();
 
   if (btnEl) { btnEl.classList.remove("pulse"); void btnEl.offsetWidth; btnEl.classList.add("pulse"); }
-  const card = document.querySelector(`#gridWish .card.selected`);
-  if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 /* ============================================================
    ПРОДАЖА ПРЕДМЕТОВ
