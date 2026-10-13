@@ -22,7 +22,8 @@ async function openShop() {
     else if (p.owned) btn = `<button class="shop-btn" onclick="shopEquip(${p.id})">Надеть</button>`;
     else btn = `<button class="shop-btn buy" onclick="shopBuy(${p.id})">${fmt(p.price)} G</button>`;
     return `<div class="shop-card" style="animation-delay:${i * 0.05}s">
-      <div><span class="nk-prefix" style="--pc:${esc(p.color)}">${esc(p.text)}</span></div>${btn}</div>`;
+      <div class="shop-info"><span class="nk-prefix" style="--pc:${esc(p.color)}">${esc(p.text)}</span>` +
+      `<span class="shop-price">${p.owned ? "Куплен" : fmt(p.price) + " G"}</span></div>${btn}</div>`;
   }).join("") || `<div class="pg-hint">Префиксов пока нет</div>`;
   openMisc(miscHead(ic("gift", 24), "Префиксы", "Покупаются за G, видны рядом с ником") +
     `<div class="reg-body"><div class="shop-bal">Баланс: ${fmt(d.balance)} G</div>${cards}</div>`);
