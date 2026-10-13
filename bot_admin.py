@@ -1,1427 +1,1119 @@
+"""
+Админ-бот Amgrader: кнопочное меню + пошаговые мастера (как /new).
+
+Как устроено:
+  • /start или /menu — главное меню, всё делается кнопками;
+  • каждое действие — «мастер»: бот спрашивает по одному шагу, на каждом шаге
+    есть быстрые кнопки, «⬅️ Назад» и «❌ Отмена», в конце — проверка и «✅ Подтвердить»;
+  • старые слэш-команды (/new, /grant, /luck …) остались и просто запускают нужный мастер.
+
+Чтобы добавить новое действие — опиши Flow в конце файла (шаги + функция run) и
+поставь кнопку в MENUS. Больше ничего трогать не нужно.
+"""
+import asyncio
+import html
+import inspect
+import logging
 import os
 import re
-import base64
-import html as htmllib
-import json
-import asyncio
-import logging
-from pathlib import Path
-from contextlib import asynccontextmanager
-import time
-import hmac
-import hashlib
-import secrets
-from contextlib import closing
-from typing import Optional, List, Dict, Any
-from urllib.parse import parse_qsl
+from dataclasses import dataclass
+from typing import Any, Callable, Optional
 
-from fastapi import FastAPI, Header, HTTPException, Depends, Response, BackgroundTasks, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-import sqlite3
 import httpx
+from aiogram import Bot, Dispatcher, F, Router
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import BaseFilter, Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+
+log = logging.getLogger("bot_admin")
 import quests
-import wheel
-import theme as themes
-import trade
-import webauth
-import style
-import auth_bot
 
-# ---------------------------------------------------------------------------
-# Настройки (задаются переменными окружения в Railway)
-# ---------------------------------------------------------------------------
-DB_PATH = os.environ.get("DB_PATH", "amgrader.db")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")               # токен бота №1 (мини-апп) — нужен для проверки Telegram-входа
-# без переменной — случайный секрет на время работы (админ-бот в том же процессе получит его сам)
-ADMIN_SECRET = os.environ.setdefault("ADMIN_SECRET", secrets.token_hex(16))
-PASSWORD_SALT = os.environ.get("PASSWORD_SALT", "amgrader-salt-change-me")
-REFERRAL_REFERRER_BONUS = int(os.environ.get("REFERRAL_REFERRER_BONUS", "1000"))
-REFERRAL_REFEREE_BONUS = int(os.environ.get("REFERRAL_REFEREE_BONUS", "500"))
-DEFAULT_BALANCE = 0
-BASE_DIR = Path(__file__).resolve().parent
-ITEMS = json.loads((BASE_DIR / "items.json").read_text(encoding="utf-8"))
-ITEM_IDS = {i["id"] for i in ITEMS}
-log = logging.getLogger("amgrader")
+TOKEN = os.environ.get("ADMIN_BOT_TOKEN", "")
+# бот работает в одном процессе с сервером — ходит к нему по локальному адресу
+BACKEND_URL = os.environ.get("BACKEND_URL", f"http://127.0.0.1:{os.environ.get('PORT', '8000')}").rstrip("/")
+ADMIN_SECRET = os.environ["ADMIN_SECRET"]
+ADMIN_IDS = {int(x) for x in os.environ.get("ADMIN_IDS", "").split(",") if x.strip().isdigit()}
+HEADERS = {"X-Admin-Secret": ADMIN_SECRET}
 
-# Специальные аккаунты: логин (в нижнем регистре) -> стартовый баланс
-SPECIAL_ACCOUNTS = {
-    "матвей": 100000,
+
+class IsAdmin(BaseFilter):
+    async def __call__(self, event) -> bool:
+        u = getattr(event, "from_user", None)
+        return bool(u and u.id in ADMIN_IDS)
+
+
+dp = Dispatcher()
+admin = Router()      # всё для админов
+other = Router()      # «заглушки» для чужих и непонятных сообщений (подключается последним)
+admin.message.filter(IsAdmin())
+admin.callback_query.filter(IsAdmin())
+dp.include_router(admin)
+dp.include_router(other)
+
+
+def enabled() -> bool:
+    return bool(TOKEN)
+
+
+def is_admin(message) -> bool:
+    return message.from_user is not None and message.from_user.id in ADMIN_IDS
+
+
+# ====================================================================
+#  Сервер
+# ====================================================================
+class ApiError(Exception):
+    pass
+
+
+def err_text(r: httpx.Response) -> str:
+    try:
+        d = r.json().get("detail", r.text)
+        return d if isinstance(d, str) else str(d)
+    except Exception:
+        return r.text
+
+
+async def api(method: str, path: str, *, json=None, params=None):
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.request(method, f"{BACKEND_URL}{path}", headers=HEADERS, json=json, params=params)
+    except httpx.HTTPError as e:
+        raise ApiError(f"сервер не отвечает ({e.__class__.__name__})")
+    if r.status_code != 200:
+        raise ApiError(err_text(r))
+    try:
+        return r.json()
+    except ValueError:
+        return None
+
+
+# ====================================================================
+#  Оформление: кнопки, сообщения
+# ====================================================================
+def esc(x) -> str:
+    return html.escape(str(x))
+
+
+def fmt_g(n) -> str:
+    try:
+        return f"{int(n):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return str(n)
+
+
+def B(text: str, data: str) -> InlineKeyboardButton:
+    return InlineKeyboardButton(text=text, callback_data=data)
+
+
+def KB(*rows) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[list(r) for r in rows if r])
+
+
+def grid(buttons: list, per: int) -> list:
+    return [buttons[i:i + per] for i in range(0, len(buttons), per)]
+
+
+HOME = B("🏠 Главное меню", "m:main")
+
+
+def clip(text: str, limit: int = 3900) -> str:
+    return text if len(text) <= limit else text[:limit].rsplit("\n", 1)[0] + "\n…"
+
+
+async def send(target, text: str, kb: Optional[InlineKeyboardMarkup] = None, edit: bool = True) -> Message:
+    """Кнопка → правим то же сообщение (чат не засоряется). Текст от админа → новое сообщение."""
+    text = clip(text)
+    if isinstance(target, CallbackQuery):
+        if edit and target.message:
+            try:
+                await target.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+                return target.message
+            except TelegramBadRequest as e:
+                if "not modified" in str(e):
+                    return target.message
+        return await target.message.answer(text, reply_markup=kb, parse_mode="HTML")
+    return await target.answer(text, reply_markup=kb, parse_mode="HTML")
+
+
+async def strip_kb(bot: Bot, chat_id: int, msg_id: Optional[int]):
+    """Убираем кнопки у прошлого вопроса, когда ответ пришёл текстом."""
+    if not msg_id:
+        return
+    try:
+        await bot.edit_message_reply_markup(chat_id=chat_id, message_id=msg_id, reply_markup=None)
+    except TelegramBadRequest:
+        pass
+
+
+# ====================================================================
+#  Меню
+# ====================================================================
+MENUS = {
+    "main": ("🛠 <b>Админ-панель Amgrader</b>\n\nВыберите раздел 👇\n"
+             "<i>Каждое действие — по шагам, в любой момент можно отменить.</i>", [
+        [("🎟 Промокоды", "m:promo"), ("💰 Баланс", "m:bal")],
+        [("👤 Игроки", "m:users"), ("🍀 Удача", "m:luck")],
+        [("📋 Задания", "m:tasks"), ("🏆 Топ игроков", "a:top")],
+    ]),
+    "promo": ("🎟 <b>Промокоды</b>\nСоздавайте коды на баланс или на предмет.", [
+        [("➕ Создать промокод", "go:promo")],
+        [("📃 Список", "a:promos"), ("🚫 Деактивировать", "a:delpromo")],
+        [("🔎 Найти предмет (id)", "go:items")],
+    ]),
+    "bal": ("💰 <b>Баланс</b>\nНачисление и установка баланса.", [
+        [("🎁 Начислить игроку", "go:grant")],
+        [("✏️ Установить игроку", "go:setbal")],
+        [("➕ Прибавить ВСЕМ", "go:grantall"), ("⚖️ Установить ВСЕМ", "go:setall")],
+    ]),
+    "users": ("👤 <b>Игроки</b>", [
+        [("🔍 Найти игрока", "go:find")],
+        [("🆔 Сменить ID игрока", "go:setpid")],
+        [("🏆 Топ по балансу", "a:top")],
+    ]),
+    "luck": ("🍀 <b>Скрытая удача</b>\nПока показанный шанс ≤ порога, реальный = показанный + бонус.", [
+        [("🎯 Игроку", "go:luck"), ("🌍 Всем", "go:gluck")],
+        [("👁 Показать правила", "go:luckshow")],
+        [("🧹 Убрать у игрока", "go:luckoff"), ("🧹 Убрать у всех", "go:gluckoff")],
+    ]),
+    "tasks": ("📋 <b>Задания</b>\nПодписки и ссылки за награду.", [
+        [("📢 Подписка на канал", "go:task_tg")],
+        [("🔗 Задание по ссылке", "go:task_link")],
+        [("📃 Список / удалить", "a:tasks")],
+        [("🎯 Новый квест", "go:quest"), ("🎯 Квесты", "a:quests")],
+        [("🎡 Выдать прокрутки", "go:spins")],
+    ]),
 }
 
-@asynccontextmanager
-async def lifespan(_app):
-    """Запускает обоих ботов и планировщик квестов в этом же процессе (если заданы токены)."""
-    quests.setup(db, ITEMS, BOT_TOKEN, user_public)
-    wheel.setup(db, user_public, ITEMS)
-    themes.setup(db)
-    trade.setup(db, ITEMS)
-    webauth.setup(db, user_public, _web_upsert_tg)
-    style.setup(db, check_telegram_auth)
-    with closing(db()) as conn, conn:
-        quests.init_db(conn)
-        wheel.init_db(conn)
-        themes.init_db(conn)
-        trade.init_db(conn)
-        webauth.init_db(conn)
-        style.init_db(conn)
-    tasks = []
-    for name in ("bot_user", "bot_admin", "auth_bot"):
-        try:
-            mod = __import__(name)
-            if mod.enabled():
-                tasks.append(asyncio.create_task(mod.run(), name=name))
-            else:
-                log.warning("%s: токен не задан — бот не запущен", name)
-        except Exception:
-            log.exception("не удалось запустить %s", name)
-    tasks.append(asyncio.create_task(quests.scheduler(), name="quests"))
-    tasks.append(asyncio.create_task(trade.sweeper(), name="trades"))
-    yield
-    for t in tasks:
-        t.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
 
+async def show_menu(target, name: str = "main", note: str = ""):
+    title, rows = MENUS.get(name, MENUS["main"])
+    kb = [[B(t, d) for t, d in row] for row in rows]
+    if name != "main":
+        kb.append([HOME])
+    await send(target, (note + "\n\n" if note else "") + title, InlineKeyboardMarkup(inline_keyboard=kb))
 
-app = FastAPI(title="Amgrader Backend", lifespan=lifespan)
 
-# Открытие index.html прямо из папки (file://) и локальные тесты: запросы идут с другого адреса.
-# Авторизация по токену в заголовке, куки не используются, поэтому разрешаем любой источник.
-from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# ====================================================================
+#  Движок мастеров (шаги, назад, отмена, подтверждение)
+# ====================================================================
+class W(StatesGroup):
+    step = State()      # ждём ответ на шаг
+    confirm = State()   # ждём «Подтвердить»
 
 
-# ---------------------------------------------------------------------------
-# База данных (SQLite)
-# ---------------------------------------------------------------------------
-def db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+@dataclass
+class Picked:
+    value: Any
+    label: str
 
 
-def gen_public_id(conn) -> str:
-    """Случайный 6-значный публичный ID, которого ещё нет в базе."""
-    while True:
-        pid = str(secrets.randbelow(900000) + 100000)
-        if not conn.execute("SELECT 1 FROM users WHERE public_id=? COLLATE NOCASE", (pid,)).fetchone():
-            return pid
+@dataclass
+class Pick:
+    options: list  # [(label, value)]
 
 
-def init_db():
-    with closing(db()) as conn, conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            login TEXT UNIQUE,
-            password_hash TEXT,
-            telegram_id INTEGER UNIQUE,
-            nickname TEXT,
-            username TEXT,
-            photo TEXT,
-            source TEXT,
-            balance INTEGER DEFAULT 0,
-            inventory TEXT DEFAULT '[]',
-            referral_code TEXT UNIQUE,
-            referred_by INTEGER,
-            token TEXT UNIQUE,
-            created_at INTEGER
-        )""")
-        for col in ("chance_bonus INTEGER DEFAULT 0", "rev INTEGER DEFAULT 0", "luck_rules TEXT DEFAULT '[]'", "last_daily INTEGER DEFAULT 0", "history TEXT DEFAULT '[]'", "about TEXT DEFAULT ''", "avatar BLOB", "avatar_key TEXT"):
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN " + col)
-            except sqlite3.OperationalError:
-                pass
-        # публичный ID (виден игрокам, ищется по нему; админ может менять)
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN public_id TEXT")
-        except sqlite3.OperationalError:
-            pass
-        for r in conn.execute("SELECT id FROM users WHERE public_id IS NULL OR public_id=''").fetchall():
-            conn.execute("UPDATE users SET public_id=? WHERE id=?", (gen_public_id(conn), r["id"]))
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users(public_id COLLATE NOCASE)")
-        conn.execute("""CREATE TABLE IF NOT EXISTS friendships(
-            user_a INTEGER, user_b INTEGER, requester INTEGER, status TEXT, created_at INTEGER,
-            PRIMARY KEY(user_a, user_b))""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS blocks(
-            blocker_id INTEGER, blocked_id INTEGER, created_at INTEGER,
-            PRIMARY KEY(blocker_id, blocked_id))""")
-        for _t in ("messages", "chat_requests", "reports"):   # переписка и жалобы удалены полностью
-            conn.execute(f"DROP TABLE IF EXISTS {_t}")
-        conn.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)")
-        conn.execute("""CREATE TABLE IF NOT EXISTS tasks(
-            id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, kind TEXT, url TEXT, chat TEXT,
-            reward INTEGER, active INTEGER DEFAULT 1)""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS task_claims(
-            user_id INTEGER, task_id INTEGER, started_at INTEGER, claimed_at INTEGER,
-            PRIMARY KEY(user_id, task_id))""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS promo_codes(
-            code TEXT PRIMARY KEY,
-            reward_type TEXT,
-            reward_value INTEGER,
-            max_uses INTEGER DEFAULT 1,
-            used_count INTEGER DEFAULT 0,
-            active INTEGER DEFAULT 1,
-            created_by TEXT,
-            created_at INTEGER
-        )""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS promo_redemptions(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            code TEXT,
-            redeemed_at INTEGER,
-            UNIQUE(user_id, code)
-        )""")
-        # владелец пользовательского промокода (для списка «Мои промокоды»)
-        try:
-            conn.execute("ALTER TABLE promo_codes ADD COLUMN owner_id INTEGER")
-        except sqlite3.OperationalError:
-            pass
-        # старые пользовательские коды привязываем к их авторам (created_by = 'user:<логин или id>')
-        conn.execute("""UPDATE promo_codes SET owner_id = (
-                            SELECT u.id FROM users u
-                            WHERE u.login=substr(promo_codes.created_by,6)
-                               OR CAST(u.id AS TEXT)=substr(promo_codes.created_by,6))
-                        WHERE owner_id IS NULL AND created_by LIKE 'user:%'""")
+@dataclass
+class Step:
+    key: str
+    prompt: Any                      # str или функция(vals) -> str
+    label: str = ""                  # как показывать в «уже введено»
+    parse: Optional[Callable] = None  # текст -> значение | Picked | Pick (можно async); ошибка = ValueError
+    quick: tuple = ()                # быстрые кнопки [(подпись, значение)]
+    strict: bool = False             # True — только кнопками, текст не принимается
+    per: int = 4                     # кнопок в ряд
+    when: Optional[Callable] = None  # показывать шаг только если when(vals)
+    fmt: Optional[Callable] = None   # как показывать значение
 
 
-init_db()
-
-
-def hash_password(pw: str) -> str:
-    return hashlib.pbkdf2_hmac("sha256", pw.encode(), PASSWORD_SALT.encode(), 120_000).hex()
-
-
-def gen_token() -> str:
-    return secrets.token_hex(24)
-
-
-def gen_referral_code() -> str:
-    return secrets.token_hex(3).upper()
-
-
-def global_bonus() -> int:
-    with closing(db()) as conn:
-        r = conn.execute("SELECT value FROM settings WHERE key='chance_bonus'").fetchone()
-    return int(r["value"]) if r else 0
-
-
-def parse_rules(s):
-    try:
-        return [[float(a), int(b)] for a, b in json.loads(s or "[]")]
-    except Exception:
-        return []
-
-
-def global_rules():
-    with closing(db()) as conn:
-        r = conn.execute("SELECT value FROM settings WHERE key='luck_rules'").fetchone()
-    return parse_rules(r["value"]) if r else []
-
-
-def luck_list(row):
-    return [r + ["u"] for r in parse_rules(row["luck_rules"])] + [r + ["g"] for r in global_rules()]
-
-
-def user_public(row) -> dict:
-    return {
-        "luck": luck_list(row),
-        "rev": row["rev"] or 0,
-        "id": row["id"],
-        "publicId": row["public_id"],
-        "about": row["about"] or "",
-        "hasPassword": bool(row["password_hash"]),
-        "login": row["login"],
-        "nickname": row["nickname"],
-        "username": row["username"],
-        "photo": row["photo"],
-        "source": row["source"],
-        "balance": row["balance"],
-        "inventory": json.loads(row["inventory"] or "[]"),
-        "referralCode": row["referral_code"],
-        "referredBy": row["referred_by"],
-        "style": style.style_fields(row),
-        "token": row["token"],
-    }
-
-
-def auth_user(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "no token")
-    token = authorization.split(" ", 1)[1]
-    with closing(db()) as conn:
-        row = conn.execute("SELECT * FROM users WHERE token=?", (token,)).fetchone()
-    if not row:
-        raise HTTPException(401, "invalid token")
-    return row
-
-
-def check_admin(x_admin_secret: Optional[str] = Header(None)):
-    if not x_admin_secret or x_admin_secret != ADMIN_SECRET:
-        raise HTTPException(403, "forbidden")
-
-
-def create_user(login=None, password_hash=None, telegram_id=None, nickname="Игрок",
-                 username=None, photo=None, source="manual", ref_code_used=None):
-    balance = SPECIAL_ACCOUNTS.get((login or "").lower(), DEFAULT_BALANCE)
-    ref_code = gen_referral_code()
-    with closing(db()) as conn, conn:
-        # уникальность реферального кода
-        while conn.execute("SELECT 1 FROM users WHERE referral_code=?", (ref_code,)).fetchone():
-            ref_code = gen_referral_code()
-
-        referred_by = None
-        if ref_code_used:
-            r = conn.execute("SELECT * FROM users WHERE referral_code=?", (ref_code_used.upper(),)).fetchone()
-            if r:
-                referred_by = r["id"]
-
-        token = gen_token()
-        cur = conn.execute(
-            """INSERT INTO users(login, password_hash, telegram_id, nickname, username, photo,
-                source, balance, inventory, referral_code, referred_by, token, created_at, public_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (login, password_hash, telegram_id, nickname, username, photo, source,
-             balance, "[]", ref_code, referred_by, token, int(time.time()), gen_public_id(conn)),
-        )
-        uid = cur.lastrowid
-        if referred_by:
-            conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFERRER_BONUS, referred_by))
-            conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFEREE_BONUS, uid))
-        row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-        return row
-
-
-# ---------------------------------------------------------------------------
-# Схемы запросов
-# ---------------------------------------------------------------------------
-class RegisterBody(BaseModel):
-    login: str
-    password: str
-    ref: Optional[str] = None
-
-
-class LoginBody(BaseModel):
-    login: str
-    password: str
-
-
-class TelegramBody(BaseModel):
-    initData: str
-    ref: Optional[str] = None
-
-
-class StateBody(BaseModel):
-    balance: int
-    inventory: List[int]
-    rev: Optional[int] = None
-
-
-class PromoRedeemBody(BaseModel):
-    code: str
-
-
-class ReferralApplyBody(BaseModel):
-    code: str
-
-
-class PromoCreateBody(BaseModel):
-    code: str
-    reward_type: str  # "balance" | "item"
-    reward_value: int
-    max_uses: int = 1
-    created_by: Optional[str] = None
-
-
-class PromoCodeOnly(BaseModel):
-    code: str
-
-
-class PromoUserCreateBody(BaseModel):
-    amount: int
-    count: int = 1
-
-
-class HistoryAddBody(BaseModel):
-    entry: Dict[str, Any]
-
-
-class GrantBody(BaseModel):
-    login: str
-    amount: int
-
-
-# ---------------------------------------------------------------------------
-# Авторизация игрока
-# ---------------------------------------------------------------------------
-@app.post("/api/auth/register")
-def register(body: RegisterBody):
-    login = body.login.strip()
-    if len(login) < 3:
-        raise HTTPException(400, "Логин слишком короткий")
-    if len(body.password) < 4:
-        raise HTTPException(400, "Пароль слишком короткий")
-    with closing(db()) as conn:
-        exists = conn.execute("SELECT 1 FROM users WHERE login=?", (login.lower(),)).fetchone()
-    if exists:
-        raise HTTPException(400, "Такой логин уже занят")
-    row = create_user(login=login.lower(), password_hash=hash_password(body.password),
-                       nickname=login, source="manual", ref_code_used=body.ref)
-    return user_public(row)
-
-
-@app.post("/api/auth/login")
-def login(body: LoginBody):
-    with closing(db()) as conn:
-        row = conn.execute("SELECT * FROM users WHERE login=?", (body.login.strip().lower(),)).fetchone()
-    if not row or row["password_hash"] != hash_password(body.password):
-        raise HTTPException(400, "Неверный логин или пароль")
-    return user_public(row)
-
-
-def check_telegram_auth(init_data: str) -> dict:
-    if not BOT_TOKEN:
-        raise HTTPException(500, "BOT_TOKEN не настроен на сервере")
-    pairs = dict(parse_qsl(init_data, strict_parsing=False))
-    recv_hash = pairs.pop("hash", None)
-    if not recv_hash:
-        raise HTTPException(400, "invalid initData")
-    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
-    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-    calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    if calc_hash != recv_hash:
-        raise HTTPException(401, "bad signature")
-    return json.loads(pairs.get("user", "{}"))
-
-
-@app.post("/api/auth/telegram")
-def telegram_auth(body: TelegramBody):
-    tg_user = check_telegram_auth(body.initData)
-    tid = tg_user.get("id")
-    if not tid:
-        raise HTTPException(400, "no telegram user")
-    with closing(db()) as conn:
-        row = conn.execute("SELECT * FROM users WHERE telegram_id=?", (tid,)).fetchone()
-    if row:
-        return user_public(row)
-    nickname = " ".join(filter(None, [tg_user.get("first_name"), tg_user.get("last_name")])) \
-        or tg_user.get("username") or "Игрок"
-    row = create_user(telegram_id=tid, nickname=nickname, username=tg_user.get("username"),
-                       photo=tg_user.get("photo_url"), source="telegram", ref_code_used=body.ref)
-    return user_public(row)
-
-
-def _web_upsert_tg(tg_user: dict, ref):
-    """Пользователь Telegram для входа из приложения: создаём, если его ещё нет (реферал учитывается)."""
-    tid = tg_user.get("id")
-    with closing(db()) as conn:
-        row = conn.execute("SELECT * FROM users WHERE telegram_id=?", (tid,)).fetchone()
-    if row:
-        return row
-    nickname = " ".join(filter(None, [tg_user.get("first_name"), tg_user.get("last_name")])) \
-        or tg_user.get("username") or ""
-    return create_user(telegram_id=tid, nickname=nickname, username=tg_user.get("username"),
-                       photo=None, source="telegram", ref_code_used=ref)
-
-
-class WebLoginStartBody(BaseModel):
-    ref: Optional[str] = None
-
-
-@app.post("/api/web-login/start")
-def web_login_start(body: WebLoginStartBody):
-    token, ref = webauth.start(body.ref)
-    name = os.environ.get("AUTH_BOT_USERNAME", "").lstrip("@")
-    if not name:
-        raise HTTPException(503, "Бот входа ещё не запущен")
-    link = f"https://t.me/{name}?start=w_{token}" + (f"_{ref}" if ref else "")
-    return {"token": token, "link": link}
-
-
-@app.get("/api/web-login/{token}")
-def web_login_status(token: str):
-    return webauth.status(token)
-
-
-class ShopBuyBody(BaseModel):
-    id: int
-
-
-class ShopEquipBody(BaseModel):
-    id: Optional[int] = None
-
-
-@app.get("/api/players")
-def players_list(q: str = "", offset: int = 0, user=Depends(auth_user)):
-    return style.players(q, offset)
-
-
-@app.get("/api/shop")
-def shop_get(user=Depends(auth_user)):
-    return style.shop(user["id"])
-
-
-@app.post("/api/shop/buy")
-def shop_buy(body: ShopBuyBody, user=Depends(auth_user)):
-    return style.buy(user["id"], body.id)
-
-
-@app.post("/api/shop/equip")
-def shop_equip(body: ShopEquipBody, user=Depends(auth_user)):
-    return style.equip(user["id"], body.id)
-
-
-@app.get("/admin/app")
-def admin_app_page():
-    f = BASE_DIR / "admin.html"
-    if not f.is_file():
-        raise HTTPException(404, "admin.html не загружен")
-    return FileResponse(f, headers={"Cache-Control": "no-cache"})
-
-
-@app.get("/api/admin/users")
-def admin_users_list(q: str = "", offset: int = 0, x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
-    style.admin_uid(x_init_data)
-    return style.admin_users(q, offset)
-
-
-@app.post("/api/admin/user/{who}")
-def admin_user_set(who: str, body: dict, x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
-    style.admin_uid(x_init_data)
-    return style.admin_user_update(who, body)
-
-
-@app.get("/api/admin/prefixes")
-def admin_prefixes_list(x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
-    style.admin_uid(x_init_data)
-    return style.admin_prefixes()
-
-
-@app.post("/api/admin/prefixes")
-def admin_prefixes_save(body: dict, x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
-    style.admin_uid(x_init_data)
-    return style.admin_prefix_save(body)
-
-
-@app.get("/api/config")
-def public_config():
-    return {"botUsername": os.environ.get("BOT_USERNAME", ""),
-            "referrerBonus": REFERRAL_REFERRER_BONUS, "refereeBonus": REFERRAL_REFEREE_BONUS}
-
-
-@app.get("/api/leaderboard")
-def leaderboard(limit: int = 10):
-    """Публичный топ игроков по балансу — для слайдера в профиле.
-    Отдаём ник/баланс/фото и публичный ID (по нему открывается профиль), без логина, внутреннего id и токена."""
-    limit = max(1, min(limit, 50))
-    with closing(db()) as conn:
-        rows = conn.execute(
-            "SELECT * FROM users ORDER BY balance DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-    return {"top": [
-        {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "balance": r["balance"], "photo": r["photo"], "style": style.style_fields(r)}
-        for r in rows
-    ]}
-
-
-@app.get("/api/me")
-def me(background: BackgroundTasks, user=Depends(auth_user)):
-    background.add_task(quests.clear_message, user["id"])
-    return user_public(user)
-
-
-@app.delete("/api/me")
-def delete_me(user=Depends(auth_user)):
-    with closing(db()) as conn, conn:
-        conn.execute("DELETE FROM users WHERE id=?", (user["id"],))
-        conn.execute("DELETE FROM friendships WHERE user_a=? OR user_b=?", (user["id"], user["id"]))
-        conn.execute("DELETE FROM blocks WHERE blocker_id=? OR blocked_id=?", (user["id"], user["id"]))
-    return {"ok": True}
-
-
-@app.post("/api/state")
-def save_state(body: StateBody, user=Depends(auth_user)):
-    if body.balance < 0 or any(i not in ITEM_IDS for i in body.inventory):
-        raise HTTPException(400, "bad state")
-    with closing(db()) as conn, conn:
-        conn.execute("BEGIN IMMEDIATE")
-        cur = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-        if body.rev is not None and body.rev != (cur["rev"] or 0):
-            # админ/промокод изменили данные, пока клиент был со старой версией
-            return {"ok": False, "stale": True, "user": user_public(cur)}
-        conn.execute("UPDATE users SET balance=?, inventory=? WHERE id=?",
-                     (body.balance, json.dumps(body.inventory), user["id"]))
-    return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
-# Промокоды
-# ---------------------------------------------------------------------------
-@app.post("/api/promo/redeem")
-def redeem_promo(body: PromoRedeemBody, user=Depends(auth_user)):
-    code = body.code.strip().upper()
-    if not code:
-        raise HTTPException(400, "Введите промокод")
-    with closing(db()) as conn, conn:
-        conn.execute("BEGIN IMMEDIATE")
-        promo = conn.execute("SELECT * FROM promo_codes WHERE code=?", (code,)).fetchone()
-        if not promo or not promo["active"]:
-            raise HTTPException(404, "Промокод не найден")
-        if promo["max_uses"] and promo["used_count"] >= promo["max_uses"]:
-            raise HTTPException(400, "Промокод исчерпан")
-        already = conn.execute(
-            "SELECT 1 FROM promo_redemptions WHERE user_id=? AND code=?", (user["id"], code)
-        ).fetchone()
-        if already:
-            raise HTTPException(400, "Вы уже использовали этот промокод")
-
-        conn.execute("INSERT INTO promo_redemptions(user_id, code, redeemed_at) VALUES(?,?,?)",
-                     (user["id"], code, int(time.time())))
-        conn.execute("UPDATE promo_codes SET used_count = used_count + 1 WHERE code=?", (code,))
-
-        if promo["reward_type"] == "balance":
-            conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (promo["reward_value"], user["id"]))
-        else:
-            row = conn.execute("SELECT inventory FROM users WHERE id=?", (user["id"],)).fetchone()
-            inv = json.loads(row["inventory"] or "[]")
-            inv.append(promo["reward_value"])
-            conn.execute("UPDATE users SET inventory=?, rev = rev + 1 WHERE id=?", (json.dumps(inv), user["id"]))
-
-        newrow = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    out = user_public(newrow)
-    out["reward"] = {"type": promo["reward_type"], "value": promo["reward_value"]}
-    return out
-
-
-@app.post("/api/promo/create")
-def create_user_promo(body: PromoUserCreateBody, user=Depends(auth_user)):
-    if body.amount <= 0:
-        raise HTTPException(400, "Сумма должна быть больше 0")
-    if body.count < 1 or body.count > 10:
-        raise HTTPException(400, "От 1 до 10 активаций")
-    total = body.amount * body.count
-    with closing(db()) as conn, conn:
-        conn.execute("BEGIN IMMEDIATE")
-        cur = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-        if cur["balance"] < total:
-            raise HTTPException(400, "Недостаточно баланса")
-        while True:
-            code = "P" + secrets.token_hex(4).upper()
-            if not conn.execute("SELECT 1 FROM promo_codes WHERE code=?", (code,)).fetchone():
-                break
-        conn.execute(
-            """INSERT INTO promo_codes(code, reward_type, reward_value, max_uses, used_count, active, created_by, created_at, owner_id)
-               VALUES(?,'balance',?,?,0,1,?,?,?)""",
-            (code, body.amount, body.count, f"user:{cur['login'] or cur['id']}", int(time.time()), cur["id"]),
-        )
-        conn.execute("UPDATE users SET balance = balance - ?, rev = rev + 1 WHERE id=?", (total, user["id"]))
-        newrow = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    out = user_public(newrow)
-    out["codes"] = [code]
-    out["amount"] = body.amount
-    out["count"] = body.count
-    return out
-
-
-@app.get("/api/promo/mine")
-def my_promos(user=Depends(auth_user)):
-    with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM promo_codes WHERE owner_id=? ORDER BY created_at DESC",
-                            (user["id"],)).fetchall()
-    out = []
-    for r in rows:
-        exhausted = bool(r["max_uses"]) and r["used_count"] >= r["max_uses"]
-        status = "disabled" if not r["active"] else ("exhausted" if exhausted else "active")
-        out.append({"code": r["code"], "amount": r["reward_value"], "maxUses": r["max_uses"],
-                    "usedCount": r["used_count"], "active": status == "active",
-                    "status": status, "createdAt": r["created_at"]})
-    return {"promos": out}
-
-
-# ---------------------------------------------------------------------------
-# История амгрейдов (для отображения в профиле на любом устройстве)
-# ---------------------------------------------------------------------------
-HISTORY_MAX = 50
-
-
-@app.get("/api/history")
-def get_history(user=Depends(auth_user)):
-    return {"history": json.loads(user["history"] or "[]")}
-
-
-@app.post("/api/history/add")
-def add_history(body: HistoryAddBody, user=Depends(auth_user)):
-    with closing(db()) as conn, conn:
-        conn.execute("BEGIN IMMEDIATE")
-        cur = conn.execute("SELECT history FROM users WHERE id=?", (user["id"],)).fetchone()
-        hist = json.loads(cur["history"] or "[]")
-        entry = dict(body.entry)
-        entry["time"] = int(time.time() * 1000)  # время фиксируем на сервере, клиенту не доверяем
-        hist.insert(0, entry)
-        hist = hist[:HISTORY_MAX]
-        conn.execute("UPDATE users SET history=? WHERE id=?", (json.dumps(hist), user["id"]))
-    return {"ok": True, "history": hist}
-
-
-@app.post("/api/history/clear")
-def clear_history(user=Depends(auth_user)):
-    with closing(db()) as conn, conn:
-        conn.execute("UPDATE users SET history='[]' WHERE id=?", (user["id"],))
-    return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
-# Реферальная программа
-# ---------------------------------------------------------------------------
-@app.post("/api/referral/apply")
-def apply_referral(body: ReferralApplyBody, user=Depends(auth_user)):
-    code = body.code.strip().upper()
-    if user["referred_by"]:
-        raise HTTPException(400, "Реферальный код уже был применён")
-    if code == user["referral_code"]:
-        raise HTTPException(400, "Нельзя использовать свой собственный код")
-    with closing(db()) as conn, conn:
-        ref = conn.execute("SELECT * FROM users WHERE referral_code=?", (code,)).fetchone()
-        if not ref:
-            raise HTTPException(404, "Такой код не найден")
-        conn.execute("UPDATE users SET referred_by=? WHERE id=?", (ref["id"], user["id"]))
-        conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFEREE_BONUS, user["id"]))
-        conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (REFERRAL_REFERRER_BONUS, ref["id"]))
-        newrow = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    return user_public(newrow)
-
-
-# ---------------------------------------------------------------------------
-# Админ-эндпоинты (используются только вторым ботом, через X-Admin-Secret)
-# ---------------------------------------------------------------------------
-@app.post("/admin/promo")
-def admin_create_promo(body: PromoCreateBody, _=Depends(check_admin)):
-    code = body.code.strip().upper()
-    if body.reward_type not in ("balance", "item"):
-        raise HTTPException(400, "reward_type должен быть balance или item")
-    if body.reward_type == "item" and body.reward_value not in ITEM_IDS:
-        raise HTTPException(400, "Предмета с таким id нет")
-    if body.reward_type == "balance" and body.reward_value <= 0:
-        raise HTTPException(400, "Сумма должна быть больше 0")
-    if not code or body.max_uses < 0:
-        raise HTTPException(400, "Неверные параметры")
-    with closing(db()) as conn, conn:
-        exists = conn.execute("SELECT 1 FROM promo_codes WHERE code=?", (code,)).fetchone()
-        if exists:
-            raise HTTPException(400, "Такой промокод уже существует")
-        conn.execute(
-            """INSERT INTO promo_codes(code, reward_type, reward_value, max_uses, used_count, active, created_by, created_at)
-               VALUES(?,?,?,?,0,1,?,?)""",
-            (code, body.reward_type, body.reward_value, body.max_uses, body.created_by, int(time.time())),
-        )
-    return {"ok": True, "code": code}
-
-
-@app.get("/admin/promo")
-def admin_list_promo(_=Depends(check_admin)):
-    with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM promo_codes ORDER BY created_at DESC").fetchall()
-    return [dict(r) for r in rows]
-
-
-@app.post("/admin/promo/deactivate")
-def admin_deactivate_promo(body: PromoCodeOnly, _=Depends(check_admin)):
-    with closing(db()) as conn, conn:
-        conn.execute("UPDATE promo_codes SET active=0 WHERE code=?", (body.code.strip().upper(),))
-    return {"ok": True}
-
-
-@app.post("/admin/grant")
-def admin_grant(body: GrantBody, _=Depends(check_admin)):
-    with closing(db()) as conn, conn:
-        who = body.login.strip().lstrip("#").lower()
-        row = conn.execute("SELECT * FROM users WHERE login=? OR CAST(id AS TEXT)=?", (who, who)).fetchone()
-        if not row:
-            raise HTTPException(404, "Пользователь не найден")
-        conn.execute("UPDATE users SET balance = MAX(0, balance + ?), rev = rev + 1 WHERE id=?", (body.amount, row["id"]))
-    return {"ok": True}
-
-
-class BalanceBody(BaseModel):
-    login: str = ""          # пусто = все пользователи
-    amount: int
-    mode: str = "add"        # add — прибавить (можно минус), set — установить
-
-
-def find_user(conn, who: str):
-    """Логин, публичный ID или #внутренний_id."""
-    raw = who.strip()
-    w = raw.lstrip("#").lower()
-    if raw.startswith("#"):
-        row = conn.execute("SELECT * FROM users WHERE CAST(id AS TEXT)=?", (w,)).fetchone()
-    else:
-        row = (conn.execute("SELECT * FROM users WHERE login=?", (w,)).fetchone()
-               or conn.execute("SELECT * FROM users WHERE public_id=? COLLATE NOCASE", (w,)).fetchone()
-               or conn.execute("SELECT * FROM users WHERE CAST(id AS TEXT)=?", (w,)).fetchone())
-    if not row:
-        raise HTTPException(404, "Пользователь не найден")
-    return row
-
-
-@app.post("/admin/balance")
-def admin_balance(body: BalanceBody, _=Depends(check_admin)):
-    if body.mode not in ("add", "set"):
-        raise HTTPException(400, "mode: add или set")
-    expr = "MAX(0, balance + ?)" if body.mode == "add" else "MAX(0, ?)"
-    with closing(db()) as conn, conn:
-        if body.login.strip():
-            row = find_user(conn, body.login)
-            conn.execute(f"UPDATE users SET balance = {expr}, rev = rev + 1 WHERE id=?", (body.amount, row["id"]))
-            n = 1
-        else:
-            n = conn.execute(f"UPDATE users SET balance = {expr}, rev = rev + 1", (body.amount,)).rowcount
-    return {"ok": True, "affected": n}
-
-
-class LuckBody(BaseModel):
-    login: str = ""          # пусто = правило для всех игроков
-    at: float = 0            # правило действует, когда ПОКАЗАННЫЙ шанс <= at (%)
-    bonus: int = 0           # сколько % добавить к реальному шансу (0 = убрать правило)
-
-
-def luck_conn_rules(conn, login):
-    if login.strip():
-        row = find_user(conn, login)
-        return row, parse_rules(row["luck_rules"])
-    r = conn.execute("SELECT value FROM settings WHERE key='luck_rules'").fetchone()
-    return None, parse_rules(r["value"]) if r else []
-
-
-def luck_save(conn, row, rules):
-    dump = json.dumps(sorted(rules))
-    if row:
-        conn.execute("UPDATE users SET luck_rules=? WHERE id=?", (dump, row["id"]))
-    else:
-        conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('luck_rules', ?)", (dump,))
-
-
-@app.post("/admin/luck")
-def admin_luck_set(body: LuckBody, _=Depends(check_admin)):
-    if not (0 < body.at <= 100) or not (-100 <= body.bonus <= 100):
-        raise HTTPException(400, "шанс 0–100, бонус -100…100")
-    with closing(db()) as conn, conn:
-        row, rules = luck_conn_rules(conn, body.login)
-        rules = [r for r in rules if abs(r[0] - body.at) > 1e-9]
-        if body.bonus:
-            rules.append([body.at, body.bonus])
-        luck_save(conn, row, rules)
-    return {"ok": True, "rules": sorted(rules)}
-
-
-@app.get("/admin/luck")
-def admin_luck_get(login: str = "", _=Depends(check_admin)):
-    with closing(db()) as conn:
-        _row, rules = luck_conn_rules(conn, login)
-    return {"rules": rules}
-
-
-@app.post("/admin/luck/clear")
-def admin_luck_clear(body: LuckBody, _=Depends(check_admin)):
-    with closing(db()) as conn, conn:
-        row, _rules = luck_conn_rules(conn, body.login)
-        luck_save(conn, row, [])
-    return {"ok": True}
-
-
-@app.get("/admin/top")
-def admin_top(_=Depends(check_admin)):
-    with closing(db()) as conn:
-        rows = conn.execute("SELECT id, login, nickname, balance, luck_rules FROM users ORDER BY balance DESC LIMIT 15").fetchall()
-        total = conn.execute("SELECT COUNT(*) c, COALESCE(SUM(balance),0) s FROM users").fetchone()
-    return {"users": [dict(r) for r in rows], "count": total["c"], "sum": total["s"]}
-
-
-# ---------------------------------------------------------------------------
-# Квесты (вместо бывших «Бонусов»): см. quests.py
-# ---------------------------------------------------------------------------
-@app.get("/api/quests")
-def quests_list(user=Depends(auth_user)):
-    return quests.list_for(user["id"])
-
-
-class QuestEventBody(BaseModel):
-    type: str
-    inventory: List[int] = []
-    drops: List[int] = []
-    success: bool = False
-    chance: Optional[float] = None
-
-
-@app.post("/api/quests/event")
-def quests_event(body: QuestEventBody, user=Depends(auth_user)):
-    return quests.record_event(user["id"], body.dict())
-
-
-class QuestAdminBody(BaseModel):
-    type: str
-    title: str
-    target: int
-    rarity: Optional[str] = None
-    chance_max: Optional[float] = None
-    difficulty: int
-
-
-class QuestDelBody(BaseModel):
-    id: str
-
-
-@app.get("/api/wheel")
-def wheel_status(user=Depends(auth_user)):
-    return wheel.status(user["id"])
-
-
-@app.post("/api/wheel/spin")
-def wheel_spin(user=Depends(auth_user)):
-    return wheel.spin(user["id"])
-
-
-class ThemeBody(BaseModel):
-    theme: str
-
-
-class ThemeCustomBody(BaseModel):
+@dataclass
+class Flow:
     name: str
-    color: str
-
-
-class ThemeDelBody(BaseModel):
-    id: str
-
-
-@app.get("/api/theme")
-def theme_get(user=Depends(auth_user)):
-    return themes.get(user["id"])
-
-
-@app.post("/api/theme")
-def theme_set(body: ThemeBody, user=Depends(auth_user)):
-    return themes.set_theme(user["id"], body.theme)
-
-
-@app.post("/api/theme/custom")
-def theme_custom_add(body: ThemeCustomBody, user=Depends(auth_user)):
-    return themes.add_custom(user["id"], body.name, body.color)
-
-
-@app.post("/api/theme/custom/delete")
-def theme_custom_del(body: ThemeDelBody, user=Depends(auth_user)):
-    return themes.delete_custom(user["id"], body.id)
-
-
-class TradeCreateBody(BaseModel):
-    items: List[int] = []
-    g: int = 0
-    to: Optional[str] = None      # publicId друга; пусто — трейд по ссылке
-
-
-class TradeSetBody(BaseModel):
-    items: List[int] = []
-    g: int = 0
-
-
-@app.get("/api/trades")
-def trades_list(user=Depends(auth_user)):
-    return trade.list_for(user["id"])
-
-
-@app.post("/api/trades")
-def trades_create(body: TradeCreateBody, request: Request, user=Depends(auth_user)):
-    return _tr(request, trade.create(user["id"], body.items, body.g, body.to))
-
-
-@app.get("/api/trades/{code}")
-def trades_get(code: str, request: Request, user=Depends(auth_user)):
-    return _tr(request, trade.get(user["id"], code))
-
-
-@app.post("/api/trades/{code}/join")
-def trades_join(code: str, request: Request, user=Depends(auth_user)):
-    return _tr(request, trade.join(user["id"], code))
-
-
-@app.post("/api/trades/{code}/set")
-def trades_set(code: str, body: TradeSetBody, request: Request, user=Depends(auth_user)):
-    return _tr(request, trade.set_side(user["id"], code, body.items, body.g))
-
-
-@app.post("/api/trades/{code}/confirm")
-def trades_confirm(code: str, request: Request, user=Depends(auth_user)):
-    return _tr(request, trade.confirm(user["id"], code))
-
-
-@app.post("/api/trades/{code}/cancel")
-def trades_cancel(code: str, request: Request, user=Depends(auth_user)):
-    return _tr(request, trade.cancel(user["id"], code))
-
-
-class WheelGrantBody(BaseModel):
-    who: str          # ID игрока (цифры) или логин
-    count: int
-
-
-@app.post("/admin/wheel/grant")
-def admin_wheel_grant(body: WheelGrantBody, _=Depends(check_admin)):
-    return wheel.grant(body.who, body.count)
-
-
-@app.post("/admin/quest")
-def admin_quest_add(body: QuestAdminBody, _=Depends(check_admin)):
-    return quests.add_custom(body.dict())
-
-
-@app.get("/admin/quest")
-def admin_quest_list(_=Depends(check_admin)):
-    return quests.list_custom()
-
-
-@app.post("/admin/quest/delete")
-def admin_quest_del(body: QuestDelBody, _=Depends(check_admin)):
-    return quests.delete_custom(body.id)
-
-
-@app.post("/api/quests/{quest_id}/claim")
-def quests_claim(quest_id: str, user=Depends(auth_user)):
-    return quests.claim(user["id"], quest_id)
-
-
-class TaskBody(BaseModel):
+    icon: str
     title: str
-    kind: str                # "tg" — проверяем подписку; "link" — по ссылке (TikTok и т.п.)
-    url: str
-    chat: str = ""
-    reward: int
+    menu: str
+    steps: list
+    run: Callable
+    summary: Optional[Callable] = None
+    confirm: bool = True
+    again: str = ""
 
 
-@app.post("/admin/task")
-def admin_task_add(body: TaskBody, _=Depends(check_admin)):
-    if body.kind not in ("tg", "link") or body.reward <= 0 or (body.kind == "tg" and not body.chat):
-        raise HTTPException(400, "Неверные параметры задания")
-    with closing(db()) as conn, conn:
-        cur = conn.execute("INSERT INTO tasks(title, kind, url, chat, reward) VALUES(?,?,?,?,?)",
-                           (body.title.strip(), body.kind, body.url.strip(), body.chat.strip(), body.reward))
-    return {"ok": True, "id": cur.lastrowid}
+FLOWS: dict = {}
 
 
-@app.get("/admin/task")
-def admin_task_list(_=Depends(check_admin)):
-    with closing(db()) as conn:
-        return [dict(r) for r in conn.execute("SELECT * FROM tasks WHERE active=1 ORDER BY id").fetchall()]
+def step_visible(step: Step, vals: dict) -> bool:
+    return step.when is None or bool(step.when(vals))
 
 
-class TaskDel(BaseModel):
-    id: int
+def next_step(flow: Flow, vals: dict, after: int) -> Optional[int]:
+    for j in range(after + 1, len(flow.steps)):
+        if step_visible(flow.steps[j], vals):
+            return j
+    return None
 
 
-@app.post("/admin/task/delete")
-def admin_task_del(body: TaskDel, _=Depends(check_admin)):
-    with closing(db()) as conn, conn:
-        n = conn.execute("UPDATE tasks SET active=0 WHERE id=?", (body.id,)).rowcount
-    if not n:
-        raise HTTPException(404, "Нет такого задания")
-    return {"ok": True}
+def show_val(step: Step, vals: dict) -> str:
+    lab = vals.get(step.key + "_label")
+    if lab:
+        return str(lab)
+    v = vals[step.key]
+    return step.fmt(v) if step.fmt else str(v)
 
 
-@app.get("/admin/items")
-def admin_items(q: str = "", _=Depends(check_admin)):
-    q = q.strip().lower()
-    return [i for i in ITEMS if not q or q in i["name"].lower() or q in i["nameEn"].lower() or q == str(i["id"])][:8]
+def render_step(flow: Flow, vals: dict, cur: int, n: int, can_back: bool):
+    step = flow.steps[cur]
+    head = f"{flow.icon} <b>{esc(flow.title)}</b> · шаг {n}"
+    done = [f"▫️ {esc(s.label)}: <b>{esc(show_val(s, vals))}</b>"
+            for s in flow.steps[:cur] if s.label and s.key in vals and step_visible(s, vals)]
+    prompt = step.prompt(vals) if callable(step.prompt) else step.prompt
+    text = head + "\n" + ("\n" + "\n".join(done) + "\n" if done else "") + "\n" + prompt
+    rows = grid([B(lbl, f"w:q:{i}") for i, (lbl, _) in enumerate(step.quick)], step.per)
+    nav = ([B("⬅️ Назад", "w:back")] if can_back else []) + [B("❌ Отмена", "w:cancel")]
+    return text, InlineKeyboardMarkup(inline_keyboard=rows + [nav])
 
 
-PUBLIC_ID_RE = re.compile(r"[A-Za-z0-9_]{3,16}")
+async def start_flow(target, state: FSMContext, name: str):
+    flow = FLOWS[name]
+    await state.clear()
+    await state.update_data(flow=name, vals={}, hist=[], opts=[], pid=None)
+    await goto(target, state, flow, next_step(flow, {}, -1))
 
 
-class PublicIdBody(BaseModel):
-    login: str
-    new_id: str
+async def goto(target, state: FSMContext, flow: Flow, i: int):
+    d = await state.get_data()
+    hist = d["hist"] + [i]
+    if isinstance(target, Message):
+        await strip_kb(target.bot, target.chat.id, d.get("pid"))
+    text, kb = render_step(flow, d["vals"], i, len(hist), len(hist) > 1)
+    await state.update_data(hist=hist, opts=[])
+    await state.set_state(W.step)
+    msg = await send(target, text, kb)
+    await state.update_data(pid=msg.message_id)
 
 
-@app.post("/admin/public_id")
-def admin_set_public_id(body: PublicIdBody, _=Depends(check_admin)):
-    new = body.new_id.strip().lstrip("#")
-    if not PUBLIC_ID_RE.fullmatch(new):
-        raise HTTPException(400, "ID: 3–16 символов, латиница, цифры и _")
-    with closing(db()) as conn, conn:
-        row = find_user(conn, body.login)
-        if conn.execute("SELECT 1 FROM users WHERE public_id=? COLLATE NOCASE AND id<>?", (new, row["id"])).fetchone():
-            raise HTTPException(409, "Этот ID уже занят")
-        conn.execute("UPDATE users SET public_id=?, rev = rev + 1 WHERE id=?", (new, row["id"]))
-    return {"ok": True, "publicId": new}
+async def accept(target, state: FSMContext, flow: Flow, step: Step, value, label: Optional[str] = None):
+    d = await state.get_data()
+    vals = d["vals"]
+    vals[step.key] = value
+    if label:
+        vals[step.key + "_label"] = label
+    else:
+        vals.pop(step.key + "_label", None)
+    await state.update_data(vals=vals)
+    nxt = next_step(flow, vals, d["hist"][-1])
+    if nxt is not None:
+        await goto(target, state, flow, nxt)
+    elif flow.confirm:
+        await ask_confirm(target, state, flow)
+    else:
+        await execute(target, state, flow)
 
 
-@app.get("/api/users/search")
-def search_users_by_public_id(q: str = "", user=Depends(auth_user)):
-    """Поиск игрока по точному публичному ID. Отдаём только ID, ник и фото."""
-    q = q.strip().lstrip("#")
-    if not q or len(q) > 16:
-        return {"users": []}
-    with closing(db()) as conn:
-        r = conn.execute("SELECT id, public_id, nickname, photo FROM users WHERE public_id=? COLLATE NOCASE", (q,)).fetchone()
-    if not r:
-        return {"users": []}
-    return {"users": [{"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок",
-                       "photo": r["photo"], "isMe": r["id"] == user["id"]}]}
-
-
-ABOUT_MAX = 20
-AVATAR_MAX_BYTES = 300_000
-
-
-class AboutBody(BaseModel):
-    about: str = ""
-
-
-class AvatarBody(BaseModel):
-    image: str
-
-
-class CredentialsBody(BaseModel):
-    login: Optional[str] = None
-    new_password: Optional[str] = None
-    current_password: Optional[str] = None
-
-
-@app.post("/api/me/profile")
-def update_profile(body: AboutBody, user=Depends(auth_user)):
-    about = " ".join(body.about.split())
-    if len(about) > ABOUT_MAX:
-        raise HTTPException(400, f"«О себе»: не больше {ABOUT_MAX} символов")
-    with closing(db()) as conn, conn:
-        conn.execute("UPDATE users SET about=? WHERE id=?", (about, user["id"]))
-        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    return user_public(row)
-
-
-@app.post("/api/me/avatar")
-def upload_avatar(body: AvatarBody, user=Depends(auth_user)):
-    """Аватар приходит уже уменьшенным JPEG (data URL) — храним в базе, отдаём по /avatar/<ключ>."""
+async def process(target, state: FSMContext, flow: Flow, step: Step, raw: str):
     try:
-        raw = base64.b64decode(body.image.split(",", 1)[-1], validate=True)
-    except Exception:
-        raise HTTPException(400, "Не удалось прочитать картинку")
-    if len(raw) < 100 or len(raw) > AVATAR_MAX_BYTES:
-        raise HTTPException(400, "Картинка слишком большая")
-    if not raw.startswith(b"\xff\xd8\xff"):
-        raise HTTPException(400, "Нужна JPEG-картинка")
-    key = secrets.token_urlsafe(9)
-    with closing(db()) as conn, conn:
-        conn.execute("UPDATE users SET avatar=?, avatar_key=?, photo=? WHERE id=?",
-                     (raw, key, "/avatar/" + key, user["id"]))
-        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    return user_public(row)
+        res = step.parse(raw) if step.parse else raw
+        if inspect.isawaitable(res):
+            res = await res
+    except ValueError as e:
+        await send(target, f"⚠️ {esc(e)}\n<i>Попробуйте ещё раз.</i>", edit=False)
+        return
+    if isinstance(res, Pick):
+        d = await state.get_data()
+        if isinstance(target, Message):
+            await strip_kb(target.bot, target.chat.id, d.get("pid"))
+        await state.update_data(opts=res.options)
+        rows = [[B(lbl[:60], f"w:p:{i}")] for i, (lbl, _) in enumerate(res.options)]
+        rows.append([B("⬅️ Назад", "w:back"), B("❌ Отмена", "w:cancel")] if len(d["hist"]) > 1 else [B("❌ Отмена", "w:cancel")])
+        msg = await send(target, "🔎 Нашёл несколько вариантов — выберите нужный:", InlineKeyboardMarkup(inline_keyboard=rows))
+        await state.update_data(pid=msg.message_id)
+        return
+    if isinstance(res, Picked):
+        await accept(target, state, flow, step, res.value, res.label)
+    else:
+        await accept(target, state, flow, step, res)
 
 
-@app.get("/avatar/{key}")
-def get_avatar(key: str):
-    if not re.fullmatch(r"[A-Za-z0-9_-]{6,32}", key):
-        raise HTTPException(404)
-    with closing(db()) as conn:
-        r = conn.execute("SELECT avatar FROM users WHERE avatar_key=?", (key,)).fetchone()
-    if not r or not r["avatar"]:
-        raise HTTPException(404)
-    return Response(bytes(r["avatar"]), media_type="image/jpeg",
-                    headers={"Cache-Control": "public, max-age=31536000, immutable"})
+async def ask_confirm(target, state: FSMContext, flow: Flow):
+    d = await state.get_data()
+    if isinstance(target, Message):
+        await strip_kb(target.bot, target.chat.id, d.get("pid"))
+    await state.set_state(W.confirm)
+    text = f"📝 <b>Проверьте</b>\n\n{flow.summary(d['vals'])}"
+    kb = KB([B("✅ Подтвердить", "w:ok"), B("✏️ Заново", "w:redo")],
+            [B("⬅️ Назад", "w:back"), B("❌ Отмена", "w:cancel")])
+    msg = await send(target, text, kb)
+    await state.update_data(pid=msg.message_id)
 
 
-@app.post("/api/me/credentials")
-def update_credentials(body: CredentialsBody, user=Depends(auth_user)):
-    new_login = (body.login or "").strip().lower() or None
-    new_pw = body.new_password or None
-    has_pw = bool(user["password_hash"])
-    cur_login = user["login"]
-    login_changed = bool(new_login) and new_login != (cur_login or "")
-    if not login_changed and not new_pw:
-        raise HTTPException(400, "Нечего менять")
-    if has_pw and hash_password(body.current_password or "") != user["password_hash"]:
-        raise HTTPException(400, "Неверный текущий пароль")
-    if login_changed and not (3 <= len(new_login) <= 32):
-        raise HTTPException(400, "Логин: от 3 до 32 символов")
-    if new_pw is not None and not (4 <= len(new_pw) <= 64):
-        raise HTTPException(400, "Пароль: от 4 до 64 символов")
-    final_login = new_login if login_changed else cur_login
-    if not has_pw and (not final_login or not new_pw):
-        raise HTTPException(400, "Чтобы входить по логину, задайте и логин, и пароль")
-    sets, vals = [], []
-    if login_changed:
-        sets.append("login=?"); vals.append(new_login)
-    if new_pw:
-        sets.append("password_hash=?"); vals.append(hash_password(new_pw))
-    vals.append(user["id"])
+async def execute(target, state: FSMContext, flow: Flow):
+    d = await state.get_data()
+    await state.clear()
+    if isinstance(target, Message):
+        await strip_kb(target.bot, target.chat.id, d.get("pid"))
+    after = [[B(flow.again, f"go:{flow.name}")] if flow.again else [], [B("⬅️ К разделу", f"m:{flow.menu}")], [HOME]]
     try:
-        with closing(db()) as conn, conn:
-            if login_changed and conn.execute("SELECT 1 FROM users WHERE login=? AND id<>?", (new_login, user["id"])).fetchone():
-                raise HTTPException(400, "Такой логин уже занят")
-            conn.execute("UPDATE users SET " + ", ".join(sets) + " WHERE id=?", vals)
-            row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    except sqlite3.IntegrityError:
-        raise HTTPException(400, "Такой логин уже занят")
-    return user_public(row)
+        text = await flow.run(d["vals"], target.from_user.id)
+        kb = KB(*after)
+    except ApiError as e:
+        text = f"❌ <b>Не получилось</b>\n{esc(e)}"
+        kb = KB([B("🔁 Попробовать заново", f"go:{flow.name}")], [B("⬅️ К разделу", f"m:{flow.menu}")], [HOME])
+    await send(target, text, kb)
 
 
-def _pair(x: int, y: int):
-    return (x, y) if x < y else (y, x)
+# ---- обработчики мастера ----
+@admin.callback_query(F.data.startswith("go:"))
+async def cb_go(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await start_flow(cb, state, cb.data[3:])
 
 
-def _target(conn, public_id: str):
-    pid = (public_id or "").strip().lstrip("#")
-    if not PUBLIC_ID_RE.fullmatch(pid):
-        raise HTTPException(404, "Игрок не найден")
-    r = conn.execute("SELECT id, public_id, nickname, photo FROM users WHERE public_id=? COLLATE NOCASE", (pid,)).fetchone()
-    if not r:
-        raise HTTPException(404, "Игрок не найден")
-    return r
+@admin.callback_query(W.step, F.data.startswith("w:q:"))
+async def cb_quick(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    d = await state.get_data()
+    flow = FLOWS[d["flow"]]
+    step = flow.steps[d["hist"][-1]]
+    await process(cb, state, flow, step, step.quick[int(cb.data[4:])][1])
 
 
-def relation(conn, me: int, other: int) -> str:
-    """none | friend | incoming (он мне) | outgoing (я ему) | blocked (я заблокировал)."""
-    if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, other)).fetchone():
-        return "blocked"
-    x, y = _pair(me, other)
-    f = conn.execute("SELECT requester, status FROM friendships WHERE user_a=? AND user_b=?", (x, y)).fetchone()
-    if not f:
-        return "none"
-    if f["status"] == "accepted":
-        return "friend"
-    return "outgoing" if f["requester"] == me else "incoming"
+@admin.callback_query(W.step, F.data.startswith("w:p:"))
+async def cb_pick(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    d = await state.get_data()
+    flow = FLOWS[d["flow"]]
+    step = flow.steps[d["hist"][-1]]
+    label, value = d["opts"][int(cb.data[4:])]
+    await accept(cb, state, flow, step, value, label)
 
 
-@app.get("/api/users/{public_id}")
-def public_profile(public_id: str, user=Depends(auth_user)):
-    """Чужой профиль: ник, фото, «о себе», дата регистрации, баланс, инвентарь и связь с вами."""
-    with closing(db()) as conn:
-        r = _target_full(conn, public_id)
-        rel = "none" if r["id"] == user["id"] else relation(conn, user["id"], r["id"])
-    return {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"],
-            "about": r["about"] or "", "createdAt": r["created_at"], "balance": r["balance"],
-            "inventory": json.loads(r["inventory"] or "[]"), "isMe": r["id"] == user["id"], "relation": rel}
+@admin.message(W.step, F.text, ~F.text.startswith("/"))
+async def w_text(message: Message, state: FSMContext):
+    d = await state.get_data()
+    flow = FLOWS[d["flow"]]
+    step = flow.steps[d["hist"][-1]]
+    if step.strict:
+        await message.answer("Выберите вариант кнопкой 👆")
+        return
+    await process(message, state, flow, step, message.text.strip())
 
 
-def _target_full(conn, public_id: str):
-    pid = (public_id or "").strip().lstrip("#")
-    if not PUBLIC_ID_RE.fullmatch(pid):
-        raise HTTPException(404, "Игрок не найден")
-    r = conn.execute("SELECT * FROM users WHERE public_id=? COLLATE NOCASE", (pid,)).fetchone()
-    if not r:
-        raise HTTPException(404, "Игрок не найден")
-    return r
+@admin.callback_query(F.data == "w:back")
+async def cb_back(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    d = await state.get_data()
+    if not d.get("flow"):
+        return await show_menu(cb, "main")
+    flow = FLOWS[d["flow"]]
+    hist, vals = d["hist"], d["vals"]
+    if await state.get_state() == W.confirm.state:
+        i = hist.pop()
+    else:
+        hist.pop()
+        i = hist.pop()
+    key = flow.steps[i].key
+    vals.pop(key, None)
+    vals.pop(key + "_label", None)
+    await state.update_data(hist=hist, vals=vals)
+    await goto(cb, state, flow, i)
 
 
-# ---------------------------------------------------------------------------
-# Друзья и блокировки
-# ---------------------------------------------------------------------------
-class PidBody(BaseModel):
-    publicId: str
+@admin.callback_query(F.data == "w:cancel")
+async def cb_cancel(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    d = await state.get_data()
+    await state.clear()
+    flow = FLOWS.get(d.get("flow"))
+    await show_menu(cb, flow.menu if flow else "main", "❌ Отменено")
 
 
-class BlockBody(BaseModel):
-    publicId: str
-    block: bool = True
+@admin.callback_query(W.confirm, F.data == "w:ok")
+async def cb_ok(cb: CallbackQuery, state: FSMContext):
+    await cb.answer("Выполняю…")
+    d = await state.get_data()
+    await execute(cb, state, FLOWS[d["flow"]])
 
 
-MAX_PENDING_OUT = 50
+@admin.callback_query(F.data == "w:redo")
+async def cb_redo(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    d = await state.get_data()
+    if d.get("flow"):
+        await start_flow(cb, state, d["flow"])
+    else:
+        await show_menu(cb, "main")
 
 
-@app.get("/api/friends")
-def friends_list(user=Depends(auth_user)):
-    me = user["id"]
-    with closing(db()) as conn:
-        rows = conn.execute(
-            """SELECT f.status, f.requester, u.*
-               FROM friendships f
-               JOIN users u ON u.id = CASE WHEN f.user_a=? THEN f.user_b ELSE f.user_a END
-               WHERE f.user_a=? OR f.user_b=? ORDER BY f.created_at DESC""", (me, me, me)).fetchall()
-    out = {"friends": [], "incoming": [], "outgoing": []}
-    for r in rows:
-        item = {"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"], "style": style.style_fields(r)}
-        if r["status"] == "accepted":
-            out["friends"].append(item)
-        elif r["requester"] == me:
-            out["outgoing"].append(item)
-        else:
-            out["incoming"].append(item)
-    return out
+@admin.callback_query(F.data.startswith("m:"))
+async def cb_menu(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await state.clear()
+    await show_menu(cb, cb.data[2:])
 
 
-@app.post("/api/friends/request")
-def friend_request(body: PidBody, user=Depends(auth_user)):
-    me = user["id"]
-    with closing(db()) as conn, conn:
-        t = _target(conn, body.publicId)
-        if t["id"] == me:
-            raise HTTPException(400, "Нельзя добавить в друзья себя")
-        if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, t["id"])).fetchone():
-            raise HTTPException(400, "Сначала разблокируйте игрока")
-        if conn.execute("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (t["id"], me)).fetchone():
-            raise HTTPException(400, "Не удалось отправить заявку")
-        x, y = _pair(me, t["id"])
-        f = conn.execute("SELECT requester, status FROM friendships WHERE user_a=? AND user_b=?", (x, y)).fetchone()
-        if f:
-            if f["status"] == "accepted":
-                return {"relation": "friend"}
-            if f["requester"] == me:
-                return {"relation": "outgoing"}
-            conn.execute("UPDATE friendships SET status='accepted' WHERE user_a=? AND user_b=?", (x, y))
-            return {"relation": "friend"}
-        n = conn.execute("SELECT COUNT(*) FROM friendships WHERE requester=? AND status='pending'", (me,)).fetchone()[0]
-        if n >= MAX_PENDING_OUT:
-            raise HTTPException(400, "Слишком много неотвеченных заявок")
-        conn.execute("INSERT INTO friendships(user_a, user_b, requester, status, created_at) VALUES(?,?,?,?,?)",
-                     (x, y, me, "pending", int(time.time())))
-    return {"relation": "outgoing"}
+# ====================================================================
+#  Разовые действия (списки, топ, удаление) — без мастера
+# ====================================================================
+def back_kb(menu: str, *extra_rows):
+    return KB(*extra_rows, [B("⬅️ К разделу", f"m:{menu}")], [HOME])
 
 
-@app.post("/api/friends/accept")
-def friend_accept(body: PidBody, user=Depends(auth_user)):
-    me = user["id"]
-    with closing(db()) as conn, conn:
-        t = _target(conn, body.publicId)
-        x, y = _pair(me, t["id"])
-        cur = conn.execute("UPDATE friendships SET status='accepted' WHERE user_a=? AND user_b=? AND status='pending' AND requester<>?",
-                           (x, y, me))
-        if cur.rowcount == 0:
-            raise HTTPException(404, "Заявка не найдена")
-    return {"relation": "friend"}
+def reward_text(p: dict) -> str:
+    return f"+{fmt_g(p['reward_value'])} G" if p["reward_type"] == "balance" else f"предмет #{p['reward_value']}"
 
 
-@app.post("/api/friends/remove")
-def friend_remove(body: PidBody, user=Depends(auth_user)):
-    """Удалить из друзей, отклонить входящую или отменить свою исходящую заявку."""
-    me = user["id"]
-    with closing(db()) as conn, conn:
-        t = _target(conn, body.publicId)
-        x, y = _pair(me, t["id"])
-        conn.execute("DELETE FROM friendships WHERE user_a=? AND user_b=?", (x, y))
-    return {"relation": "none"}
+async def act_top(target):
+    try:
+        d = await api("GET", "/admin/top")
+    except ApiError as e:
+        return await send(target, f"❌ {esc(e)}", back_kb("users"))
+    medals = ["🥇", "🥈", "🥉"]
+    lines = []
+    for i, u in enumerate(d["users"]):
+        luck = " 🎯" if u.get("luck_rules") not in (None, "", "[]") else ""
+        lines.append(f"{medals[i] if i < 3 else str(i + 1) + '.'} <b>{esc(u['login'] or u['nickname'])}</b> · {fmt_g(u['balance'])} G{luck}")
+    await send(target, f"🏆 <b>Топ игроков</b>\nИгроков: <b>{d['count']}</b> · на балансах: <b>{fmt_g(d['sum'])} G</b>\n\n" + "\n".join(lines),
+               back_kb("users"))
 
 
-@app.get("/api/blocks")
-def blocks_list(user=Depends(auth_user)):
-    with closing(db()) as conn:
-        rows = conn.execute(
-            """SELECT u.public_id, u.nickname, u.photo FROM blocks b JOIN users u ON u.id=b.blocked_id
-               WHERE b.blocker_id=? ORDER BY b.created_at DESC""", (user["id"],)).fetchall()
-    return {"blocked": [{"publicId": r["public_id"], "nickname": r["nickname"] or "Игрок", "photo": r["photo"]} for r in rows]}
+async def act_promos(target):
+    try:
+        promos = await api("GET", "/admin/promo")
+    except ApiError as e:
+        return await send(target, f"❌ {esc(e)}", back_kb("promo"))
+    if not promos:
+        return await send(target, "Промокодов пока нет.", back_kb("promo", [B("➕ Создать", "go:promo")]))
+    lines = [f"{'✅' if p['active'] else '🚫'} <code>{esc(p['code'])}</code> — {reward_text(p)} · {p['used_count']}/{p['max_uses'] or '∞'}"
+             for p in promos]
+    await send(target, "🎟 <b>Промокоды</b>\n\n" + "\n".join(lines), back_kb("promo", [B("➕ Создать", "go:promo")]))
 
 
-@app.post("/api/blocks")
-def block_user(body: BlockBody, user=Depends(auth_user)):
-    me = user["id"]
-    with closing(db()) as conn, conn:
-        t = _target(conn, body.publicId)
-        if t["id"] == me:
-            raise HTTPException(400, "Нельзя заблокировать себя")
-        if body.block:
-            conn.execute("INSERT OR IGNORE INTO blocks(blocker_id, blocked_id, created_at) VALUES(?,?,?)",
-                         (me, t["id"], int(time.time())))
-            x, y = _pair(me, t["id"])
-            conn.execute("DELETE FROM friendships WHERE user_a=? AND user_b=?", (x, y))
-        else:
-            conn.execute("DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?", (me, t["id"]))
-    return {"relation": "blocked" if body.block else "none"}
+async def act_delpromo(target):
+    try:
+        promos = [p for p in await api("GET", "/admin/promo") if p["active"]]
+    except ApiError as e:
+        return await send(target, f"❌ {esc(e)}", back_kb("promo"))
+    if not promos:
+        return await send(target, "Активных промокодов нет.", back_kb("promo"))
+    rows = [[B(f"🚫 {p['code']} · {reward_text(p)}", f"dp:{p['code']}")] for p in promos[:40]]
+    await send(target, "Какой промокод деактивировать?", back_kb("promo", *rows))
 
 
-@app.get("/admin/users")
-def admin_search_users(q: str = "", _=Depends(check_admin)):
-    like = f"%{q}%"
-    with closing(db()) as conn:
-        rows = conn.execute(
-            """SELECT id, public_id, login, nickname, username, balance, referral_code FROM users
-               WHERE login LIKE ? OR nickname LIKE ? OR username LIKE ? OR public_id LIKE ? LIMIT 20""",
-            (like, like, like, like),
-        ).fetchall()
-    return [dict(r) for r in rows]
+async def act_tasks(target):
+    try:
+        tasks = await api("GET", "/admin/task")
+    except ApiError as e:
+        return await send(target, f"❌ {esc(e)}", back_kb("tasks"))
+    if not tasks:
+        return await send(target, "Заданий пока нет.", back_kb("tasks", [B("📢 Добавить", "go:task_tg")]))
+    lines = [f"#{t['id']} {'📢' if t['kind'] == 'tg' else '🔗'} <b>{esc(t['title'])}</b> · +{fmt_g(t['reward'])} G" for t in tasks]
+    rows = [[B(f"🗑 #{t['id']} · {t['title'][:28]}", f"dt:{t['id']}")] for t in tasks[:40]]
+    await send(target, "📋 <b>Задания</b>\nНажмите на задание, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
 
 
-# Мини-апп (index.html лежит рядом с app.py)
-# ---------------------------------------------------------------------------
-@app.get("/videos/{name}")
-def video(name: str):
-    """Видео-реакции: лежат в папке videos/ (или прямо в корне рядом с app.py)."""
-    if "/" in name or "\\" in name or not name.lower().endswith(".mp4"):
-        raise HTTPException(404)
-    for folder in (BASE_DIR / "videos", BASE_DIR):
-        f = folder / name
-        if f.is_file():
-            return FileResponse(f, media_type="video/mp4", headers={"Cache-Control": "public, max-age=86400"})
-    raise HTTPException(404)
+ACTIONS = {"top": act_top, "promos": act_promos, "delpromo": act_delpromo, "tasks": act_tasks}
 
 
-APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
+@admin.callback_query(F.data.startswith("a:"))
+async def cb_action(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await state.clear()
+    await ACTIONS[cb.data[2:]](cb)
 
 
-def _index_html() -> str:
-    # <base href="/"> — чтобы css/js грузились и со страницы /t/КОД (ссылка на трейд)
-    html = (BASE_DIR / "index.html").read_text(encoding="utf-8")
-    return html.replace("<head>", '<head>\n<base href="/">', 1)
+@admin.callback_query(F.data.startswith("dp:"))
+async def cb_dp(cb: CallbackQuery):
+    await cb.answer()
+    code = cb.data[3:]
+    await send(cb, f"Деактивировать промокод <code>{esc(code)}</code>?",
+               KB([B("✅ Да", f"dpc:{code}"), B("⬅️ Нет", "a:delpromo")]))
 
 
-def _base(request: Request) -> str:
-    if APP_URL:
-        return APP_URL
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    return f"{proto}://{request.headers.get('host', request.url.netloc)}"
+@admin.callback_query(F.data.startswith("dpc:"))
+async def cb_dpc(cb: CallbackQuery):
+    await cb.answer()
+    code = cb.data[4:]
+    try:
+        await api("POST", "/admin/promo/deactivate", json={"code": code})
+        text = f"🚫 Промокод <code>{esc(code)}</code> деактивирован."
+    except ApiError as e:
+        text = f"❌ {esc(e)}"
+    await send(cb, text, back_kb("promo", [B("🚫 Ещё один", "a:delpromo")]))
 
 
-def _tr(request: Request, v):
-    if isinstance(v, dict) and v.get("id"):
-        v["link"] = f"{_base(request)}/t/{v['id']}"
+@admin.callback_query(F.data.startswith("dt:"))
+async def cb_dt(cb: CallbackQuery):
+    await cb.answer()
+    tid = cb.data[3:]
+    await send(cb, f"Удалить задание #{esc(tid)}?", KB([B("✅ Да", f"dtc:{tid}"), B("⬅️ Нет", "a:tasks")]))
+
+
+@admin.callback_query(F.data.startswith("dtc:"))
+async def cb_dtc(cb: CallbackQuery):
+    await cb.answer()
+    tid = cb.data[4:]
+    try:
+        await api("POST", "/admin/task/delete", json={"id": int(tid)})
+        text = f"🗑 Задание #{esc(tid)} удалено."
+    except (ApiError, ValueError) as e:
+        text = f"❌ {esc(e)}"
+    await send(cb, text, back_kb("tasks", [B("🗑 Ещё одно", "a:tasks")]))
+
+
+# ====================================================================
+#  Команды (остались для привычки — открывают то же меню / мастера)
+# ====================================================================
+COMMAND_FLOWS = {
+    "new": "promo", "newpromo": "promo", "newitem": "promo", "items": "items",
+    "grant": "grant", "setbal": "setbal", "grantall": "grantall", "setall": "setall",
+    "luck": "luck", "gluck": "gluck", "luckoff": "luckoff", "gluckoff": "gluckoff",
+    "find": "find", "setid": "setpid", "addtask": "task_tg", "newquest": "quest", "spins": "spins",
+}
+COMMAND_ACTIONS = {"top": "top", "promos": "promos", "delpromo": "delpromo", "tasks": "tasks", "deltask": "tasks"}
+
+
+def cmd_name(message: Message) -> str:
+    return message.text.split()[0][1:].split("@")[0].lower()
+
+
+@admin.message(Command("start", "menu"))
+async def cmd_menu(message: Message, state: FSMContext):
+    await state.clear()
+    await show_menu(message, "main")
+
+
+@admin.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext):
+    await state.clear()
+    await show_menu(message, "main", "❌ Отменено")
+
+
+@admin.message(Command(*COMMAND_FLOWS))
+async def cmd_flow(message: Message, state: FSMContext):
+    await start_flow(message, state, COMMAND_FLOWS[cmd_name(message)])
+
+
+@admin.message(Command(*COMMAND_ACTIONS))
+async def cmd_action(message: Message, state: FSMContext):
+    await state.clear()
+    await ACTIONS[COMMAND_ACTIONS[cmd_name(message)]](message)
+
+
+# ---- заглушки: чужие и непонятные сообщения ----
+@other.message()
+async def fb_message(message: Message):
+    if is_admin(message):
+        await show_menu(message, "main", "Не понял 🤔 Выберите действие кнопкой:")
+    else:
+        await message.answer("У вас нет доступа к этому боту.")
+
+
+@other.callback_query()
+async def fb_callback(cb: CallbackQuery):
+    if cb.from_user.id in ADMIN_IDS:
+        await cb.answer()
+        await show_menu(cb, "main", "Эта кнопка устарела — вот свежее меню:")
+    else:
+        await cb.answer("Нет доступа", show_alert=True)
+
+
+# ====================================================================
+#  Разбор ответов (парсеры шагов)
+# ====================================================================
+def to_int(s: str) -> Optional[int]:
+    try:
+        return int(s.replace(" ", "").replace("+", "").replace("−", "-"))
+    except ValueError:
+        return None
+
+
+def int_parser(lo: Optional[int] = None, hi: Optional[int] = None, nonzero: bool = False):
+    def p(t: str) -> int:
+        v = to_int(t)
+        if v is None:
+            raise ValueError("Нужно целое число, например 500.")
+        if nonzero and v == 0:
+            raise ValueError("Число не может быть нулём.")
+        if lo is not None and v < lo:
+            raise ValueError(f"Минимум {fmt_g(lo)}.")
+        if hi is not None and v > hi:
+            raise ValueError(f"Максимум {fmt_g(hi)}.")
+        return v
+    return p
+
+
+def p_percent(t: str) -> float:
+    try:
+        v = float(t.replace(",", ".").replace("%", "").strip())
+    except ValueError:
+        raise ValueError("Нужно число от 0 до 100, например 5 или 12.5.")
+    if not 0 <= v <= 100:
+        raise ValueError("Процент должен быть от 0 до 100.")
     return v
 
 
-@app.get("/")
-def index():
-    return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
+def p_code(t: str) -> str:
+    code = t.strip().upper()
+    if not re.fullmatch(r"[\w-]{3,32}", code):
+        raise ValueError("Код: 3–32 символа, только буквы, цифры, _ и -.")
+    return code
 
 
-_PWA_MANIFEST = {
-    "name": "Amgrader", "short_name": "Amgrader",
-    "description": "Амгрейд: кейсы, апгрейды, квесты и колесо бонусов",
-    "start_url": "/", "scope": "/", "display": "standalone", "orientation": "portrait",
-    "background_color": "#09090B", "theme_color": "#09090B",
-    "icons": [
-        {"src": "/img/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-        {"src": "/img/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-        {"src": "/img/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
-    ],
-}
-_PWA_SW = (
-    'self.addEventListener("install", () => self.skipWaiting());\n'
-    'self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));\n'
-    'self.addEventListener("fetch", () => {});\n'
-)
+def p_chat(t: str) -> str:
+    m = re.search(r"(?:t\.me/|@)?([A-Za-z]\w{3,31})/?$", t.strip())
+    if not m:
+        raise ValueError("Пришлите @username канала или ссылку вида t.me/канал.")
+    return "@" + m.group(1)
 
 
-@app.get("/manifest.json")
-def pwa_manifest():
-    # Отдаём из кода, а не из файла: деплой не падает, даже если manifest.json не загружен
-    return JSONResponse(_PWA_MANIFEST, media_type="application/manifest+json")
+def p_url(t: str) -> str:
+    t = t.strip()
+    if not re.match(r"https?://\S+\.\S+", t):
+        raise ValueError("Нужна ссылка, начинающаяся с https://")
+    return t
 
 
-@app.get("/sw.js")
-def pwa_sw():
-    return Response(_PWA_SW, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+def p_title(t: str) -> str:
+    t = t.strip()
+    if not 2 <= len(t) <= 80:
+        raise ValueError("Название: от 2 до 80 символов.")
+    return t
 
 
-@app.get("/.well-known/assetlinks.json")
-def asset_links():
-    # Файл подтверждает связь сайта с APK (Digital Asset Links): без него приложение показывает адресную строку.
-    f = BASE_DIR / "assetlinks.json"
-    if not f.is_file():
-        raise HTTPException(404, "assetlinks.json не загружен")
-    return FileResponse(f, media_type="application/json")
+def p_query(t: str) -> str:
+    if not t.strip():
+        raise ValueError("Введите хотя бы пару символов.")
+    return t.strip()
 
 
-@app.get("/t/{code}")
-def trade_link_page(code: str):
-    return HTMLResponse(_index_html(), headers={"Cache-Control": "no-cache"})
+async def p_user(t: str, allow_all: bool = False):
+    q = t.strip().lstrip("@")
+    if not q:
+        raise ValueError("Введите логин, ник или #id игрока.")
+    if q == "*" and allow_all:
+        return Picked("", "все игроки")
+    if re.fullmatch(r"#\d+", q):
+        return Picked(q, q)
+    try:
+        users = await api("GET", "/admin/users", params={"q": q})
+    except ApiError as e:
+        raise ValueError(str(e))
+    if not users:
+        raise ValueError("Игрока с таким логином или ником не нашёл.")
+
+    def ident(u):
+        return u.get("login") or f"#{u['id']}"
+
+    def lab(u):
+        return f"{u['nickname']} · {ident(u)} · {fmt_g(u['balance'])} G"
+
+    exact = [u for u in users if (u.get("login") or "").lower() == q.lower()]
+    if len(exact) == 1 or len(users) == 1:
+        u = exact[0] if exact else users[0]
+        return Picked(ident(u), lab(u))
+    return Pick([(lab(u), ident(u)) for u in users[:8]])
 
 
-# Статика фронтенда: index.html ссылается на css/, js/ и img/ — без этого страница выглядит голой и не работает.
-for _d in ("css", "js", "img"):
-    if (BASE_DIR / _d).is_dir():
-        app.mount(f"/{_d}", StaticFiles(directory=BASE_DIR / _d), name=f"static_{_d}")
+async def p_item(t: str):
+    try:
+        items = await api("GET", "/admin/items", params={"q": t.strip()})
+    except ApiError as e:
+        raise ValueError(str(e))
+    if not items:
+        raise ValueError("Предмет не нашёл. Попробуйте другое слово (можно по-английски).")
+    if len(items) == 1:
+        return Picked(items[0]["id"], items[0]["name"])
+    return Pick([(f"{i['name']} · {fmt_g(i['price'])} G", i["id"]) for i in items[:10]])
+
+
+AMOUNTS = (("100", "100"), ("500", "500"), ("1 000", "1000"), ("5 000", "5000"))
+USER_PROMPT = "Введите <b>логин</b> или ник игрока (или <code>#id</code>).\n<i>Можно часть — я поищу.</i>"
+
+
+def lab(vals: dict, key: str) -> str:
+    return esc(vals.get(key + "_label") or vals.get(key))
+
+
+def fmt_rules(rules) -> str:
+    return "\n".join(f"• показанный шанс ≤ {r[0]:g}% → +{r[1]}%" for r in rules) or "правил нет"
+
+
+# ====================================================================
+#  Описание мастеров
+# ====================================================================
+# ---- промокод ----
+async def run_promo(v: dict, uid: int) -> str:
+    await api("POST", "/admin/promo", json={
+        "code": v["code"], "reward_type": v["kind"], "reward_value": v["value"],
+        "max_uses": v["uses"], "created_by": str(uid)})
+    return (f"✅ <b>Промокод создан!</b>\n\n<code>{esc(v['code'])}</code>\n"
+            f"{sum_reward(v)}\n👥 Активаций: {'без ограничений' if v['uses'] == 0 else v['uses']}")
+
+
+def sum_reward(v: dict) -> str:
+    return f"💰 {fmt_g(v['value'])} G" if v["kind"] == "balance" else f"🎁 {lab(v, 'value')}"
+
+
+def sum_promo(v: dict) -> str:
+    return (f"🎟 Код: <code>{esc(v['code'])}</code>\n{sum_reward(v)}\n"
+            f"👥 Активаций: <b>{'без ограничений' if v['uses'] == 0 else v['uses']}</b>")
+
+
+FLOWS["promo"] = Flow("promo", "🎟", "Создание промокода", "promo", [
+    Step("code", "Придумайте <b>текст промокода</b> — его будут вводить игроки.\n<i>Например: <code>SUMMER26</code> (3–32 символа: буквы, цифры, _ и -)</i>",
+         "Код", p_code),
+    Step("kind", "Что подарит промокод?", "Награда", lambda t: t,
+         quick=(("💰 Сумму (G)", "balance"), ("🎁 Предмет", "item")), strict=True, per=2,
+         fmt=lambda v: "💰 сумма" if v == "balance" else "🎁 предмет"),
+    Step("value", "Сколько <b>G</b> дарить? Нажмите кнопку или введите число.", "Сумма",
+         int_parser(lo=1), quick=AMOUNTS, when=lambda v: v.get("kind") == "balance", fmt=lambda x: f"{fmt_g(x)} G"),
+    Step("value", "Введите <b>название предмета</b> (или часть, можно по-английски) — я найду.", "Предмет",
+         p_item, when=lambda v: v.get("kind") == "item"),
+    Step("uses", "Сколько человек смогут активировать код?\n<i>Нажмите кнопку или введите число.</i>", "Активаций",
+         int_parser(lo=0), quick=(("1", "1"), ("10", "10"), ("100", "100"), ("♾ Без лимита", "0")), per=4,
+         fmt=lambda x: "∞" if x == 0 else str(x)),
+], run_promo, sum_promo, again="➕ Ещё промокод")
+
+
+# ---- поиск предмета ----
+async def run_items(v: dict, uid: int) -> str:
+    items = await api("GET", "/admin/items", params={"q": v["q"]})
+    if not items:
+        return "Ничего не найдено."
+    return "🔎 <b>Найденные предметы</b>\n\n" + "\n".join(
+        f"<code>#{i['id']}</code> {esc(i['name'])} · {esc(i['rarity'])} · {fmt_g(i['price'])} G" for i in items)
+
+
+FLOWS["items"] = Flow("items", "🔎", "Поиск предмета", "promo", [
+    Step("q", "Введите название предмета (или часть):", "", p_query)], run_items, confirm=False, again="🔎 Искать ещё")
+
+
+# ---- начислить игроку ----
+async def run_grant(v: dict, uid: int) -> str:
+    await api("POST", "/admin/grant", json={"login": v["user"], "amount": v["amount"]})
+    return f"✅ Игроку <b>{lab(v, 'user')}</b> начислено <b>{fmt_g(v['amount'])} G</b>"
+
+
+FLOWS["grant"] = Flow("grant", "🎁", "Начислить игроку", "bal", [
+    Step("user", USER_PROMPT, "Игрок", p_user),
+    Step("amount", "Сколько <b>G</b> начислить?", "Сумма", int_parser(lo=1), quick=AMOUNTS, fmt=lambda x: f"{fmt_g(x)} G"),
+], run_grant, lambda v: f"🎁 Игроку: <b>{lab(v, 'user')}</b>\n💰 Начислить: <b>{fmt_g(v['amount'])} G</b>", again="🎁 Ещё начисление")
+
+
+# ---- установить баланс игроку ----
+async def run_setbal(v: dict, uid: int) -> str:
+    await api("POST", "/admin/balance", json={"login": v["user"], "amount": v["amount"], "mode": "set"})
+    return f"✅ Баланс <b>{lab(v, 'user')}</b> теперь <b>{fmt_g(v['amount'])} G</b>"
+
+
+FLOWS["setbal"] = Flow("setbal", "✏️", "Установить баланс игроку", "bal", [
+    Step("user", USER_PROMPT, "Игрок", p_user),
+    Step("amount", "Какой баланс <b>установить</b>? (число, G)", "Баланс", int_parser(lo=0),
+         quick=(("0", "0"), ("500", "500"), ("1 000", "1000"), ("10 000", "10000")), fmt=lambda x: f"{fmt_g(x)} G"),
+], run_setbal, lambda v: f"✏️ Игрок: <b>{lab(v, 'user')}</b>\n💰 Новый баланс: <b>{fmt_g(v['amount'])} G</b>", again="✏️ Ещё один")
+
+
+# ---- баланс ВСЕМ ----
+def all_runner(mode: str):
+    async def run(v: dict, uid: int) -> str:
+        r = await api("POST", "/admin/balance", json={"login": "", "amount": v["amount"], "mode": mode})
+        return f"✅ Готово! Затронуто игроков: <b>{(r or {}).get('affected')}</b>"
+    return run
+
+
+FLOWS["grantall"] = Flow("grantall", "➕", "Прибавить ВСЕМ", "bal", [
+    Step("amount", "Сколько <b>G</b> прибавить <b>всем игрокам</b>?\n<i>Минус — списать, например −100.</i>", "Сумма",
+         int_parser(nonzero=True), quick=(("+100", "100"), ("+500", "500"), ("+1 000", "1000"), ("−100", "-100")), per=4,
+         fmt=lambda x: f"{x:+,} G".replace(",", " ")),
+], all_runner("add"), lambda v: f"⚠️ <b>ВСЕМ игрокам</b>\n{'➕ прибавить' if v['amount'] > 0 else '➖ списать'} <b>{fmt_g(abs(v['amount']))} G</b>",
+    again="➕ Ещё раз")
+
+FLOWS["setall"] = Flow("setall", "⚖️", "Установить баланс ВСЕМ", "bal", [
+    Step("amount", "Какой баланс <b>установить всем игрокам</b>?", "Баланс", int_parser(lo=0),
+         quick=(("0", "0"), ("500", "500"), ("1 000", "1000")), fmt=lambda x: f"{fmt_g(x)} G"),
+], all_runner("set"), lambda v: f"⚠️ <b>ВСЕМ игрокам</b>\n⚖️ установить баланс <b>{fmt_g(v['amount'])} G</b>", again="⚖️ Ещё раз")
+
+
+# ---- удача ----
+def luck_steps(with_user: bool) -> list:
+    steps = [Step("user", USER_PROMPT, "Игрок", p_user)] if with_user else []
+    steps += [
+        Step("at", "Порог: пока <b>показанный</b> шанс ≤ …%, удача работает.\n<i>Например 5</i>", "Порог", p_percent,
+             quick=(("1", "1"), ("5", "5"), ("10", "10"), ("25", "25")), per=4, fmt=lambda x: f"≤ {x:g}%"),
+        Step("bonus", "На сколько <b>% повысить реальный</b> шанс?\n<i>Например 65</i>", "Бонус",
+             int_parser(lo=-100, hi=100, nonzero=True), quick=(("+10", "10"), ("+25", "25"), ("+50", "50"), ("+65", "65")), per=4,
+             fmt=lambda x: f"+{x}%"),
+    ]
+    return steps
+
+
+def sum_luck(v: dict) -> str:
+    who = lab(v, "user") if "user" in v else "🌍 все игроки"
+    real = max(0, min(100, v["at"] + v["bonus"]))
+    return (f"🎯 Кому: <b>{who}</b>\nПорог: показанный шанс ≤ <b>{v['at']:g}%</b>\nБонус: <b>{v['bonus']:+d}%</b>\n\n"
+            f"<i>Пример: на экране {v['at']:g}% → реально ≈ {real:g}%</i>")
+
+
+async def run_luck(v: dict, uid: int) -> str:
+    r = await api("POST", "/admin/luck", json={"login": v.get("user", ""), "at": v["at"], "bonus": v["bonus"]})
+    return "✅ <b>Правила удачи обновлены</b>\n\n" + esc(fmt_rules(r["rules"]))
+
+
+FLOWS["luck"] = Flow("luck", "🎯", "Удача игроку", "luck", luck_steps(True), run_luck, sum_luck, again="🎯 Ещё игроку")
+FLOWS["gluck"] = Flow("gluck", "🌍", "Удача всем", "luck", luck_steps(False), run_luck, sum_luck, again="🌍 Изменить")
+
+
+async def run_luckshow(v: dict, uid: int) -> str:
+    r = await api("GET", "/admin/luck", params={"login": v["user"]})
+    who = lab(v, "user") if v["user"] else "все игроки"
+    return f"👁 <b>Правила удачи — {who}</b>\n\n" + esc(fmt_rules(r["rules"]))
+
+
+FLOWS["luckshow"] = Flow("luckshow", "👁", "Правила удачи", "luck", [
+    Step("user", USER_PROMPT, "Игрок", lambda t: p_user(t, True), quick=(("🌍 Все игроки", "*"),), per=1)],
+    run_luckshow, confirm=False, again="👁 Посмотреть ещё")
+
+
+def luckoff_steps(with_user: bool) -> list:
+    steps = [Step("user", USER_PROMPT, "Игрок", p_user)] if with_user else []
+    steps += [
+        Step("mode", "Что убрать?", "Что убрать", lambda t: t, strict=True, per=1,
+             quick=(("🧹 Все правила", "all"), ("🎯 Одно правило (по порогу)", "one")),
+             fmt=lambda x: "все правила" if x == "all" else "одно правило"),
+        Step("at", "Введите <b>порог</b> правила, которое убрать (например 5).", "Порог", p_percent,
+             when=lambda v: v.get("mode") == "one", fmt=lambda x: f"≤ {x:g}%"),
+    ]
+    return steps
+
+
+def sum_luckoff(v: dict) -> str:
+    who = lab(v, "user") if "user" in v else "🌍 все игроки"
+    what = "все правила" if v["mode"] == "all" else f"правило с порогом {v['at']:g}%"
+    return f"🧹 Кому: <b>{who}</b>\nУбрать: <b>{what}</b>"
+
+
+async def run_luckoff(v: dict, uid: int) -> str:
+    login = v.get("user", "")
+    if v["mode"] == "one":
+        await api("POST", "/admin/luck", json={"login": login, "at": v["at"], "bonus": 0})
+    else:
+        await api("POST", "/admin/luck/clear", json={"login": login})
+    return "✅ Убрано"
+
+
+FLOWS["luckoff"] = Flow("luckoff", "🧹", "Убрать удачу у игрока", "luck", luckoff_steps(True), run_luckoff, sum_luckoff)
+FLOWS["gluckoff"] = Flow("gluckoff", "🧹", "Убрать удачу у всех", "luck", luckoff_steps(False), run_luckoff, sum_luckoff)
+
+
+# ---- задания ----
+def task_steps(kind: str) -> list:
+    first = (Step("target", "Пришлите <b>канал</b>: @username или ссылку t.me/…\n<i>⚠️ Бот должен быть админом этого канала — иначе подписку не проверить.</i>",
+                  "Канал", p_chat)
+             if kind == "tg" else
+             Step("target", "Пришлите <b>ссылку</b> (TikTok, Instagram и т.д.).\n<i>Начинается с https://</i>", "Ссылка", p_url))
+    return [first,
+            Step("reward", "Сколько <b>G</b> дать за выполнение?", "Награда", int_parser(lo=1),
+                 quick=(("50", "50"), ("100", "100"), ("250", "250"), ("500", "500")), per=4, fmt=lambda x: f"{fmt_g(x)} G"),
+            Step("title", "Напишите <b>название задания</b> — его увидят игроки.\n<i>Например: Подписаться на наш канал</i>", "Название", p_title)]
+
+
+def task_runner(kind: str):
+    async def run(v: dict, uid: int) -> str:
+        if kind == "tg":
+            payload = {"title": v["title"], "kind": "tg", "url": "https://t.me/" + v["target"].lstrip("@"),
+                       "chat": v["target"], "reward": v["reward"]}
+        else:
+            payload = {"title": v["title"], "kind": "link", "url": v["target"], "reward": v["reward"]}
+        r = await api("POST", "/admin/task", json=payload)
+        return f"✅ Задание <b>#{(r or {}).get('id')}</b> добавлено\n{esc(v['title'])} · +{fmt_g(v['reward'])} G"
+    return run
+
+
+def task_summary(v: dict) -> str:
+    return f"📋 <b>{esc(v['title'])}</b>\n🔗 {esc(v['target'])}\n💰 Награда: <b>{fmt_g(v['reward'])} G</b>"
+
+
+FLOWS["task_tg"] = Flow("task_tg", "📢", "Задание: подписка на канал", "tasks", task_steps("tg"), task_runner("tg"), task_summary,
+                        again="📢 Ещё задание")
+FLOWS["task_link"] = Flow("task_link", "🔗", "Задание по ссылке", "tasks", task_steps("link"), task_runner("link"), task_summary,
+                          again="🔗 Ещё задание")
+
+
+# ---- квесты: создание через мастер (кейсы и апгрейды) и список/удаление ----
+QUEST_RARITIES = [("Обычный", "common"), ("Редкий", "rare"), ("Эпический", "epic"), ("Легендарный", "legendary"),
+                  ("Мифический", "mythic"), ("Секретный", "secret"), ("Галактический", "galactic"), ("Колбасный", "sausage")]
+QUEST_RU = {code: name for name, code in QUEST_RARITIES}
+
+
+def quest_reward(v: dict) -> int:
+    return quests.reward_for({"type": v["type"], "difficulty": int(v["difficulty"])})
+
+
+def quest_steps() -> list:
+    return [
+        Step("type", "Квест на что?", "Тип", lambda t: t,
+             quick=(("📦 Открытие кейсов", "case"), ("🛠 Апгрейды", "upgrade")), strict=True, per=2,
+             fmt=lambda v: "📦 кейсы" if v == "case" else "🛠 апгрейды"),
+        Step("rarity", "Редкость предметов?\n<i>Для апгрейдов — редкость предметов, которые улучшаем.</i>", "Редкость",
+             lambda t: t, quick=(("Любая", "any"),) + tuple(QUEST_RARITIES), strict=True, per=3,
+             fmt=lambda v: "любая" if v == "any" else QUEST_RU.get(v, v)),
+        Step("chance", "Максимальный шанс результата в апгрейде?\n<i>Квест засчитается, если шанс выпавшего предмета не выше этого значения.</i>",
+             "Шанс", int_parser(lo=0, hi=100),
+             quick=(("Без ограничения", "0"), ("50%", "50"), ("30%", "30"), ("20%", "20"), ("10%", "10"), ("5%", "5")),
+             per=3, when=lambda v: v.get("type") == "upgrade",
+             fmt=lambda x: "без ограничения" if x == 0 else f"не выше {x}%"),
+        Step("target", "Сколько раз нужно выполнить?", "Количество", int_parser(lo=1, hi=1000),
+             quick=(("1", "1"), ("3", "3"), ("5", "5"), ("10", "10")), per=4, fmt=lambda x: f"{x} раз"),
+        Step("difficulty", "Сложность квеста от 1 до 5 — от неё зависит награда.", "Сложность", int_parser(lo=1, hi=5),
+             quick=(("1 · легко", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5 · сложно", "5")), per=5,
+             fmt=lambda x: f"{x} из 5"),
+        Step("title", "Напишите <b>название квеста</b> — его увидят игроки.\n<i>Например: Открыть 5 редких кейсов</i>",
+             "Название", p_title),
+    ]
+
+
+def sum_quest(v: dict) -> str:
+    rar = "любая" if v.get("rarity") in (None, "any") else QUEST_RU.get(v["rarity"], v["rarity"])
+    lines = [f"🎯 <b>{esc(v['title'])}</b>",
+             f"📦 Тип: {'кейсы' if v['type'] == 'case' else 'апгрейды'}",
+             f"💎 Редкость: {esc(rar)}"]
+    if v["type"] == "upgrade" and v.get("chance"):
+        lines.append(f"🎲 Шанс выпадения не выше {v['chance']}%")
+    lines += [f"🔢 Нужно: {v['target']} раз",
+              f"⚖️ Сложность: {v['difficulty']} из 5",
+              f"💰 Награда: <b>{fmt_g(quest_reward(v))} G</b>"]
+    return "\n".join(lines)
+
+
+async def run_quest(v: dict, uid: int) -> str:
+    chance = v.get("chance") if v["type"] == "upgrade" else None
+    payload = {"type": v["type"], "title": v["title"], "target": v["target"],
+               "rarity": None if v.get("rarity") in (None, "any") else v["rarity"],
+               "chance_max": chance or None, "difficulty": int(v["difficulty"])}
+    r = await api("POST", "/admin/quest", json=payload)
+    return (f"✅ Квест <b>#{esc((r or {}).get('id'))}</b> добавлен\n{esc(v['title'])} · +{fmt_g(quest_reward(v))} G\n"
+            f"<i>Он будет попадать в ежедневный набор.</i>")
+
+
+def spin_steps() -> list:
+    return [
+        Step("who", "Кому выдать прокрутки?\n<i>ID игрока (цифры из профиля) или логин.</i>", "Игрок",
+             lambda t: t.strip(), fmt=lambda v: v),
+        Step("count", "Сколько прокруток выдать?", "Количество", int_parser(lo=1, hi=1000),
+             quick=(("1", "1"), ("5", "5"), ("10", "10"), ("50", "50")), per=4, fmt=lambda x: f"{x} шт."),
+    ]
+
+
+def sum_spins(v: dict) -> str:
+    return (f"🎡 <b>Выдать прокрутки</b>\n👤 Игрок: <b>{esc(v['who'])}</b>\n"
+            f"🔢 Количество: <b>{v['count']}</b>")
+
+
+async def run_spins(v: dict, uid: int) -> str:
+    r = await api("POST", "/admin/wheel/grant", json={"who": v["who"], "count": int(v["count"])})
+    return (f"✅ Игроку <b>{esc(r.get('nickname', 'Игрок'))}</b> выдано прокруток: +{r.get('added')}\n"
+            f"В запасе теперь: <b>{r.get('spins')}</b>")
+
+
+FLOWS["spins"] = Flow("spins", "🎡", "Выдать прокрутки", "tasks", spin_steps(), run_spins, sum_spins,
+                      again="🎡 Ещё выдать")
+FLOWS["quest"] = Flow("quest", "🎯", "Новый квест", "tasks", quest_steps(), run_quest, sum_quest, again="🎯 Ещё квест")
+
+
+async def act_quests(target):
+    try:
+        qs = await api("GET", "/admin/quest")
+    except ApiError as e:
+        return await send(target, f"❌ {esc(e)}", back_kb("tasks"))
+    if not qs:
+        return await send(target, "🎯 Своих квестов пока нет.", back_kb("tasks", [B("🎯 Новый квест", "go:quest")]))
+    lines = [f"#{q['id']} · <b>{esc(q['title'])}</b> · +{fmt_g(quest_reward(q))} G" for q in qs]
+    rows = [[B(f"🗑 #{q['id']} · {q['title'][:28]}", f"dq:{q['id']}")] for q in qs[:40]]
+    await send(target, "🎯 <b>Квесты</b>\nНажмите на квест, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
+
+
+ACTIONS["quests"] = act_quests
+
+
+@admin.callback_query(F.data.startswith("dq:"))
+async def cb_dq(cb: CallbackQuery):
+    await cb.answer()
+    qid = cb.data[3:]
+    await send(cb, f"Удалить квест #{esc(qid)}?", KB([B("✅ Да", f"dqc:{qid}"), B("⬅️ Нет", "a:quests")]))
+
+
+@admin.callback_query(F.data.startswith("dqc:"))
+async def cb_dqc(cb: CallbackQuery):
+    await cb.answer()
+    qid = cb.data[4:]
+    try:
+        await api("POST", "/admin/quest/delete", json={"id": qid})
+        text = f"🗑 Квест #{esc(qid)} удалён."
+    except ApiError as e:
+        text = f"❌ {esc(e)}"
+    await send(cb, text, back_kb("tasks", [B("🗑 Ещё один", "a:quests")]))
+
+
+# ---- поиск игрока ----
+async def run_find(v: dict, uid: int) -> str:
+    users = await api("GET", "/admin/users", params={"q": v["q"]})
+    if not users:
+        return "Никого не найдено."
+    blocks = [f"<b>{esc(u['nickname'])}</b> @{esc(u['username'] or '—')}\n"
+              f"#{u['id']} · ID: <code>{esc(u.get('public_id') or '—')}</code> · логин: <code>{esc(u['login'] or '—')}</code> · {fmt_g(u['balance'])} G · код: <code>{esc(u['referral_code'])}</code>"
+              for u in users[:15]]
+    return "🔍 <b>Найдено</b>\n\n" + "\n\n".join(blocks)
+
+
+FLOWS["find"] = Flow("find", "🔍", "Поиск игрока", "users", [
+    Step("q", "Введите логин, ник или @username (можно часть):", "", p_query)], run_find, confirm=False, again="🔍 Искать ещё")
+
+
+# ---- сменить публичный ID игроку ----
+def p_pid(t: str) -> str:
+    s = t.strip().lstrip("#")
+    if not re.fullmatch(r"[A-Za-z0-9_]{3,16}", s):
+        raise ValueError("ID: 3–16 символов, только латиница, цифры и _")
+    return s
+
+
+async def run_setpid(v: dict, uid: int) -> str:
+    r = await api("POST", "/admin/public_id", json={"login": v["user"], "new_id": v["pid"]})
+    return f"✅ Публичный ID <b>{lab(v, 'user')}</b> теперь <code>{esc(r.get('publicId', v['pid']))}</code>"
+
+
+FLOWS["setpid"] = Flow("setpid", "🆔", "Сменить ID игрока", "users", [
+    Step("user", USER_PROMPT, "Игрок", p_user),
+    Step("pid", "Введите <b>новый ID</b> (3–16 символов: латиница, цифры, _).", "Новый ID", p_pid),
+], run_setpid, lambda v: f"🆔 Игрок: <b>{lab(v, 'user')}</b>\nНовый ID: <code>{esc(v['pid'])}</code>", again="🆔 Ещё смена ID")
+
+
+# ====================================================================
+#  Запуск
+# ====================================================================
+async def run():
+    """Запускается из app.py; при падении перезапускается."""
+    while True:
+        bot = Bot(TOKEN)
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            try:
+                await bot.set_my_commands([
+                    BotCommand(command="menu", description="🏠 Главное меню"),
+                    BotCommand(command="new", description="🎟 Создать промокод"),
+                    BotCommand(command="cancel", description="❌ Отмена"),
+                ])
+            except Exception:
+                log.warning("не удалось выставить список команд")
+            await dp.start_polling(bot, handle_signals=False)
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("админ-бот упал, перезапуск через 5 с")
+            await asyncio.sleep(5)
+        finally:
+            await bot.session.close()
+
