@@ -491,6 +491,25 @@ def admin_user_set(who: str, body: dict, x_init_data: Optional[str] = Header(Non
     return style.admin_user_update(who, body)
 
 
+@app.post("/api/admin/grant")
+def admin_grant(body: dict, x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
+    style.admin_uid(x_init_data)
+    who = str(body.get("who", "")).strip()
+    g = int(body.get("g") or 0)
+    spins = int(body.get("spins") or 0)
+    if not who:
+        raise HTTPException(400, "Укажите ID или логин игрока")
+    if g <= 0 and spins <= 0:
+        raise HTTPException(400, "Укажите G или прокрутки")
+    nickname = None
+    if g > 0:
+        nickname = style.admin_grant_g(who, g)["nickname"]
+    if spins > 0:
+        res = wheel.grant(who, spins)
+        nickname = nickname or res["nickname"]
+    return {"ok": True, "nickname": nickname or "Игрок", "g": g, "spins": spins}
+
+
 @app.get("/api/admin/prefixes")
 def admin_prefixes_list(x_init_data: Optional[str] = Header(None, alias="X-Init-Data")):
     style.admin_uid(x_init_data)
