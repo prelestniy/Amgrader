@@ -270,7 +270,15 @@ async function openEditProfile() {
       + `<button type="button" class="ep-pref${cur == null ? " on" : ""}" data-id="" onclick="pickEpPrefix(this)">Без префикса</button>`
       + owned.map(x => `<button type="button" class="ep-pref${cur === x.id ? " on" : ""}" data-id="${x.id}" onclick="pickEpPrefix(this)"><span class="nk-prefix" style="--pc:${esc(x.color)}">${esc(x.text)}</span></button>`).join("")
       + `</div></div>`
-    : `<div class="misc-hint">Купите префикс в разделе «Префиксы», и он появится здесь.</div>`;
+      : `<div class="misc-hint">Купите префикс в разделе «Магазин», и он появится здесь.</div>`;
+  const ownedCols = shop ? (shop.colors || []).filter(c => c.owned) : [];
+  const curCol = shop ? (shop.equippedColor || "") : "";
+  const colBlock = ownedCols.length
+    ? `<div class="reg-field"><label>Цвет ника</label><div class="ep-prefix-list" id="epColorList" data-cur="${curCol}">`
+      + `<button type="button" class="ep-pref${curCol ? "" : " on"}" data-hex="" onclick="pickEpColor(this)">Без цвета</button>`
+      + ownedCols.map(c => `<button type="button" class="ep-pref${curCol === c.hex ? " on" : ""}" data-hex="${c.hex}" onclick="pickEpColor(this)"><span class="ep-colsample" style="color:${c.hex}">Ник</span></button>`).join("")
+      + `</div></div>`
+    : "";
   const pwBlock = p.hasPassword
     ? `<div class="reg-field"><label>Текущий пароль (нужен, чтобы сменить логин или пароль)</label><input id="epCurPw" type="password" maxlength="64" autocomplete="current-password"></div>`
     : `<div class="misc-hint">Задайте логин и пароль — тогда можно будет входить не только через Telegram.</div>`;
@@ -286,6 +294,7 @@ async function openEditProfile() {
       <div class="reg-field"><label>Логин</label>
         <input id="epLogin" type="text" maxlength="32" value="${esc(p.login || "")}" placeholder="Придумайте логин" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"></div>
       ${prefBlock}
+      ${colBlock}
       ${pwBlock}
       <div class="reg-field"><label>${p.hasPassword ? "Новый пароль (если нужно сменить)" : "Пароль"}</label>
         <input id="epNewPw" type="password" maxlength="64" autocomplete="new-password"></div>
@@ -328,6 +337,9 @@ async function saveProfile() {
   const selBtn = pl ? pl.querySelector(".ep-pref.on") : null;
   const newPid = selBtn ? (selBtn.dataset.id === "" ? null : Number(selBtn.dataset.id)) : undefined;
   const prefChanged = pl && newPid !== curPid;
+  const cl = gid("epColorList");
+  const newHex = cl ? (cl.querySelector(".ep-pref.on") ? cl.querySelector(".ep-pref.on").dataset.hex : "") : "";
+  const colChanged = cl && newHex !== (cl.dataset.cur || "");
   const loginChanged = !!login && login !== (p.login || "");
   if (about.length > 20) return miscMsg("«О себе»: не больше 20 символов");
   if (loginChanged && login.length < 3) return miscMsg("Логин слишком короткий");
@@ -339,11 +351,15 @@ async function saveProfile() {
     if (loginChanged || newPw) applyProfileFields(await api("/api/me/credentials", { method: "POST",
       body: { login: loginChanged ? login : undefined, new_password: newPw || undefined, current_password: curPw || undefined } }));
     if (prefChanged) { await api("/api/shop/equip", { method: "POST", body: { id: newPid } }); await refreshMeFromServer(); }
+    if (colChanged) { await api("/api/shop/color/equip", { method: "POST", body: { hex: newHex || null } }); await refreshMeFromServer(); }
     closeMisc();
     notify("win", "Профиль сохранён", "Изменения применены", "OK", OK_ITEM);
   } catch (e) { btn.disabled = false; miscMsg(e.message); }
 }
 
+function pickEpColor(btn) {
+  document.querySelectorAll("#epColorList .ep-pref").forEach(b => b.classList.toggle("on", b === btn));
+}
 function pickEpPrefix(btn) {
   document.querySelectorAll("#epPrefixList .ep-pref").forEach(b => b.classList.toggle("on", b === btn));
 }
