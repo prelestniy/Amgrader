@@ -305,7 +305,7 @@ function renderCases() {
   const capEl = $("casesTitle");
   if (capEl) capEl.innerHTML = esc(c.name) + (state.freeCaseSpins > 0 && cs.sel === 0 ? ` <span class="soon-badge" style="margin-left:6px;">${ic("gift", 13)} ×${state.freeCaseSpins}</span>` : "");
   $("caseQty").innerHTML = [1, 2, 3, 4, 5].map(n => `<button class="qty-chip ${n === cs.qty ? "on" : ""}" onclick="pickQty(${n})">${n}</button>`).join("");
-  $("casePool").innerHTML = c.pool.map(p => `<div class="pool-item" style="--rc:${getRarityHex(p.m.rarity)}">${renderIcon(p.m, 44)}<div class="pi-n">${esc(p.m.name)}</div><div class="pi-p">${fmtCasePct(p.w / c.tot * 100)}%</div></div>`).join("");
+  $("casePool").innerHTML = c.pool.map(p => `<div class="pool-item" style="--rc:${getRarityHex(p.m.rarity)}">${renderIcon(p.m, 44)}<div class="pi-r">${RARITY_RU[p.m.rarity] || ""}</div><div class="pi-n">${esc(p.m.name)}</div><div class="pi-pr">${fmt(p.m.price)} G</div><div class="pi-pr">${fmt(p.m.price)} G</div><div class="pi-p">${fmtCasePct(p.w / c.tot * 100)}%</div></div>`).join("");
   updateCaseBtn();
   if (!state.spinning) { $("caseResult").innerHTML = ""; buildStage(cs.qty, null); }
 }
