@@ -1,5 +1,5 @@
 /* ===== Ник с префиксом и галочкой, магазин префиксов ===== */
-const VERIFIED_BADGE = '<svg class="vbadge" viewBox="0 0 100 100" aria-label="Верифицирован"><circle cx="50" cy="50" r="50" fill="#4FEAFF"/><polyline points="29,50 47.8,68 81,32" fill="none" stroke="#FFFFFF" stroke-width="7.2"/></svg>';
+const VERIFIED_BADGE = '<svg class="vbadge" viewBox="0 0 100 100" aria-label="Верифицирован"><circle cx="50" cy="50" r="50" fill="#4FEAFF"/><polyline points="28,50 43,65 72,35" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 /* Ник в одном месте: префикс-плашка, ник (цвет если выдан), галочка если верифицирован */
 function nickHTML(u) {
@@ -28,8 +28,28 @@ async function openShop() {
   openMisc(miscHead(ic("gift", 24), "Префиксы", "Покупаются за G, видны рядом с ником") +
     `<div class="reg-body"><div class="shop-bal">Баланс: ${fmt(d.balance)} G</div>${cards}</div>`);
 }
-async function shopBuy(id) {
-  try { await api("/api/shop/buy", { method: "POST", body: { id } }); await refreshMeFromServer(); notify("win", "Префикс куплен", "", "", OK_ITEM); openShop(); }
+async function openColorShop() {
+  if (!isLoggedIn()) return openAuth("Войдите, чтобы покупать цвета ника");
+  let d;
+  try { d = await api("/api/shop"); } catch (e) { return notify("lose", "Цвета ника", "Не получилось", e.message, OK_ITEM); }
+  const cards = (d.colors || []).map((c, i) => {
+    let btn;
+    if (d.equippedColor === c.hex) btn = `<button class="shop-btn on" onclick="shopColorEquip(null)">Снять</button>`;
+    else if (c.owned) btn = `<button class="shop-btn" onclick="shopColorEquip('${c.hex}')">Надеть</button>`;
+    else btn = `<button class="shop-btn buy" onclick="shopColorBuy('${c.hex}')">${fmt(c.price)} G</button>`;
+    return `<div class="shop-card" style="animation-delay:${i * 0.03}s">
+      <div class="shop-info"><span class="shop-sample" style="color:${c.hex}">Ник</span>` +
+      `<span class="shop-price">${c.owned ? "Куплен" : fmt(c.price) + " G"}</span></div>${btn}</div>`;
+  }).join("") || `<div class="pg-hint">Цветов пока нет</div>`;
+  openMisc(miscHead(ic("gift", 24), "Цвета ника", "Цвет имени за G, виден в топе и профиле") +
+    `<div class="reg-body"><div class="shop-bal">Баланс: ${fmt(d.balance)} G</div>${cards}</div>`);
+}
+async function shopColorBuy(hex) {
+  try { await api("/api/shop/color/buy", { method: "POST", body: { hex } }); await refreshMeFromServer(); notify("win", "Цвет куплен", "", "", OK_ITEM); openColorShop(); }
+  catch (e) { notify("lose", "Магазин", "Не получилось", e.message, OK_ITEM); }
+}
+async function shopColorEquip(hex) {
+  try { await api("/api/shop/color/equip", { method: "POST", body: { hex } }); await refreshMeFromServer(); openColorShop(); }
   catch (e) { notify("lose", "Магазин", "Не получилось", e.message, OK_ITEM); }
 }
 async function shopEquip(id) {
