@@ -487,6 +487,20 @@ def shop_get(user=Depends(auth_user)):
     return style.shop(user["id"])
 
 
+class ShopColorBody(BaseModel):
+    hex: Optional[str] = None
+
+
+@app.post("/api/shop/color/buy")
+def shop_color_buy(body: ShopColorBody, user=Depends(auth_user)):
+    return style.buy_color(user["id"], body.hex)
+
+
+@app.post("/api/shop/color/equip")
+def shop_color_equip(body: ShopColorBody, user=Depends(auth_user)):
+    return style.equip_color(user["id"], body.hex)
+
+
 @app.post("/api/shop/buy")
 def shop_buy(body: ShopBuyBody, user=Depends(auth_user)):
     return style.buy(user["id"], body.id)
@@ -1470,3 +1484,4 @@ def trade_link_page(code: str):
 for _d in ("css", "js", "img"):
     if (BASE_DIR / _d).is_dir():
         app.mount(f"/{_d}", StaticFiles(directory=BASE_DIR / _d), name=f"static_{_d}")
+
