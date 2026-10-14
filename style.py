@@ -20,7 +20,7 @@ def setup(db, verify_init_data):
 def init_db(conn):
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
     for col, typ in (("verified", "INTEGER DEFAULT 0"), ("name_color", "TEXT"),
-                     ("prefix_id", "INTEGER"), ("owned_prefixes", "TEXT DEFAULT '[]'")):
+                     ("prefix_id", "INTEGER"), ("owned_prefixes", "TEXT DEFAULT '[]'"), ("owned_colors", "TEXT DEFAULT '[]'")):
         if col not in cols:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
     conn.execute("""CREATE TABLE IF NOT EXISTS prefixes(
@@ -59,32 +59,56 @@ def style_fields(row):
 
 
 # ---------- для игрока ----------
+# Цвета ника продаются отдельно от префиксов: hex -> цена в G
+COLOR_SHOP = [
+    ("#9CA3AF", 10000), ("#FFFFFF", 15000), ("#FF5A4A", 20000), ("#FFB020", 30000),
+    ("#FFE14D", 40000), ("#B6F24A", 50000), ("#2EE6D0", 60000), ("#4FEAFF", 70000),
+    ("#3B82F6", 80000), ("#8B5CF6", 100000), ("#FF6EC7", 140000), ("#FF8C00", 160000),
+    ("#00FF7F", 180000), ("#FFD700", 200000), ("#E040FB", 120000), ("#FF0000", 250000),
+]
+COLOR_PRICE = dict(COLOR_SHOP)
+
+
 def shop(uid):
     with closing(_db()) as conn:
-        u = conn.execute("SELECT balance, prefix_id, owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
+        u = conn.execute("SELECT balance, prefix_id, owned_prefixes, owned_colors, name_color FROM users WHERE id=?",
+                         (uid,)).fetchone()
         owned = set(json.loads(u["owned_prefixes"] or "[]"))
+        owned_c = set(json.loads(u["owned_colors"] or "[]"))
         rows = [r for r in conn.execute("SELECT * FROM prefixes ORDER BY price, id").fetchall()
                 if r["active"] or r["id"] in owned]
     return {"balance": u["balance"] or 0, "equipped": u["prefix_id"],
             "items": [{"id": r["id"], "text": r["text"], "color": r["color"], "price": r["price"],
-                       "owned": r["id"] in owned} for r in rows]}
+                       "owned": r["id"] in owned} for r in rows],
+            "colors": [{"hex": h, "price": p, "owned": h in owned_c} for h, p in COLOR_SHOP],
+            "equippedColor": u["name_color"]}
 
 
-def buy(uid, pid):
+def buy_color(uid, hex_):
+    if hex_ not in COLOR_PRICE:
+        raise HTTPException(404, "Такого цвета нет")
     with closing(_db()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
-        u = conn.execute("SELECT balance, owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
-        p = conn.execute("SELECT * FROM prefixes WHERE id=? AND active=1", (pid,)).fetchone()
-        if p is None:
-            raise HTTPException(404, "Префикс не найден")
-        owned = json.loads(u["owned_prefixes"] or "[]")
-        if pid in owned:
-            raise HTTPException(400, "Этот префикс уже куплен")
-        if (u["balance"] or 0) < p["price"]:
+        u = conn.execute("SELECT balance, owned_colors FROM users WHERE id=?", (uid,)).fetchone()
+        owned = json.loads(u["owned_colors"] or "[]")
+        if hex_ in owned:
+            raise HTTPException(400, "Этот цвет уже куплен")
+        price = COLOR_PRICE[hex_]
+        if (u["balance"] or 0) < price:
             raise HTTPException(400, "Не хватает G")
-        owned.append(pid)
-        conn.execute("UPDATE users SET balance=balance-?, owned_prefixes=?, rev=rev+1 WHERE id=?",
-                     (p["price"], json.dumps(owned), uid))
+        owned.append(hex_)
+        conn.execute("UPDATE users SET balance=balance-?, owned_colors=?, rev=rev+1 WHERE id=?",
+                     (price, json.dumps(owned), uid))
+    return {"ok": True}
+
+
+def equip_color(uid, hex_):
+    with closing(_db()) as conn, conn:
+        if hex_ is not None:
+            u = conn.execute("SELECT owned_colors FROM users WHERE id=?", (uid,)).fetchone()
+            if hex_ not in json.loads(u["owned_colors"] or "[]"):
+                raise HTTPException(400, "Сначала купите этот цвет")
+        conn.execute("UPDATE users SET name_color=?, rev=rev+1 WHERE id=?", (hex_, uid))
     return {"ok": True}
 
 
