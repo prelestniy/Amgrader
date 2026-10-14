@@ -102,7 +102,3 @@
 
 /* цена предмета в списке наград кейса */
 .pi-pr { font-size:11px; color:var(--text-dim); font-weight:700; margin-top:2px; }
-
-/* магазин: цвета ника */
-.shop-sample { font-weight:800; font-size:16px; }
-.ep-colsample { font-weight:800; }
