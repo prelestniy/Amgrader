@@ -540,7 +540,7 @@ def admin_grant(body: dict, x_init_data: Optional[str] = Header(None, alias="X-I
     if not who:
         raise HTTPException(400, "Укажите ID или логин игрока")
     if g <= 0 and spins <= 0:
-        raise HTTPException(400, "Укажите G или прокрутки")
+        raise HTTPException(400, "Укажите M или прокрутки")
     nickname = None
     if g > 0:
         nickname = style.admin_grant_g(who, g)["nickname"]

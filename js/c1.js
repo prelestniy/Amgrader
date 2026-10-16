@@ -99,10 +99,25 @@ function minesLoadPrefs() {
 function minesSavePrefs() { try { localStorage.setItem("minesPrefs", JSON.stringify({ bet: mines.bet, count: mines.count })); } catch (e) {} }
 function minesNextMult(opened, bombs) { const safe = MINES_TOTAL - bombs; return (MINES_TOTAL - opened) / (safe - opened); }
 function minesCurMult(opened, bombs) { let m = 1; for (let i = 0; i < opened; i++) m *= minesNextMult(i, bombs); return m * MINES_EDGE; }
-function minesOnBetInput() { mines.bet = Math.max(1, Math.round(Number($("minesBetInput").value) || 1)); minesSavePrefs(); }
+/* Ввод не переписываем на лету (иначе нельзя стереть цифру и набрать новую) — значение приводим к диапазону при уходе из поля */
+function minesBetTyping() {
+  const el = $("minesBetInput"); ladderDigitsOnly(el);
+  const v = parseInt(el.value, 10); if (v > 0) { mines.bet = v; minesSavePrefs(); }
+}
+function minesOnBetInput() {
+  const el = $("minesBetInput");
+  const v = Math.max(1, parseInt(el.value, 10) || 1);
+  mines.bet = v; el.value = v; minesSavePrefs();
+}
+function minesCountTyping() {
+  const el = $("minesCountInput"); ladderDigitsOnly(el);
+  const v = parseInt(el.value, 10);
+  if (v >= 1 && v <= 24) { mines.count = v; minesSavePrefs(); if (mines.phase === "idle") renderMinesGrid(); }
+}
 function minesOnCountInput() {
-  let v = Math.round(Number($("minesCountInput").value) || 1); v = Math.max(1, Math.min(24, v));
-  mines.count = v; $("minesCountInput").value = v; minesSavePrefs();
+  const el = $("minesCountInput");
+  const v = Math.max(1, Math.min(24, parseInt(el.value, 10) || 1));   // на поле 25 клеток — максимум 24 мины
+  mines.count = v; el.value = v; minesSavePrefs();
   if (mines.phase === "idle") renderMinesGrid();
 }
 function minesStakeAction(i) {

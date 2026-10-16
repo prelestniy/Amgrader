@@ -68,7 +68,7 @@ function isWin(angle, chance) {                               // ЕДИНАЯ ф
 
 
 const RARITY_RU = { common:"Обычный", rare:"Редкий", epic:"Эпический", legendary:"Легендарный", mythic:"Мифический", secret:"Секретный", galactic:"Галактический", sausage:"Колбасный", eldovaya:"Елдовая", sasnaya:"Сасная", rubinovaya:"Рубиновая", kratnost:"Кратность" };
-const fmt = n => Number(n).toLocaleString("ru-RU") + " G";
+const fmt = n => Number(n).toLocaleString("ru-RU") + " M";
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 /* ============================================================

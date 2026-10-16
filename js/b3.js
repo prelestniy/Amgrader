@@ -42,7 +42,7 @@ function openReferral() {
       <div class="reg-field"><label>Есть код друга?</label>
         <input id="refInput" type="text" maxlength="16" placeholder="Введите код" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false"></div>
       <button class="ghost-btn" onclick="applyReferral()">Применить код</button>`;
-  openMisc(miscHead(ic("users", 24), "Реферальный код", "Приглашайте друзей и получайте G") + `
+  openMisc(miscHead(ic("users", 24), "Реферальный код", "Приглашайте друзей и получайте M") + `
     <div class="reg-body">
       <div class="code-box"><b>${esc(p.referralCode || "—")}</b></div>
       <div class="misc-btns">
@@ -81,7 +81,7 @@ function openCreatePromo() {
           <button onclick="cpStep(-1)">${svgi("minus", 18)}</button><b id="cpCountVal">${cpCount}</b><button onclick="cpStep(1)">${svgi("plus", 18)}</button>
         </div></div>
       <button class="ghost-btn" onclick="openMyPromos()">Мои промокоды</button>
-      <div class="misc-hint" id="cpTotal">Спишется 0 G с вашего баланса (${fmt(state.balance)} доступно)</div>
+      <div class="misc-hint" id="cpTotal">Спишется 0 M с вашего баланса (${fmt(state.balance)} доступно)</div>
       <div class="misc-msg" id="miscError"></div>
     </div>
     <div class="sheet-foot"><button class="primary-btn" id="miscBtn" onclick="submitCreatePromo()">Создать</button></div>`);

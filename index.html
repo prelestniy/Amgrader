@@ -16,19 +16,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;800&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="css/fonts.css?v=46">
-<link rel="stylesheet" href="css/main1.css?v=46">
-<link rel="stylesheet" href="css/main2.css?v=46">
-<link rel="stylesheet" href="css/main3.css?v=46">
-<link rel="stylesheet" href="css/main4.css?v=46">
-<link rel="stylesheet" href="css/nav.css?v=46">
-<link rel="stylesheet" href="css/wheel.css?v=46">
-<link rel="stylesheet" href="css/themes.css?v=46">
-<link rel="stylesheet" href="css/wallpaper.css?v=46">
-<link rel="stylesheet" href="css/style.css?v=46">
-<link rel="stylesheet" href="css/trade.css?v=46">
-<link rel="stylesheet" href="css/anim.css?v=46">
-<link rel="stylesheet" href="css/lite.css?v=46">
+<link rel="stylesheet" href="css/fonts.css?v=47">
+<link rel="stylesheet" href="css/main1.css?v=47">
+<link rel="stylesheet" href="css/main2.css?v=47">
+<link rel="stylesheet" href="css/main3.css?v=47">
+<link rel="stylesheet" href="css/main4.css?v=47">
+<link rel="stylesheet" href="css/nav.css?v=47">
+<link rel="stylesheet" href="css/wheel.css?v=47">
+<link rel="stylesheet" href="css/themes.css?v=47">
+<link rel="stylesheet" href="css/wallpaper.css?v=47">
+<link rel="stylesheet" href="css/style.css?v=47">
+<link rel="stylesheet" href="css/trade.css?v=47">
+<link rel="stylesheet" href="css/anim.css?v=47">
+<link rel="stylesheet" href="css/lite.css?v=47">
 </head>
 <body>
 <div id="wpLayer" hidden></div>
@@ -278,11 +278,11 @@
           <div class="range-row" style="grid-template-columns:1fr 1fr;">
             <div class="range-field">
               <label>Ставка</label>
-              <input id="minesBetInput" type="number" inputmode="numeric" min="1" value="100" oninput="minesOnBetInput()">
+              <input id="minesBetInput" type="text" inputmode="numeric" autocomplete="off" value="100" oninput="minesBetTyping()" onchange="minesOnBetInput()" onblur="minesOnBetInput()">
             </div>
             <div class="range-field">
-              <label>Количество мин</label>
-              <input id="minesCountInput" type="number" inputmode="numeric" min="1" max="24" value="3" oninput="minesOnCountInput()">
+              <label>Количество мин (1–24)</label>
+              <input id="minesCountInput" type="text" inputmode="numeric" autocomplete="off" value="3" oninput="minesCountTyping()" onchange="minesOnCountInput()" onblur="minesOnCountInput()">
             </div>
           </div>
         </div>
@@ -338,7 +338,7 @@
   <button class="nav-btn nav-center active" id="navUpgrade" onclick="showScreen('upgrade')">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M6 11L12 5L18 11" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     <span class="nav-label">Амгрейд</span>
-    <span class="nav-bal" id="headerMeta">0 G</span>
+    <span class="nav-bal" id="headerMeta">0 M</span>
   </button>
   <button class="nav-btn" id="navBonus" onclick="toggleBubble('bonus', this)" aria-haspopup="true" aria-expanded="false">
     <span class="nav-icon"><svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 1 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 1 1 0 5"/></svg></span>
@@ -451,27 +451,27 @@
   <div class="bubble-bar"></div>
 </div>
 
-<script src="js/a1.js?v=46"></script>
-<script src="js/a2.js?v=46"></script>
-<script src="js/a3.js?v=46"></script>
-<script src="js/a4.js?v=46"></script>
-<script src="js/b1.js?v=46"></script>
-<script src="js/b2.js?v=46"></script>
-<script src="js/b3.js?v=46"></script>
-<script src="js/b4.js?v=46"></script>
-<script src="js/c1.js?v=46"></script>
-<script src="js/c2.js?v=46"></script>
-<script src="js/c3.js?v=46"></script>
-<script src="js/d1.js?v=46"></script>
-<script src="js/f1.js?v=46"></script>
+<script src="js/a1.js?v=47"></script>
+<script src="js/a2.js?v=47"></script>
+<script src="js/a3.js?v=47"></script>
+<script src="js/a4.js?v=47"></script>
+<script src="js/b1.js?v=47"></script>
+<script src="js/b2.js?v=47"></script>
+<script src="js/b3.js?v=47"></script>
+<script src="js/b4.js?v=47"></script>
+<script src="js/c1.js?v=47"></script>
+<script src="js/c2.js?v=47"></script>
+<script src="js/c3.js?v=47"></script>
+<script src="js/d1.js?v=47"></script>
+<script src="js/f1.js?v=47"></script>
 <script src="js/h1.js"></script>
 <script src="js/k1.js"></script>
 <script src="js/t1.js"></script>
-<script src="js/wheel_v2.js?v=46"></script>
+<script src="js/wheel_v2.js?v=47"></script>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js").catch(function(){});}</script>
-<script src="js/pl1.js?v=46"></script>
-<script src="js/n1.js?v=46"></script>
-<script src="js/w1.js?v=46"></script>
-<script src="js/p1.js?v=46"></script>
+<script src="js/pl1.js?v=47"></script>
+<script src="js/n1.js?v=47"></script>
+<script src="js/w1.js?v=47"></script>
+<script src="js/p1.js?v=47"></script>
 </body>
 </html>

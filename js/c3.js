@@ -5,7 +5,7 @@ async function openCases() {
   const c = CASES[cs.sel], n = cs.qty;
   const useFree = !demo.on && state.freeCaseSpins > 0 && n === 1;
   const cost = useFree ? 0 : c.price * n;
-  if (!useFree && curBal() < cost) { const b = $("caseBtn"); b.textContent = "Не хватает G"; setTimeout(updateCaseBtn, 1400); return; }
+  if (!useFree && curBal() < cost) { const b = $("caseBtn"); b.textContent = "Не хватает M"; setTimeout(updateCaseBtn, 1400); return; }
   audioEnsure(); state.spinning = true; spinReset();
   if (useFree) state.freeCaseSpins--;
   const token = ++caseRunToken;

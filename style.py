@@ -1,4 +1,4 @@
-"""Префиксы (покупаются за G, цену ставит админ), верификация и цвет ника. Админка через мини-апп."""
+"""Префиксы (покупаются за M, цену ставит админ), верификация и цвет ника. Админка через мини-апп."""
 import json
 import os
 import re
@@ -59,7 +59,7 @@ def style_fields(row):
 
 
 # ---------- для игрока ----------
-# Цвета ника продаются отдельно от префиксов: hex -> цена в G
+# Цвета ника продаются отдельно от префиксов: hex -> цена в M
 COLOR_SHOP = [
     ("#9CA3AF", 10000), ("#FFFFFF", 15000), ("#FF5A4A", 20000), ("#FFB020", 30000),
     ("#FFE14D", 40000), ("#B6F24A", 50000), ("#2EE6D0", 60000), ("#4FEAFF", 70000),
@@ -84,6 +84,24 @@ def shop(uid):
             "equippedColor": u["name_color"]}
 
 
+def buy(uid, pid):
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        u = conn.execute("SELECT balance, owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
+        p = conn.execute("SELECT * FROM prefixes WHERE id=? AND active=1", (pid,)).fetchone()
+        if p is None:
+            raise HTTPException(404, "Префикс не найден")
+        owned = json.loads(u["owned_prefixes"] or "[]")
+        if pid in owned:
+            raise HTTPException(400, "Этот префикс уже куплен")
+        if (u["balance"] or 0) < p["price"]:
+            raise HTTPException(400, "Не хватает M")
+        owned.append(pid)
+        conn.execute("UPDATE users SET balance=balance-?, owned_prefixes=?, rev=rev+1 WHERE id=?",
+                     (p["price"], json.dumps(owned), uid))
+    return {"ok": True}
+
+
 def buy_color(uid, hex_):
     if hex_ not in COLOR_PRICE:
         raise HTTPException(404, "Такого цвета нет")
@@ -95,7 +113,7 @@ def buy_color(uid, hex_):
             raise HTTPException(400, "Этот цвет уже куплен")
         price = COLOR_PRICE[hex_]
         if (u["balance"] or 0) < price:
-            raise HTTPException(400, "Не хватает G")
+            raise HTTPException(400, "Не хватает M")
         owned.append(hex_)
         conn.execute("UPDATE users SET balance=balance-?, owned_colors=?, rev=rev+1 WHERE id=?",
                      (price, json.dumps(owned), uid))
@@ -250,7 +268,7 @@ def players(q, offset):
 
 def admin_grant_g(who, amount):
     if not 1 <= amount <= 10**12:
-        raise HTTPException(400, "Сумма G: от 1 до 10^12")
+        raise HTTPException(400, "Сумма M: от 1 до 10^12")
     with closing(_db()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
         u = _find_user(conn, who)
