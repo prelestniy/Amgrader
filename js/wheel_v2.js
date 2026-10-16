@@ -77,7 +77,7 @@ function wheelPreviewLabels(p) {
   for (let k = 0; k < WHEEL_SECTORS; k++) list.push(pool[Math.floor(Math.random() * pool.length)]);
   wheelDrawLabels(list);
 }
-function wheelSetMsg(text) { const m = document.getElementById("whMsg"); if (m) m.textContent = text; }
+function wheelSetMsg(text) { const m = document.getElementById("whMsg"); if (m) m.innerHTML = text; }
 function wheelSetBtn() {
   const b = document.getElementById("whBtn");
   if (b) b.disabled = wheelUI.busy || Date.now() < wheelReadyAt;
@@ -158,7 +158,7 @@ async function wheelSpin() {
     wheelSetReadyIn(res.secondsLeft);
     const p = res.prize;
     if (p.type === "g") {
-      wheelSetMsg(`+${fmt(p.amount)} M`);
+      wheelSetMsg(`+${fmt(p.amount)}`);
       notify("win", "Колесо бонусов", "Награда получена", "+" + fmt(p.amount), OK_ITEM);
     } else {
       const m = (typeof MEMES !== "undefined" && MEMES.find(x => x.id === p.id)) || { name: p.name, rarity: p.rarity, icon: "" };
