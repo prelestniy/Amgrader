@@ -51,7 +51,7 @@ function tradeHTML() {
     </div>
     <div class="tr-who">Партнёр: ${who}</div>
     <div class="tr-gbox">
-      <div class="tr-gbar"><div class="tr-gfill" id="trGFill" style="width:${pctFill}%"></div><span id="trGVal">${fmt(tradeDraft.g)} G</span></div>
+      <div class="tr-gbar"><div class="tr-gfill" id="trGFill" style="width:${pctFill}%"></div><span id="trGVal">${fmt(tradeDraft.g)} M</span></div>
       ${slider}
     </div>
     ${editable ? `<div class="tr-h">Ваш инвентарь</div><div class="tr-tiles">${tiles}</div>` : ""}
@@ -76,7 +76,7 @@ function tradeLiveG(v) {
   tradeDraft.g = Math.max(0, Math.min(max, Math.floor(+v || 0)));
   const f = document.getElementById("trGFill"), t = document.getElementById("trGVal");
   if (f) f.style.width = (max ? Math.min(100, tradeDraft.g / max * 100) : 0) + "%";
-  if (t) t.textContent = fmt(tradeDraft.g) + " G";
+  if (t) t.textContent = fmt(tradeDraft.g);
 }
 function tradeAdd(id, d) {
   const owned = tOwned()[id] || 0, cur = tradeDraft.items[id] || 0;
