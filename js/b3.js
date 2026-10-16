@@ -98,7 +98,7 @@ function cpUpdateTotal() {
   const amount = parseInt(document.getElementById("cpAmount").value, 10) || 0;
   const total = amount * cpCount;
   const el = document.getElementById("cpTotal"); if (!el) return;
-  el.textContent = `Спишется ${fmt(total)} с вашего баланса (${fmt(state.balance)} доступно)`;
+  el.innerHTML = `Спишется ${fmt(total)} с вашего баланса (${fmt(state.balance)} доступно)`;
   el.classList.toggle("bad", total > state.balance || amount <= 0);
 }
 async function submitCreatePromo() {
