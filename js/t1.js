@@ -51,7 +51,7 @@ function tradeHTML() {
     </div>
     <div class="tr-who">Партнёр: ${who}</div>
     <div class="tr-gbox">
-      <div class="tr-gbar"><div class="tr-gfill" id="trGFill" style="width:${pctFill}%"></div><span id="trGVal">${fmt(tradeDraft.g)} M</span></div>
+      <div class="tr-gbar"><div class="tr-gfill" id="trGFill" style="width:${pctFill}%"></div><span id="trGVal">${fmt(tradeDraft.g)}</span></div>
       ${slider}
     </div>
     ${editable ? `<div class="tr-h">Ваш инвентарь</div><div class="tr-tiles">${tiles}</div>` : ""}
@@ -76,7 +76,7 @@ function tradeLiveG(v) {
   tradeDraft.g = Math.max(0, Math.min(max, Math.floor(+v || 0)));
   const f = document.getElementById("trGFill"), t = document.getElementById("trGVal");
   if (f) f.style.width = (max ? Math.min(100, tradeDraft.g / max * 100) : 0) + "%";
-  if (t) t.textContent = fmt(tradeDraft.g);
+  if (t) t.innerHTML = fmt(tradeDraft.g);
 }
 function tradeAdd(id, d) {
   const owned = tOwned()[id] || 0, cur = tradeDraft.items[id] || 0;
@@ -90,7 +90,7 @@ function tradeSetG(v) {
 }
 function tradeApply(v) {
   const before = tradeView && tradeView.status;
-  tradeView = v;
+  tradeView = v; trSyncTimer(v);
   if (v.status === "done" && before !== "done") { tradeDraft = { items: {}, g: 0 }; refreshMeFromServer(); }
   if (before !== v.status || v.status !== "countdown") renderTrade(); else { const t = document.getElementById("trTimer"); if (t) t.textContent = v.secondsLeft; }
 }
@@ -104,7 +104,7 @@ async function openTrade(id, joinFirst) {
     if (joinFirst) { try { await api(`/api/trades/${id}/join`, { method: "POST" }); } catch (e) {} }
     const v = await api(`/api/trades/${id}`);
     if (v.needJoin) { await api(`/api/trades/${id}/join`, { method: "POST" }); return openTrade(id, false); }
-    tradeView = v;
+    tradeView = v; trSyncTimer(v);
     const mine = v.you === "a" ? v.a : v.b;
     tradeDraft = { items: tCounts(mine.items), g: mine.g };
     renderTrade();
@@ -199,3 +199,15 @@ function tradeCheckPending() {
 }
 tradeFromUrl();
 setInterval(tradeCheckPending, 1500);
+
+let __trEnd = 0;
+function trSyncTimer(v) {
+  if (!v || v.status !== "countdown") { __trEnd = 0; return; }
+  const want = Date.now() + (v.secondsLeft || 0) * 1000;
+  if (!__trEnd || Math.abs(want - __trEnd) > 1500) __trEnd = want;
+}
+setInterval(() => {
+  const t = document.getElementById("trTimer");
+  if (!t || !__trEnd) return;
+  t.textContent = Math.max(0, Math.ceil((__trEnd - Date.now()) / 1000));
+}, 250);
