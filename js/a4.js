@@ -189,10 +189,7 @@ async function resetProfile() {
 
 /* ник в топе: без префикса, перенос по словам, чтобы весь ник влезал */
 function topNickHTML(u) {
-  const s = (u && u.style) || {};
-  const col = s.nameColor ? ` style="color:${esc(s.nameColor)}"` : "";
-  const badge = s.verified ? VERIFIED_BADGE : "";
-  return `<span class="nk nk-top"><span class="nk-name"${col}>${esc((u && u.nickname) || "Игрок")}</span>${badge}</span>`;
+  return nickHTML({ nickname: (u && u.nickname) || "Игрок", style: (u && (u.style || (u.raw && u.raw.style))) || {} });
 }
 
 function renderProfile() {
@@ -229,7 +226,7 @@ function renderProfile() {
     chip.textContent = "Войти";
   }
 
-  document.getElementById("statBalance").textContent = fmt(state.balance);
+  document.getElementById("statBalance").innerHTML = fmt(state.balance);
   document.getElementById("statItems").textContent = state.inventory.length;
 
   renderTopBalanceSlider();
