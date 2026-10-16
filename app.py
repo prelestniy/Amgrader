@@ -233,6 +233,7 @@ def user_public(row) -> dict:
         "hasPassword": bool(row["password_hash"]),
         "login": row["login"],
         "nickname": row["nickname"],
+        "nickChangedAt": (row["nick_changed_at"] if "nick_changed_at" in row.keys() else 0) or 0,
         "username": row["username"],
         "photo": row["photo"],
         "source": row["source"],
@@ -1154,6 +1155,15 @@ def update_profile(body: AboutBody, user=Depends(auth_user)):
         conn.execute("UPDATE users SET about=? WHERE id=?", (about, user["id"]))
         row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
     return user_public(row)
+
+
+class NickBody(BaseModel):
+    nickname: str
+
+
+@app.post("/api/me/nickname")
+def me_nickname(body: NickBody, user=Depends(auth_user)):
+    return style.change_nick(user["id"], body.nickname)
 
 
 @app.post("/api/me/avatar")
