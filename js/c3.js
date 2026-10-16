@@ -10,7 +10,7 @@ async function openCases() {
   if (useFree) state.freeCaseSpins--;
   const token = ++caseRunToken;
   const results = Array.from({ length: n }, () => pickFromCase(c));
-  if (demo.on) demo.bal -= cost; else state.balance -= cost;               // итог фиксируем сразу, анимация — только показ
+  if (!demo.on) state.balance -= cost;               // итог фиксируем сразу, анимация — только показ
   if (!demo.on) results.forEach(m => state.inventory.push({ ...m, uid: makeUid("u") }));
   /* Бонус: 3+ одинаковых предмета за один спин — бесплатный кейс на будущее */
   const dupCounts = {};
@@ -126,7 +126,7 @@ function renderCraft(keepOut) {
   const ready = picked.length === CRAFT_COUNT;
   const b = $("craftBtn"); b.disabled = !ready || !next || !!state.spinning;
   b.textContent = state.spinning ? "Крафтим…" : (ready || !picked.length ? "Скрафтить" : "Нужно ещё " + (CRAFT_COUNT - picked.length));
-  $("craftCount").textContent = "Выбрано: " + picked.length + " / " + CRAFT_COUNT + (picked.length ? " · стоимость " + fmt(cost) : "");
+  $("craftCount").innerHTML = "Выбрано: " + picked.length + " / " + CRAFT_COUNT + (picked.length ? " · стоимость " + fmt(cost) : "");
   if (next) {
     $("craftOddsLabel").style.display = "";
     const pool = craftPool(next, cost || 1);
