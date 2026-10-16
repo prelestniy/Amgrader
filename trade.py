@@ -64,13 +64,13 @@ def _check_side(uid, conn, items, g):
     if len(items) > 50:
         raise HTTPException(400, "Не больше 50 предметов за раз")
     if not isinstance(g, int) or g < 0:
-        raise HTTPException(400, "Некорректная сумма G")
+        raise HTTPException(400, "Некорректная сумма M")
     row = conn.execute("SELECT inventory, balance FROM users WHERE id=?", (uid,)).fetchone()
     inv = json.loads(row["inventory"] or "[]")
     if not _has(inv, items):
         raise HTTPException(400, "Недостаточно предметов в инвентаре")
     if g > (row["balance"] or 0):
-        raise HTTPException(400, "Недостаточно G")
+        raise HTTPException(400, "Недостаточно M")
     return sorted(items), g
 
 
@@ -134,7 +134,7 @@ def _execute(conn, row):
     if not _has(inv_a, a_items) or not _has(inv_b, b_items):
         problem = "Предмет уже нет в инвентаре — предложение нужно обновить"
     elif (ua["balance"] or 0) < row["a_g"] + fee_a or (ub["balance"] or 0) < row["b_g"] + fee_b:
-        problem = "Не хватает G на комиссию или сумму — предложение нужно обновить"
+        problem = "Не хватает M на комиссию или сумму — предложение нужно обновить"
     if problem:
         conn.execute("UPDATE trades SET status='open', a_ok=0, b_ok=0, exec_at=0, note=?, updated_at=? WHERE id=?",
                      (problem, int(time.time()), row["id"]))
@@ -255,7 +255,7 @@ def confirm(uid, code):
         if row["to_uid"] is None:
             raise HTTPException(400, "Дождитесь, пока второй игрок откроет трейд")
         if not json.loads(row["a_items"]) and not json.loads(row["b_items"]) and not row["a_g"] and not row["b_g"]:
-            raise HTTPException(400, "Добавьте предметы или G")
+            raise HTTPException(400, "Добавьте предметы или M")
         col = "a" if row["from_uid"] == uid else "b"
         conn.execute(f"UPDATE trades SET {col}_ok=1, updated_at=? WHERE id=?", (int(time.time()), code))
         row = _load(conn, code)
