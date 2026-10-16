@@ -35,7 +35,6 @@ function showScreen(name) {
   if (state.spinning) return;
   { const uo = document.getElementById("userOverlay"); if (uo && !uo.hidden && typeof closeUserProfile === "function") closeUserProfile(); }
   if (typeof closeTrade === "function") closeTrade();
-  if (demo.on && !["cases", "mines", "ladder"].includes(name)) setDemo(false);
   syncDemoUI();
   const els = SCREENS.map(s => $("screen" + cap(s))).filter(Boolean);   // экран может отсутствовать в старой index.html
   const out = els.find(e => !e.hidden) || null, inn = $("screen" + cap(name));
@@ -139,7 +138,7 @@ function renderMinesHud() {
   const n = mines.opened.length;
   const mult = mines.phase === "idle" ? 1 : minesCurMult(n, mines.count);
   $("minesMult").textContent = "x" + mult.toFixed(2);
-  $("minesWin").textContent = (mines.phase !== "idle" && n > 0) ? ("Выигрыш: " + fmt(Math.round(mines.bet * mult))) : "";
+  $("minesWin").innerHTML = (mines.phase !== "idle" && n > 0) ? ("Выигрыш: " + fmt(Math.round(mines.bet * mult))) : "";
   const btn = $("minesMainBtn"); const note = $("minesNote");
   btn.classList.remove("cashout", "lost"); btn.disabled = false;
   const betIn = $("minesBetInput"), cntIn = $("minesCountInput");
@@ -148,10 +147,10 @@ function renderMinesHud() {
   } else if (mines.phase === "playing") {
     betIn.disabled = true; cntIn.disabled = true;
     if (n === 0) { btn.textContent = "Выберите клетку"; btn.disabled = true; note.textContent = "Жмите на поле — баланс раунда растёт с каждой открытой клеткой"; }
-    else { btn.textContent = "Забрать " + fmt(Math.round(mines.bet * mult)); btn.classList.add("cashout"); note.textContent = "Можно забрать в любой момент или рискнуть дальше"; }
+    else { btn.innerHTML = "Забрать " + fmt(Math.round(mines.bet * mult)); btn.classList.add("cashout"); note.textContent = "Можно забрать в любой момент или рискнуть дальше"; }
   } else if (mines.phase === "lost") {
     betIn.disabled = false; cntIn.disabled = false;
-    btn.textContent = "Играть снова"; btn.classList.add("lost"); note.textContent = "Бум! Ставка сгорела — " + fmt(mines.bet);
+    btn.innerHTML = "Играть снова"; btn.classList.add("lost"); note.innerHTML = "Бум! Ставка сгорела — " + fmt(mines.bet);
   }
 }
 function minesMainAction() {
@@ -163,7 +162,7 @@ function minesStart() {
   if (mines.phase !== "idle") return;
   const bet = mines.bet;
   if (!(bet > 0)) { $("minesNote").textContent = "Укажите ставку"; return; }
-  if (bet > curBal()) { $("minesNote").textContent = "Не хватает " + fmt(bet - curBal()); return; }
+  if (bet > curBal()) { $("minesNote").innerHTML = "Не хватает " + fmt(bet - curBal()); return; }
   gAdd(-bet);
   const bombs = [];
   while (bombs.length < mines.count) { const r = Math.floor(Math.random() * MINES_TOTAL); if (!bombs.includes(r)) bombs.push(r); }
@@ -284,7 +283,7 @@ function ladderRenderHud() {
   const n = ladder.row;
   const mult = ladder.phase === "idle" ? 1 : ladderCurMult(n);
   $("ladderMult").textContent = "x" + mult.toFixed(2);
-  $("ladderWin").textContent = (ladder.phase === "playing" && n > 0) ? ("Выигрыш: " + fmt(Math.round(ladder.bet * mult))) : "";
+  $("ladderWin").innerHTML = (ladder.phase === "playing" && n > 0) ? ("Выигрыш: " + fmt(Math.round(ladder.bet * mult))) : "";
   const btn = $("ladderMainBtn"); const note = $("ladderNote");
   btn.classList.remove("cashout", "lost"); btn.disabled = false;
   const betIn = $("ladderBetInput"), stonesIn = $("ladderStonesInput");
@@ -294,9 +293,9 @@ function ladderRenderHud() {
     betIn.disabled = true; stonesIn.disabled = true;
     if (ladder.resolving) { btn.textContent = "…"; btn.disabled = true; note.textContent = "Камень падает…"; }
     else if (n === 0) { btn.textContent = "Выберите деление"; btn.disabled = true; note.textContent = "Жмите на клетку — человечек побежит туда и полезет выше"; }
-    else { btn.textContent = "Забрать " + fmt(Math.round(ladder.bet * mult)); btn.classList.add("cashout"); note.textContent = "Заберите выигрыш или рискните подняться выше"; }
+    else { btn.innerHTML = "Забрать " + fmt(Math.round(ladder.bet * mult)); btn.classList.add("cashout"); note.textContent = "Заберите выигрыш или рискните подняться выше"; }
   } else if (ladder.phase === "lost") {
     betIn.disabled = false; stonesIn.disabled = false;
-    btn.textContent = "Играть снова"; btn.classList.add("lost"); note.textContent = "Придавило камнем — ставка сгорела: " + fmt(ladder.bet);
+    btn.innerHTML = "Играть снова"; btn.classList.add("lost"); note.innerHTML = "Придавило камнем — ставка сгорела: " + fmt(ladder.bet);
   }
 }
