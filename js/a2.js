@@ -68,7 +68,8 @@ function isWin(angle, chance) {                               // ЕДИНАЯ ф
 
 
 const RARITY_RU = { common:"Обычный", rare:"Редкий", epic:"Эпический", legendary:"Легендарный", mythic:"Мифический", secret:"Секретный", galactic:"Галактический", sausage:"Колбасный", eldovaya:"Елдовая", sasnaya:"Сасная", rubinovaya:"Рубиновая", kratnost:"Кратность" };
-const fmt = n => Number(n).toLocaleString("ru-RU") + " M";
+const COIN = '<svg class="coin" role="img" aria-label="M"><use href="#coin-ico"/></svg>';
+const fmt = n => (Number.isFinite(Number(n)) ? Number(n).toLocaleString("ru-RU") : "∞") + COIN;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 /* ============================================================
@@ -262,20 +263,21 @@ function plural(n, one, few, many) {
 }
 /* ============ ДЕМО-РЕЖИМ: виртуальный баланс для кейсов, мин и лесенки ============ */
 const demo = { on: false, bal: 100000 };
-function curBal() { return demo.on ? demo.bal : state.balance; }
+function curBal() { return demo.on ? Infinity : state.balance; }
 function gAdd(x) {
-  if (demo.on) demo.bal += x; else { state.balance += x; saveGame(); }
+  if (!demo.on) { state.balance += x; saveGame(); }
   updateHeader(); pulseBalance();
 }
 function syncDemoUI() {
   document.body.classList.toggle("demo-on", demo.on);
   document.querySelectorAll(".demo-box").forEach(b => {
-    b.innerHTML = `<button class="demo-pill${demo.on ? " on" : ""}" onclick="toggleDemo()"><i></i>Демо</button>` +
-      (demo.on ? `<button class="demo-reset" onclick="resetDemo()">Сбросить</button>` : "");
+    b.innerHTML = "";
   });
 }
+function demoKey() { return "amg_demo_" + ((state.profile && state.profile.accountKey) || "guest"); }
 function setDemo(on) {
-  demo.on = on; syncDemoUI(); updateHeader();
+  demo.on = on; try { localStorage.setItem(demoKey(), on ? "1" : "0"); } catch (e) {}
+  syncDemoUI(); updateHeader();
   try { renderMinesHud(); ladderRenderHud(); updateCaseBtn(); } catch (e) {}
 }
 function toggleDemo() {
@@ -290,14 +292,15 @@ function updateHeader() {
   const el = document.getElementById("headerMeta");
   const el2 = document.getElementById("spinBalance");
   const from = shownBalance, to = curBal();
-  if (from === to) { el.textContent = fmt(to); if (el2) el2.textContent = fmt(to); return; }
+  if (!Number.isFinite(to)) { el.innerHTML = fmt(to); if (el2) el2.innerHTML = fmt(to); return; }
+  if (from === to) { el.innerHTML = fmt(to); if (el2) el2.innerHTML = fmt(to); return; }
   const id = ++balanceAnim, start = performance.now(), dur = 600;
   (function frame(now) {
     if (id !== balanceAnim) return;
     const t = Math.min((now - start) / dur, 1);
     shownBalance = Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)));
-    el.textContent = fmt(shownBalance);
-    if (el2) el2.textContent = fmt(shownBalance);
+    el.innerHTML = fmt(shownBalance);
+    if (el2) el2.innerHTML = fmt(shownBalance);
     if (t < 1) requestAnimationFrame(frame);
   })(start);
 }
@@ -413,6 +416,7 @@ let sellUid = null;
 function sellPrice(m) { return Math.round(m.price * SELL_RATE); }
 
 function openSell(uid) {
+  if (demo.on) return notify("lose", "Демо", "В демо-режиме нельзя продавать предметы", "—", OK_ITEM);
   if (state.spinning || paying) return;
   if (!state.inventory.find(i => i.uid === uid)) return;
   if (!isLoggedIn()) { openAuth("Войдите, чтобы продавать предметы"); return; }
@@ -484,3 +488,5 @@ function finishSell() {
   notify("win", "Продано", m.name, "+ " + fmt(price), m);
 }
 
+
+function epToggleDemo(btn) { toggleDemo(); btn.classList.toggle("on", demo.on); btn.textContent = demo.on ? "Включён" : "Выключен"; }
