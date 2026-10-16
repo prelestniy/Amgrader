@@ -82,11 +82,22 @@ async function api(path, opts) {
 }
 
 function mergeServerUser(u) {
-  state.balance = u.balance; state.rev = u.rev || 0; state.luck = u.luck || [];
-  setInventoryFromIds(u.inventory || []);
+  const base = syncBase;
+  let bal = u.balance || 0, ids = (u.inventory || []).slice();
+  if (base) {   // несохранённые локальные изменения (продажа, открытие) накладываем на данные сервера
+    bal = Math.max(0, bal + (state.balance - base.balance));
+    const d = diffIds(state.inventory.map(i => i.id), base.ids);
+    d.rem.forEach(x => { const k = ids.indexOf(x); if (k >= 0) ids.splice(k, 1); });
+    ids.push(...d.add);
+  }
+  state.balance = bal; state.rev = u.rev || 0; state.luck = u.luck || [];
+  if (state.profile && u.nickChangedAt !== undefined) state.profile.nickChangedAt = u.nickChangedAt;
+  setInventoryFromIds(ids);
+  syncBase = { balance: u.balance || 0, ids: (u.inventory || []).slice() };
   if (state.profile && u.style) state.profile.style = u.style;
   if (state.profile) { state.profile.referralCode = u.referralCode; state.profile.referredBy = u.referredBy;
     if (u.publicId) { state.profile.publicId = u.publicId; state.profile.about = u.about || ""; } }
+  if (state.profile) demo.on = localStorage.getItem("amg_demo_" + state.profile.accountKey) === "1";
   renderAll(); renderProfile(); pulseBalance();
 }
 function fixSelection() {
@@ -114,16 +125,36 @@ function applyServerUser(u) {
 }
 const OK_ITEM = { name: "OK", rarity: "common", icon: '<svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' };
 
+let syncBase = null, saveChain = Promise.resolve();
+function diffIds(local, base) {
+  const m = new Map(); base.forEach(x => m.set(x, (m.get(x) || 0) + 1));
+  const add = [];
+  local.forEach(x => { const c = m.get(x) || 0; if (c > 0) m.set(x, c - 1); else add.push(x); });
+  const rem = []; m.forEach((c, x) => { for (let k = 0; k < c; k++) rem.push(x); });
+  return { add, rem };
+}
 function saveGame() {
-  const tk = getToken();
-  if (!isLoggedIn() || !tk) return;
+  if (!isLoggedIn() || !getToken()) return;
   lastSaveAt = Date.now();
-  fetch(API_BASE + "/api/state", { method: "POST", keepalive: true,
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tk },
-    body: JSON.stringify({ balance: state.balance, inventory: state.inventory.map(i => i.id), rev: state.rev }) })
-    .then(r => r.json()).then(d => { if (d && d.stale && d.user) mergeServerUser(d.user); }).catch(() => {});
+  saveChain = saveChain.then(doSaveState).catch(() => {});   // сохранения идут по очереди
+}
+async function doSaveState() {
+  const tk = getToken(); if (!isLoggedIn() || !tk) return;
+  for (let i = 0; i < 3; i++) {
+    const bal = state.balance, ids = state.inventory.map(x => x.id);
+    let d;
+    try {
+      d = await (await fetch(API_BASE + "/api/state", { method: "POST", keepalive: true,
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tk },
+        body: JSON.stringify({ balance: bal, inventory: ids, rev: state.rev }) })).json();
+    } catch (e) { return; }
+    if (d && d.ok) { syncBase = { balance: bal, ids: ids }; return; }
+    if (d && d.stale && d.user) { mergeServerUser(d.user); continue; }   // локальные правки переложатся поверх сервера
+    return;
+  }
 }
 function resetGuestState() {
+  syncBase = null;
   state.rev = 0; state.luck = []; state.balance = 0; state.inventory = []; state.selectedMemeUids = []; state.targetMemeId = null; state.cart = {}; shownBalance = 0;
 }
 
@@ -274,7 +305,7 @@ async function openEditProfile() {
   const ownedCols = shop ? (shop.colors || []).filter(c => c.owned) : [];
   const curCol = shop ? (shop.equippedColor || "") : "";
   const colBlock = ownedCols.length
-    ? `<div class="reg-field"><label>Цвет ника</label><div class="ep-prefix-list" id="epColorList" data-cur="${curCol}">`
+    ? `<div class="reg-field"><label>Цвет префикса</label><div class="ep-prefix-list" id="epColorList" data-cur="${curCol}">`
       + `<button type="button" class="ep-pref${curCol ? "" : " on"}" data-hex="" onclick="pickEpColor(this)">Без цвета</button>`
       + ownedCols.map(c => `<button type="button" class="ep-pref${curCol === c.hex ? " on" : ""}" data-hex="${c.hex}" onclick="pickEpColor(this)"><span class="ep-colsample" style="color:${c.hex}">Ник</span></button>`).join("")
       + `</div></div>`
@@ -282,19 +313,25 @@ async function openEditProfile() {
   const pwBlock = p.hasPassword
     ? `<div class="reg-field"><label>Текущий пароль (нужен, чтобы сменить логин или пароль)</label><input id="epCurPw" type="password" maxlength="64" autocomplete="current-password"></div>`
     : `<div class="misc-hint">Задайте логин и пароль — тогда можно будет входить не только через Telegram.</div>`;
-  openMisc(miscHead(ic("users", 24), "Редактирование профиля", "Ник и ID изменить нельзя") + `
+  const nickLocked = Date.now() / 1000 < (p.nickChangedAt || 0) + 86400;
+  openMisc(miscHead(ic("users", 24), "Редактирование профиля", "ID нельзя менять, ник раз в сутки") + `
     <div class="reg-body" style="overflow-y:auto;min-height:0">
       <div class="ep-avatar-row">
         <div class="ep-avatar" id="epAvatar">${avatarHTML(p.photo, p.nickname)}</div>
         <button class="ghost-btn" onclick="gid('epFile').click()">Фото из галереи</button>
         <input id="epFile" type="file" accept="image/*" hidden onchange="pickAvatar(this)">
       </div>
+      <div class="reg-field"><label>Ник (раз в сутки)</label>
+        <input id="epNick" type="text" maxlength="20" value="${esc(p.nickname || "")}" autocomplete="off"${nickLocked ? " disabled" : ""}>
+        ${nickLocked ? `<div class="misc-hint">Следующая смена ника: ${new Date(((p.nickChangedAt || 0) + 86400) * 1000).toLocaleString("ru-RU")}</div>` : ""}</div>
       <div class="reg-field"><label>О себе (до 20 символов)</label>
         <input id="epAbout" type="text" maxlength="20" value="${esc(p.about || "")}" placeholder="Например, коллекционер" autocomplete="off"></div>
       <div class="reg-field"><label>Логин</label>
         <input id="epLogin" type="text" maxlength="32" value="${esc(p.login || "")}" placeholder="Придумайте логин" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"></div>
       ${prefBlock}
       ${colBlock}
+      <div class="reg-field"><label>Демо-режим (∞ баланс, реальный баланс не меняется)</label>
+        <button type="button" class="ep-pref${demo.on ? " on" : ""}" onclick="epToggleDemo(this)">${demo.on ? "Включён" : "Выключен"}</button></div>
       ${pwBlock}
       <div class="reg-field"><label>${p.hasPassword ? "Новый пароль (если нужно сменить)" : "Пароль"}</label>
         <input id="epNewPw" type="password" maxlength="64" autocomplete="new-password"></div>
@@ -341,12 +378,20 @@ async function saveProfile() {
   const newHex = cl ? (cl.querySelector(".ep-pref.on") ? cl.querySelector(".ep-pref.on").dataset.hex : "") : "";
   const colChanged = cl && newHex !== (cl.dataset.cur || "");
   const loginChanged = !!login && login !== (p.login || "");
+  const nickEl = gid("epNick");
+  const nickNew = nickEl && !nickEl.disabled ? nickEl.value.trim().replace(/\s+/g, " ") : "";
+  const nickChanged = !!nickNew && nickNew !== p.nickname;
   if (about.length > 20) return miscMsg("«О себе»: не больше 20 символов");
   if (loginChanged && login.length < 3) return miscMsg("Логин слишком короткий");
   if (newPw && newPw.length < 4) return miscMsg("Пароль слишком короткий");
   if (p.hasPassword && (loginChanged || newPw) && !curPw) return miscMsg("Введите текущий пароль");
   btn.disabled = true; miscMsg("");
   try {
+    if (nickChanged) {
+      const r = await api("/api/me/nickname", { method: "POST", body: { nickname: nickNew } });
+      state.profile.nickname = r.nickname; state.profile.nickChangedAt = r.nickChangedAt;
+      renderProfile(); renderAll();
+    }
     if (about !== (p.about || "")) applyProfileFields(await api("/api/me/profile", { method: "POST", body: { about } }));
     if (loginChanged || newPw) applyProfileFields(await api("/api/me/credentials", { method: "POST",
       body: { login: loginChanged ? login : undefined, new_password: newPw || undefined, current_password: curPw || undefined } }));
