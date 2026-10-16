@@ -35,6 +35,7 @@ function updateSellCartBtn() {
 }
 
 function openSellCart() {
+  if (demo.on) return notify("lose", "Демо", "В демо-режиме нельзя продавать предметы", "—", OK_ITEM);
   if (state.spinning || paying) return;
   const n = state.selectedMemeUids.length;
   if (n < 1) return;
@@ -161,7 +162,7 @@ function updateCartBar() {
   if (n) {
     document.getElementById("cartCount").textContent = "В корзине: " + n + " " + plural(n, "предмет", "предмета", "предметов");
     const ct = document.getElementById("cartTotal");
-    ct.textContent = fmt(cartTotal());
+    ct.innerHTML = fmt(cartTotal());
     ct.classList.toggle("bad", cartTotal() > state.balance);
   }
 }
@@ -407,7 +408,7 @@ function notify(kind, title, sub, badge, item) {
   document.getElementById("bubbleIcon").innerHTML = renderIcon(item, 44);
   document.getElementById("bubbleTitle").textContent = title;
   document.getElementById("bubbleSub").textContent = sub;
-  document.getElementById("bubbleBadge").textContent = badge;
+  document.getElementById("bubbleBadge").innerHTML = badge;
   requestAnimationFrame(() => el.classList.add("show"));
   bubbleTimer = setTimeout(hideBubble, 3200);
 }
