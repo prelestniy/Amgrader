@@ -19,7 +19,7 @@ function wheelSvgHtml(list) {
     const a = k * WHEEL_STEP, rad = a * Math.PI / 180;
     const x = 160 + R * Math.sin(rad), y = 160 - R * Math.cos(rad);
     const isG = p.type === "g";
-    const text = isG ? `+${p.amount}G` : esc(String(p.name || "").slice(0, 10));
+    const text = isG ? `+${p.amount}M` : esc(String(p.name || "").slice(0, 10));
     return `<text transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a - 90})" text-anchor="middle" dominant-baseline="middle" ` +
       `style="fill:var(--text);font:800 ${isG ? 14 : 11}px Arteks,Manrope,system-ui,sans-serif">${text}</text>`;
   }).join("");
@@ -158,7 +158,7 @@ async function wheelSpin() {
     wheelSetReadyIn(res.secondsLeft);
     const p = res.prize;
     if (p.type === "g") {
-      wheelSetMsg(`+${fmt(p.amount)} G`);
+      wheelSetMsg(`+${fmt(p.amount)} M`);
       notify("win", "Колесо бонусов", "Награда получена", "+" + fmt(p.amount), OK_ITEM);
     } else {
       const m = (typeof MEMES !== "undefined" && MEMES.find(x => x.id === p.id)) || { name: p.name, rarity: p.rarity, icon: "" };
