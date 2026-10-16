@@ -1,12 +1,12 @@
 /* НИКИ: префикс-плашка, цвет ника, галочка */
-.nk { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nk { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
 .nk-prefix { font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 3px 9px; border-radius: 999px;
   color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 45%, transparent); }
 .nk-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nk > .nk-prefix { flex: none; }
 .nk > .vbadge { flex: none; }
-.vbadge { width: .78em; height: .78em; flex: none; display: inline-block; vertical-align: .02em; margin-left: 1px; }
+.vbadge { width: .95em; height: .95em; flex: none; display: inline-block; vertical-align: -.12em; margin-left: 3px; }
 
 /* МАГАЗИН ПРЕФИКСОВ */
 .shop-bal { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
@@ -110,3 +110,11 @@
 .shop-card .shop-btn { min-width: 112px; white-space: nowrap; text-align: center; flex: none; }
 .shop-bal-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
 .shop-bal-row .shop-bal { margin-bottom: 0; }
+
+/* МОНЕТА M: SVG-символ из спрайта в index.html */
+.coin { display: inline-block; width: 1em; height: 1em; vertical-align: -0.14em; margin-left: .18em; flex: none; }
+
+/* ВКЛАДКИ МАГАЗИНА: префиксы / цвета */
+.shop-tabs { display: flex; gap: 8px; margin: 6px 0 10px; }
+.shop-tab { flex: 1; border: 1px solid var(--border-hi); background: var(--surface-2); color: var(--text-dim); border-radius: 999px; padding: 8px 10px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.shop-tab.on { color: var(--accent); border-color: var(--accent); }
