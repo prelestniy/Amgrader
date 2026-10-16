@@ -1,6 +1,7 @@
-"""Префиксы (покупаются за G, цену ставит админ), верификация и цвет ника. Админка через мини-апп."""
+"""Префиксы (покупаются за M, цену ставит админ), верификация и цвет ника. Админка через мини-апп."""
 import json
 import os
+import time
 import re
 from contextlib import closing
 
@@ -19,13 +20,47 @@ def setup(db, verify_init_data):
 
 def init_db(conn):
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
-    for col, typ in (("verified", "INTEGER DEFAULT 0"), ("name_color", "TEXT"),
+    for col, typ in (("verified", "INTEGER DEFAULT 0"), ("name_color", "TEXT"), ("nick_changed_at", "INTEGER DEFAULT 0"),
                      ("prefix_id", "INTEGER"), ("owned_prefixes", "TEXT DEFAULT '[]'"), ("owned_colors", "TEXT DEFAULT '[]'")):
         if col not in cols:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
     conn.execute("""CREATE TABLE IF NOT EXISTS prefixes(
         id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, color TEXT NOT NULL,
         price INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1)""")
+
+
+NICK_RE = re.compile(r"[\w \-]{2,20}")   # буквы любого алфавита, цифры, пробел, _ и -
+NICK_COOLDOWN = 24 * 3600
+
+
+def clean_nick(raw):
+    n = re.sub(r"\s+", " ", (raw or "").strip())
+    if not NICK_RE.fullmatch(n):
+        raise HTTPException(400, "Ник: от 2 до 20 символов — буквы, цифры, пробел, _ или -")
+    return n
+
+
+def nick_taken(conn, nick, uid):
+    return conn.execute("SELECT 1 FROM users WHERE LOWER(nickname)=LOWER(?) AND id!=?", (nick, uid)).fetchone() is not None
+
+
+def change_nick(uid, raw):
+    """Смена ника самим игроком: раз в 24 часа, ник должен быть свободен."""
+    nick = clean_nick(raw)
+    now = int(time.time())
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        u = conn.execute("SELECT nickname, nick_changed_at FROM users WHERE id=?", (uid,)).fetchone()
+        if u["nickname"] == nick:
+            return {"ok": True, "nickname": nick, "nickChangedAt": u["nick_changed_at"] or 0}
+        left = (u["nick_changed_at"] or 0) + NICK_COOLDOWN - now
+        if left > 0:
+            hours = -(-left // 3600)
+            raise HTTPException(429, f"Ник можно менять раз в сутки. Следующая смена через {hours} ч")
+        if nick_taken(conn, nick, uid):
+            raise HTTPException(400, "Этот ник уже занят")
+        conn.execute("UPDATE users SET nickname=?, nick_changed_at=?, rev=rev+1 WHERE id=?", (nick, now, uid))
+    return {"ok": True, "nickname": nick, "nickChangedAt": now}
 
 
 def admin_ids():
@@ -95,7 +130,7 @@ def buy_color(uid, hex_):
             raise HTTPException(400, "Этот цвет уже куплен")
         price = COLOR_PRICE[hex_]
         if (u["balance"] or 0) < price:
-            raise HTTPException(400, "Не хватает G")
+            raise HTTPException(400, "Не хватает M")
         owned.append(hex_)
         conn.execute("UPDATE users SET balance=balance-?, owned_colors=?, rev=rev+1 WHERE id=?",
                      (price, json.dumps(owned), uid))
@@ -109,6 +144,24 @@ def equip_color(uid, hex_):
             if hex_ not in json.loads(u["owned_colors"] or "[]"):
                 raise HTTPException(400, "Сначала купите этот цвет")
         conn.execute("UPDATE users SET name_color=?, rev=rev+1 WHERE id=?", (hex_, uid))
+    return {"ok": True}
+
+
+def buy(uid, pid):
+    with closing(_db()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        p = conn.execute("SELECT price, active FROM prefixes WHERE id=?", (pid,)).fetchone()
+        if p is None or not p["active"]:
+            raise HTTPException(404, "Такого префикса нет")
+        u = conn.execute("SELECT balance, owned_prefixes FROM users WHERE id=?", (uid,)).fetchone()
+        owned = json.loads(u["owned_prefixes"] or "[]")
+        if pid in owned:
+            raise HTTPException(400, "Этот префикс уже куплен")
+        if (u["balance"] or 0) < p["price"]:
+            raise HTTPException(400, "Не хватает M")
+        owned.append(pid)
+        conn.execute("UPDATE users SET balance=balance-?, owned_prefixes=?, rev=rev+1 WHERE id=?",
+                     (p["price"], json.dumps(owned), uid))
     return {"ok": True}
 
 
@@ -187,6 +240,11 @@ def admin_user_update(who, body):
             if gp not in owned:
                 owned.append(gp)
                 sets.append("owned_prefixes=?"); args.append(json.dumps(owned))
+        if "nickname" in body:          # админ меняет ник без ограничения по времени
+            nick = clean_nick(body.get("nickname"))
+            if nick_taken(conn, nick, u["id"]):
+                raise HTTPException(400, "Этот ник уже занят")
+            sets.append("nickname=?"); args.append(nick)
         if sets:
             conn.execute(f"UPDATE users SET {', '.join(sets)}, rev=rev+1 WHERE id=?", (*args, u["id"]))
     return {"ok": True}
