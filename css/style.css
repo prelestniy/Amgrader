@@ -102,3 +102,11 @@
 
 /* цена предмета в списке наград кейса */
 .pi-pr { font-size:11px; color:var(--text-dim); font-weight:700; margin-top:2px; }
+
+/* ФИКС ПЛАШЕК В МАГАЗИНЕ: каждая плашка по своему тексту, кнопки выровнены */
+.shop-card { min-height: 64px; }
+.shop-card .shop-info { flex: 1; min-width: 0; }
+.shop-card .nk-prefix { display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-card .shop-btn { min-width: 112px; white-space: nowrap; text-align: center; flex: none; }
+.shop-bal-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.shop-bal-row .shop-bal { margin-bottom: 0; }
