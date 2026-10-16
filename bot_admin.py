@@ -461,7 +461,7 @@ def back_kb(menu: str, *extra_rows):
 
 
 def reward_text(p: dict) -> str:
-    return f"+{fmt_g(p['reward_value'])} G" if p["reward_type"] == "balance" else f"предмет #{p['reward_value']}"
+    return f"+{fmt_g(p['reward_value'])} M" if p["reward_type"] == "balance" else f"предмет #{p['reward_value']}"
 
 
 async def act_top(target):
@@ -473,8 +473,8 @@ async def act_top(target):
     lines = []
     for i, u in enumerate(d["users"]):
         luck = " 🎯" if u.get("luck_rules") not in (None, "", "[]") else ""
-        lines.append(f"{medals[i] if i < 3 else str(i + 1) + '.'} <b>{esc(u['login'] or u['nickname'])}</b> · {fmt_g(u['balance'])} G{luck}")
-    await send(target, f"🏆 <b>Топ игроков</b>\nИгроков: <b>{d['count']}</b> · на балансах: <b>{fmt_g(d['sum'])} G</b>\n\n" + "\n".join(lines),
+        lines.append(f"{medals[i] if i < 3 else str(i + 1) + '.'} <b>{esc(u['login'] or u['nickname'])}</b> · {fmt_g(u['balance'])} M{luck}")
+    await send(target, f"🏆 <b>Топ игроков</b>\nИгроков: <b>{d['count']}</b> · на балансах: <b>{fmt_g(d['sum'])} M</b>\n\n" + "\n".join(lines),
                back_kb("users"))
 
 
@@ -508,7 +508,7 @@ async def act_tasks(target):
         return await send(target, f"❌ {esc(e)}", back_kb("tasks"))
     if not tasks:
         return await send(target, "Заданий пока нет.", back_kb("tasks", [B("📢 Добавить", "go:task_tg")]))
-    lines = [f"#{t['id']} {'📢' if t['kind'] == 'tg' else '🔗'} <b>{esc(t['title'])}</b> · +{fmt_g(t['reward'])} G" for t in tasks]
+    lines = [f"#{t['id']} {'📢' if t['kind'] == 'tg' else '🔗'} <b>{esc(t['title'])}</b> · +{fmt_g(t['reward'])} M" for t in tasks]
     rows = [[B(f"🗑 #{t['id']} · {t['title'][:28]}", f"dt:{t['id']}")] for t in tasks[:40]]
     await send(target, "📋 <b>Задания</b>\nНажмите на задание, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
 
@@ -707,7 +707,7 @@ async def p_user(t: str, allow_all: bool = False):
         return u.get("login") or f"#{u['id']}"
 
     def lab(u):
-        return f"{u['nickname']} · {ident(u)} · {fmt_g(u['balance'])} G"
+        return f"{u['nickname']} · {ident(u)} · {fmt_g(u['balance'])} M"
 
     exact = [u for u in users if (u.get("login") or "").lower() == q.lower()]
     if len(exact) == 1 or len(users) == 1:
@@ -725,7 +725,7 @@ async def p_item(t: str):
         raise ValueError("Предмет не нашёл. Попробуйте другое слово (можно по-английски).")
     if len(items) == 1:
         return Picked(items[0]["id"], items[0]["name"])
-    return Pick([(f"{i['name']} · {fmt_g(i['price'])} G", i["id"]) for i in items[:10]])
+    return Pick([(f"{i['name']} · {fmt_g(i['price'])} M", i["id"]) for i in items[:10]])
 
 
 AMOUNTS = (("100", "100"), ("500", "500"), ("1 000", "1000"), ("5 000", "5000"))
@@ -753,7 +753,7 @@ async def run_promo(v: dict, uid: int) -> str:
 
 
 def sum_reward(v: dict) -> str:
-    return f"💰 {fmt_g(v['value'])} G" if v["kind"] == "balance" else f"🎁 {lab(v, 'value')}"
+    return f"💰 {fmt_g(v['value'])} M" if v["kind"] == "balance" else f"🎁 {lab(v, 'value')}"
 
 
 def sum_promo(v: dict) -> str:
@@ -767,8 +767,8 @@ FLOWS["promo"] = Flow("promo", "🎟", "Создание промокода", "p
     Step("kind", "Что подарит промокод?", "Награда", lambda t: t,
          quick=(("💰 Сумму (G)", "balance"), ("🎁 Предмет", "item")), strict=True, per=2,
          fmt=lambda v: "💰 сумма" if v == "balance" else "🎁 предмет"),
-    Step("value", "Сколько <b>G</b> дарить? Нажмите кнопку или введите число.", "Сумма",
-         int_parser(lo=1), quick=AMOUNTS, when=lambda v: v.get("kind") == "balance", fmt=lambda x: f"{fmt_g(x)} G"),
+    Step("value", "Сколько <b>M</b> дарить? Нажмите кнопку или введите число.", "Сумма",
+         int_parser(lo=1), quick=AMOUNTS, when=lambda v: v.get("kind") == "balance", fmt=lambda x: f"{fmt_g(x)} M"),
     Step("value", "Введите <b>название предмета</b> (или часть, можно по-английски) — я найду.", "Предмет",
          p_item, when=lambda v: v.get("kind") == "item"),
     Step("uses", "Сколько человек смогут активировать код?\n<i>Нажмите кнопку или введите число.</i>", "Активаций",
@@ -783,7 +783,7 @@ async def run_items(v: dict, uid: int) -> str:
     if not items:
         return "Ничего не найдено."
     return "🔎 <b>Найденные предметы</b>\n\n" + "\n".join(
-        f"<code>#{i['id']}</code> {esc(i['name'])} · {esc(i['rarity'])} · {fmt_g(i['price'])} G" for i in items)
+        f"<code>#{i['id']}</code> {esc(i['name'])} · {esc(i['rarity'])} · {fmt_g(i['price'])} M" for i in items)
 
 
 FLOWS["items"] = Flow("items", "🔎", "Поиск предмета", "promo", [
@@ -793,26 +793,26 @@ FLOWS["items"] = Flow("items", "🔎", "Поиск предмета", "promo", [
 # ---- начислить игроку ----
 async def run_grant(v: dict, uid: int) -> str:
     await api("POST", "/admin/grant", json={"login": v["user"], "amount": v["amount"]})
-    return f"✅ Игроку <b>{lab(v, 'user')}</b> начислено <b>{fmt_g(v['amount'])} G</b>"
+    return f"✅ Игроку <b>{lab(v, 'user')}</b> начислено <b>{fmt_g(v['amount'])} M</b>"
 
 
 FLOWS["grant"] = Flow("grant", "🎁", "Начислить игроку", "bal", [
     Step("user", USER_PROMPT, "Игрок", p_user),
-    Step("amount", "Сколько <b>G</b> начислить?", "Сумма", int_parser(lo=1), quick=AMOUNTS, fmt=lambda x: f"{fmt_g(x)} G"),
-], run_grant, lambda v: f"🎁 Игроку: <b>{lab(v, 'user')}</b>\n💰 Начислить: <b>{fmt_g(v['amount'])} G</b>", again="🎁 Ещё начисление")
+    Step("amount", "Сколько <b>M</b> начислить?", "Сумма", int_parser(lo=1), quick=AMOUNTS, fmt=lambda x: f"{fmt_g(x)} M"),
+], run_grant, lambda v: f"🎁 Игроку: <b>{lab(v, 'user')}</b>\n💰 Начислить: <b>{fmt_g(v['amount'])} M</b>", again="🎁 Ещё начисление")
 
 
 # ---- установить баланс игроку ----
 async def run_setbal(v: dict, uid: int) -> str:
     await api("POST", "/admin/balance", json={"login": v["user"], "amount": v["amount"], "mode": "set"})
-    return f"✅ Баланс <b>{lab(v, 'user')}</b> теперь <b>{fmt_g(v['amount'])} G</b>"
+    return f"✅ Баланс <b>{lab(v, 'user')}</b> теперь <b>{fmt_g(v['amount'])} M</b>"
 
 
 FLOWS["setbal"] = Flow("setbal", "✏️", "Установить баланс игроку", "bal", [
     Step("user", USER_PROMPT, "Игрок", p_user),
     Step("amount", "Какой баланс <b>установить</b>? (число, G)", "Баланс", int_parser(lo=0),
-         quick=(("0", "0"), ("500", "500"), ("1 000", "1000"), ("10 000", "10000")), fmt=lambda x: f"{fmt_g(x)} G"),
-], run_setbal, lambda v: f"✏️ Игрок: <b>{lab(v, 'user')}</b>\n💰 Новый баланс: <b>{fmt_g(v['amount'])} G</b>", again="✏️ Ещё один")
+         quick=(("0", "0"), ("500", "500"), ("1 000", "1000"), ("10 000", "10000")), fmt=lambda x: f"{fmt_g(x)} M"),
+], run_setbal, lambda v: f"✏️ Игрок: <b>{lab(v, 'user')}</b>\n💰 Новый баланс: <b>{fmt_g(v['amount'])} M</b>", again="✏️ Ещё один")
 
 
 # ---- баланс ВСЕМ ----
@@ -824,16 +824,16 @@ def all_runner(mode: str):
 
 
 FLOWS["grantall"] = Flow("grantall", "➕", "Прибавить ВСЕМ", "bal", [
-    Step("amount", "Сколько <b>G</b> прибавить <b>всем игрокам</b>?\n<i>Минус — списать, например −100.</i>", "Сумма",
+    Step("amount", "Сколько <b>M</b> прибавить <b>всем игрокам</b>?\n<i>Минус — списать, например −100.</i>", "Сумма",
          int_parser(nonzero=True), quick=(("+100", "100"), ("+500", "500"), ("+1 000", "1000"), ("−100", "-100")), per=4,
-         fmt=lambda x: f"{x:+,} G".replace(",", " ")),
-], all_runner("add"), lambda v: f"⚠️ <b>ВСЕМ игрокам</b>\n{'➕ прибавить' if v['amount'] > 0 else '➖ списать'} <b>{fmt_g(abs(v['amount']))} G</b>",
+         fmt=lambda x: f"{x:+,} M".replace(",", " ")),
+], all_runner("add"), lambda v: f"⚠️ <b>ВСЕМ игрокам</b>\n{'➕ прибавить' if v['amount'] > 0 else '➖ списать'} <b>{fmt_g(abs(v['amount']))} M</b>",
     again="➕ Ещё раз")
 
 FLOWS["setall"] = Flow("setall", "⚖️", "Установить баланс ВСЕМ", "bal", [
     Step("amount", "Какой баланс <b>установить всем игрокам</b>?", "Баланс", int_parser(lo=0),
-         quick=(("0", "0"), ("500", "500"), ("1 000", "1000")), fmt=lambda x: f"{fmt_g(x)} G"),
-], all_runner("set"), lambda v: f"⚠️ <b>ВСЕМ игрокам</b>\n⚖️ установить баланс <b>{fmt_g(v['amount'])} G</b>", again="⚖️ Ещё раз")
+         quick=(("0", "0"), ("500", "500"), ("1 000", "1000")), fmt=lambda x: f"{fmt_g(x)} M"),
+], all_runner("set"), lambda v: f"⚠️ <b>ВСЕМ игрокам</b>\n⚖️ установить баланс <b>{fmt_g(v['amount'])} M</b>", again="⚖️ Ещё раз")
 
 
 # ---- удача ----
@@ -914,8 +914,8 @@ def task_steps(kind: str) -> list:
              if kind == "tg" else
              Step("target", "Пришлите <b>ссылку</b> (TikTok, Instagram и т.д.).\n<i>Начинается с https://</i>", "Ссылка", p_url))
     return [first,
-            Step("reward", "Сколько <b>G</b> дать за выполнение?", "Награда", int_parser(lo=1),
-                 quick=(("50", "50"), ("100", "100"), ("250", "250"), ("500", "500")), per=4, fmt=lambda x: f"{fmt_g(x)} G"),
+            Step("reward", "Сколько <b>M</b> дать за выполнение?", "Награда", int_parser(lo=1),
+                 quick=(("50", "50"), ("100", "100"), ("250", "250"), ("500", "500")), per=4, fmt=lambda x: f"{fmt_g(x)} M"),
             Step("title", "Напишите <b>название задания</b> — его увидят игроки.\n<i>Например: Подписаться на наш канал</i>", "Название", p_title)]
 
 
@@ -927,12 +927,12 @@ def task_runner(kind: str):
         else:
             payload = {"title": v["title"], "kind": "link", "url": v["target"], "reward": v["reward"]}
         r = await api("POST", "/admin/task", json=payload)
-        return f"✅ Задание <b>#{(r or {}).get('id')}</b> добавлено\n{esc(v['title'])} · +{fmt_g(v['reward'])} G"
+        return f"✅ Задание <b>#{(r or {}).get('id')}</b> добавлено\n{esc(v['title'])} · +{fmt_g(v['reward'])} M"
     return run
 
 
 def task_summary(v: dict) -> str:
-    return f"📋 <b>{esc(v['title'])}</b>\n🔗 {esc(v['target'])}\n💰 Награда: <b>{fmt_g(v['reward'])} G</b>"
+    return f"📋 <b>{esc(v['title'])}</b>\n🔗 {esc(v['target'])}\n💰 Награда: <b>{fmt_g(v['reward'])} M</b>"
 
 
 FLOWS["task_tg"] = Flow("task_tg", "📢", "Задание: подписка на канал", "tasks", task_steps("tg"), task_runner("tg"), task_summary,
@@ -983,7 +983,7 @@ def sum_quest(v: dict) -> str:
         lines.append(f"🎲 Шанс выпадения не выше {v['chance']}%")
     lines += [f"🔢 Нужно: {v['target']} раз",
               f"⚖️ Сложность: {v['difficulty']} из 5",
-              f"💰 Награда: <b>{fmt_g(quest_reward(v))} G</b>"]
+              f"💰 Награда: <b>{fmt_g(quest_reward(v))} M</b>"]
     return "\n".join(lines)
 
 
@@ -993,7 +993,7 @@ async def run_quest(v: dict, uid: int) -> str:
                "rarity": None if v.get("rarity") in (None, "any") else v["rarity"],
                "chance_max": chance or None, "difficulty": int(v["difficulty"])}
     r = await api("POST", "/admin/quest", json=payload)
-    return (f"✅ Квест <b>#{esc((r or {}).get('id'))}</b> добавлен\n{esc(v['title'])} · +{fmt_g(quest_reward(v))} G\n"
+    return (f"✅ Квест <b>#{esc((r or {}).get('id'))}</b> добавлен\n{esc(v['title'])} · +{fmt_g(quest_reward(v))} M\n"
             f"<i>Он будет попадать в ежедневный набор.</i>")
 
 
@@ -1029,7 +1029,7 @@ async def act_quests(target):
         return await send(target, f"❌ {esc(e)}", back_kb("tasks"))
     if not qs:
         return await send(target, "🎯 Своих квестов пока нет.", back_kb("tasks", [B("🎯 Новый квест", "go:quest")]))
-    lines = [f"#{q['id']} · <b>{esc(q['title'])}</b> · +{fmt_g(quest_reward(q))} G" for q in qs]
+    lines = [f"#{q['id']} · <b>{esc(q['title'])}</b> · +{fmt_g(quest_reward(q))} M" for q in qs]
     rows = [[B(f"🗑 #{q['id']} · {q['title'][:28]}", f"dq:{q['id']}")] for q in qs[:40]]
     await send(target, "🎯 <b>Квесты</b>\nНажмите на квест, чтобы удалить.\n\n" + "\n".join(lines), back_kb("tasks", *rows))
 
@@ -1062,7 +1062,7 @@ async def run_find(v: dict, uid: int) -> str:
     if not users:
         return "Никого не найдено."
     blocks = [f"<b>{esc(u['nickname'])}</b> @{esc(u['username'] or '—')}\n"
-              f"#{u['id']} · ID: <code>{esc(u.get('public_id') or '—')}</code> · логин: <code>{esc(u['login'] or '—')}</code> · {fmt_g(u['balance'])} G · код: <code>{esc(u['referral_code'])}</code>"
+              f"#{u['id']} · ID: <code>{esc(u.get('public_id') or '—')}</code> · логин: <code>{esc(u['login'] or '—')}</code> · {fmt_g(u['balance'])} M · код: <code>{esc(u['referral_code'])}</code>"
               for u in users[:15]]
     return "🔍 <b>Найдено</b>\n\n" + "\n\n".join(blocks)
 
