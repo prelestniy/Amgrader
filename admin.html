@@ -116,7 +116,7 @@
       <div class="lbl" style="margin-top:0">ID игрока или логин</div>
       <input class="inp" id="gWho" placeholder="например 123456">
       <div class="row" style="margin-top:10px">
-        <div><div class="lbl" style="margin-top:0">G</div><input class="inp" id="gG" type="number" min="0" value="0"></div>
+        <div><div class="lbl" style="margin-top:0">M</div><input class="inp" id="gG" type="number" min="0" value="0"></div>
         <div><div class="lbl" style="margin-top:0">Прокрутки</div><input class="inp" id="gSpins" type="number" min="0" value="0"></div>
       </div>
       <button class="btn" style="width:100%;margin-top:18px" onclick="grant()">Выдать</button>
@@ -192,7 +192,7 @@ async function loadUsers(reset){
       d.className = "card"; d.style.animationDelay = (i * 0.035) + "s";
       d.innerHTML = `<div class="av">${u.photo ? `<img src="${u.photo}" alt="">` : initials(u.nickname)}</div>
         <div class="info">${nk({ nickname: u.nickname, verified: u.verified, nameColor: u.nameColor, prefix: u.prefix })}
-        <div class="sub">ID ${esc(u.publicId)} · ${esc(u.login || "—")} · ${u.balance} G</div></div><span class="chev">›</span>`;
+        <div class="sub">ID ${esc(u.publicId)} · ${esc(u.login || "—")} · ${u.balance} M</div></div><span class="chev">›</span>`;
       d.onclick = () => openUser(u); box.appendChild(d);
     });
     offset += rows.length;
@@ -279,7 +279,7 @@ async function loadPrefixes(){
     renderPrePal();
     box.innerHTML = prefixes.map((p, i) => `<div class="pre-card ${p.active ? "" : "off"}" style="animation-delay:${i * 0.04}s" onclick='editPrefix(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
         <span class="nk-prefix" style="--pc:${esc(p.color)}">${esc(p.text)}</span>
-        <span class="sub" style="margin:0">${p.price} G${p.active ? "" : " · скрыт"}</span></div>`).join("") || '<div class="empty">Префиксов пока нет</div>';
+        <span class="sub" style="margin:0">${p.price} M${p.active ? "" : " · скрыт"}</span></div>`).join("") || '<div class="empty">Префиксов пока нет</div>';
   } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 function renderPrePal(){
