@@ -207,7 +207,7 @@ const PALETTE = ["#FFFFFF","#E8E8EC","#9CA3AF","#6B7280","#111111","#000000",
 let draft = null;
 function openUser(u){
   cur = u;
-  draft = { publicId: u.publicId, verified: !!u.verified, nameColor: u.nameColor || "", prefixId: u.prefixId || null };
+  draft = { publicId: u.publicId, nickname: u.nickname || "", verified: !!u.verified, nameColor: u.nameColor || "", prefixId: u.prefixId || null };
   document.getElementById("shTitle").textContent = "Игрок";
   const sw = PALETTE.map(c => `<button class="sw-c" style="background:${c}" data-c="${c}" onclick="pickColor('${c}')" aria-label="${c}"></button>`).join("");
   const pre = [`<button class="pre-pick" data-id="" onclick="pickPrefix(null)">Без префикса</button>`]
@@ -226,6 +226,8 @@ function openUser(u){
     <button class="btn ghost" style="width:100%;margin-top:8px" onclick="pickColor('')">Сбросить цвет</button>
     <div class="lbl">Префикс</div>
     <div class="pre-row">${pre}</div>
+    <div class="lbl">Ник (2–20 символов, без ограничения по времени)</div>
+    <input class="inp" id="dNick" value="${esc(draft.nickname)}" oninput="draft.nickname=this.value.trim()">
     <div class="lbl">ID игрока (буквы любого алфавита, цифры, _ · 3–16)</div>
     <input class="inp" id="dId" value="${esc(draft.publicId)}" oninput="draft.publicId=this.value.trim()">
     <div class="row" style="margin-top:20px"><button class="btn" onclick="saveUser()">Сохранить</button><button class="btn ghost" onclick="closeSheet()">Закрыть</button></div>
@@ -262,11 +264,11 @@ async function grantPrefix(){
   catch (e) { msg.textContent = e.message; }
 }
 async function saveUser(){
-  const body = { publicId: draft.publicId, verified: draft.verified, nameColor: draft.nameColor || null, prefixId: draft.prefixId || null };
+  const body = { publicId: draft.publicId, nickname: draft.nickname, verified: draft.verified, nameColor: draft.nameColor || null, prefixId: draft.prefixId || null };
   const msg = document.getElementById("uMsg");
   try {
     await api(`/api/admin/user/${encodeURIComponent(cur.publicId)}`, { method: "POST", body });
-    msg.textContent = "Сохранено ✓"; cur.publicId = draft.publicId; offset = 0; loadUsers(true);
+    msg.textContent = "Сохранено ✓"; cur.publicId = draft.publicId; cur.nickname = draft.nickname; offset = 0; loadUsers(true);
   } catch (e) { msg.textContent = e.message; }
 }
 function openSheet(){ document.getElementById("sheet").classList.add("on"); document.getElementById("scrim").classList.add("on"); }
