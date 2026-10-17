@@ -42,27 +42,32 @@ function tradeHTML() {
   const who = other.publicId ? `${esc(other.nickname)} <small>#${esc(other.publicId)}</small>` : "ждём второго игрока";
   const shareBtn = !other.publicId && editable ? `<button class="ghost-btn" onclick="tradeShare()">Поделиться ссылкой</button>` : "";
   const status = v.status === "open" && mine.ok ? "Вы подтвердили · ждём партнёра" : tStatusText(v);
+  const numInput = editable
+    ? `<input class="tr-num" type="number" min="0" max="${max}" value="${tradeDraft.g}" onchange="tradeSetG(this.value)" ${max ? "" : "disabled"}>` : "";
   return `<div class="tr-screen">
     <div class="tr-status">${status}</div>
-    <div class="tr-panels">
-      <div class="tr-panel mine"><div class="tr-h">Вы отдаёте${unsaved ? ' <small class="tr-unsaved">не сохранено</small>' : ""}</div>${tSideList(tFlat(tradeDraft.items), tradeDraft.g)}</div>
+    <div class="tr-stack">
+      <div class="tr-panel mine"><div class="tr-h">Твоя ставка${unsaved ? ' <small class="tr-unsaved">не сохранено</small>' : ""}</div>${tSideList(tFlat(tradeDraft.items), tradeDraft.g)}</div>
       <div class="tr-arrows" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h15l-4-4M20 15H5l4 4"/></svg></div>
-      <div class="tr-panel theirs"><div class="tr-h">Вы получаете</div>${tSideList(other.items, other.g)}</div>
+      <div class="tr-panel theirs"><div class="tr-h">Ставка друга</div>${tSideList(other.items, other.g)}</div>
     </div>
     <div class="tr-who">Партнёр: ${who}</div>
+    <div class="tr-btns">
+      ${editable ? `<button class="primary-btn" onclick="tradeConfirm()">Принять</button>` : ""}
+      ${editable ? `<button class="ghost-btn" onclick="tradeSave()">Сохранить</button>` : ""}
+      ${v.status === "countdown" ? `<button class="ghost-btn bad" onclick="tradeCancel()">Отменить обмен</button>` : ""}
+      ${v.status === "open" ? `<button class="ghost-btn bad" onclick="tradeCancel()">Закрыть трейд</button>` : ""}
+      ${shareBtn}
+    </div>
     <div class="tr-gbox">
       <div class="tr-gbar"><div class="tr-gfill" id="trGFill" style="width:${pctFill}%"></div><span id="trGVal">${fmt(tradeDraft.g)}</span></div>
-      ${slider}
+      <div class="tr-gsub">можно писать, сколько именно баланса</div>
+      <div class="tr-grow">${numInput}${slider}</div>
     </div>
     ${editable ? `<div class="tr-h">Ваш инвентарь</div><div class="tr-tiles">${tiles}</div>` : ""}
     ${editable ? `<div class="tr-fee">Комиссия ${v.feePct || 0}%: ${fmt(tDraftFee())}</div>` : ""}
     ${v.note ? `<div class="tr-note">${esc(v.note)}</div>` : ""}
-    <div class="tr-btns">
-      ${editable ? `<button class="ghost-btn" onclick="tradeSave()">Сохранить</button><button class="primary-btn" onclick="tradeConfirm()">Подтвердить</button>` : ""}
-      ${v.status === "countdown" ? `<button class="ghost-btn bad" onclick="tradeCancel()">Отменить обмен</button>` : ""}
-      ${v.status === "open" ? `<button class="ghost-btn bad" onclick="tradeCancel()">Закрыть трейд</button>` : ""}
-      ${shareBtn}
-    </div></div>`;
+  </div>`;
 }
 function renderTrade() {
   if (!tradeView) return;
@@ -211,3 +216,29 @@ setInterval(() => {
   if (!t || !__trEnd) return;
   t.textContent = Math.max(0, Math.ceil((__trEnd - Date.now()) / 1000));
 }, 250);
+
+const TR_SEEN_KEY = "amg_trade_seen";
+function trSeenSet() { try { return new Set(JSON.parse(localStorage.getItem(TR_SEEN_KEY) || "[]")); } catch (e) { return new Set(); } }
+function trSeenAdd(id) { const set = trSeenSet(); set.add(id); try { localStorage.setItem(TR_SEEN_KEY, JSON.stringify([...set].slice(-50))); } catch (e) {} }
+function trShowInvite(t) {
+  document.querySelectorAll(".tr-invite").forEach(n => n.remove());
+  const other = t.you === "a" ? t.b : t.a;
+  const who = other && other.nickname ? esc(other.nickname) : "Игрок";
+  const el = document.createElement("div");
+  el.className = "tr-invite";
+  el.innerHTML = `<div class="tr-invite-text"><b>Трейд от ${who}</b><small>Вам предложили обмен</small></div><button class="primary-btn">Открыть</button>`;
+  el.querySelector("button").onclick = () => { el.remove(); openTrade(t.id, false); };
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 20000);
+}
+async function trCheckIncoming() {
+  if (!isLoggedIn() || document.hidden) return;
+  const ov = document.getElementById("tradeOverlay");
+  if (ov && !ov.hidden) return;
+  let list = [];
+  try { list = await api("/api/trades"); } catch (e) { return; }
+  const seen = trSeenSet();
+  const fresh = (list || []).find(t => t.you === "b" && (t.status === "open" || t.status === "countdown") && !seen.has(t.id));
+  if (fresh) { trSeenAdd(fresh.id); trShowInvite(fresh); }
+}
+setInterval(trCheckIncoming, 4000);
