@@ -2,11 +2,11 @@ const VERIFIED_BADGE = '<svg class="vbadge" viewBox="0 0 100 100" aria-label="В
 /* ===== Ник с префиксом и галочкой, магазин префиксов ===== */
 
 /* Ник в одном месте: префикс-плашка, ник (цвет если выдан), галочка если верифицирован */
-function nickHTML(u) {
+function nickHTML(u, o) {
   const s = (u && u.style) || {};
   const name = esc((u && u.nickname) || "Игрок");
   const pc = s.nameColor || "#FFFFFF";
-  const pre = s.prefix ? `<span class="nk-prefix" style="--pc:${esc(pc)}">${esc(s.prefix.text)}</span>` : "";
+  const pre = (s.prefix && !(o && o.noPrefix)) ? `<span class="nk-prefix" style="--pc:${esc(pc)}">${esc(s.prefix.text)}</span>` : "";
   const badge = s.verified ? VERIFIED_BADGE : "";
   return `<span class="nk">${pre}<span class="nk-name">${name}</span>${badge}</span>`;
 }
