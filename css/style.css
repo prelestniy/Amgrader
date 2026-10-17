@@ -139,3 +139,8 @@
 .tr-invite-text small { color:var(--text-dim); }
 .tr-invite .primary-btn { width:auto; padding:8px 16px; flex:none; }
 @keyframes trIn { from { transform:translateY(-20px); opacity:0; } to { transform:none; opacity:1; } }
+
+/* ФИКС: в карточке профиля префикс виден, галочка стоит сразу за ником и не уезжает вправо */
+.profile-name .nk { display: inline-flex; width: auto; max-width: 100%; vertical-align: middle; }
+.profile-name .nk > .nk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+.profile-name .nk > .vbadge { margin-left: 4px; }
