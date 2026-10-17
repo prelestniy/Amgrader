@@ -118,3 +118,24 @@
 .shop-tabs { display: flex; gap: 8px; margin: 6px 0 10px; }
 .shop-tab { flex: 1; border: 1px solid var(--border-hi); background: var(--surface-2); color: var(--text-dim); border-radius: 999px; padding: 8px 10px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
 .shop-tab.on { color: var(--accent); border-color: var(--accent); }
+
+/* ФИКС: монета внутри карточки кейса не должна получать размер арта */
+.case-lobby-art svg.coin { width: 1em; height: 1em; }
+/* ФИКС: длинный ник обрезается многоточием, галочка и префикс остаются видимыми */
+.nk { max-width: 100%; min-width: 0; }
+.nk > .nk-name { flex: 0 1 auto; }
+.nk > .vbadge, .nk > .nk-prefix { flex: none; }
+
+/* ТРЕЙД ПО МАКЕТУ: ставки друг под другом, кнопки, сумма, инвентарь */
+.tr-stack { display:flex; flex-direction:column; gap:8px; }
+.tr-stack .tr-arrows { transform:rotate(90deg); padding:2px 0; }
+.tr-stack .tr-panel { min-height:120px; }
+.tr-gsub { font-size:12px; color:var(--text-dim); text-align:center; }
+.tr-grow { display:flex; gap:8px; align-items:center; }
+.tr-num { width:120px; flex:none; padding:8px 10px; border-radius:12px; border:1px solid var(--border); background:var(--surface-1); color:var(--text); font:inherit; font-weight:800; }
+.tr-invite { position:fixed; left:12px; right:12px; top:calc(env(safe-area-inset-top, 0px) + 10px); z-index:9999; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:18px; background:var(--surface-2); border:1px solid var(--accent); box-shadow:0 10px 30px rgba(0,0,0,.45); animation:trIn .3s ease-out; }
+.tr-invite-text { display:flex; flex-direction:column; min-width:0; }
+.tr-invite-text b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tr-invite-text small { color:var(--text-dim); }
+.tr-invite .primary-btn { width:auto; padding:8px 16px; flex:none; }
+@keyframes trIn { from { transform:translateY(-20px); opacity:0; } to { transform:none; opacity:1; } }
