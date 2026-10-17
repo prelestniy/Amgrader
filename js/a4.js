@@ -200,7 +200,7 @@ function renderProfile() {
   else if (loggedIn) avatar.textContent = initials(p.nickname);
   else avatar.innerHTML = ICON_LOCK;
 
-  document.getElementById("profileName").innerHTML = loggedIn ? nickHTML({ nickname: p.nickname, style: p.style }, { noPrefix: true }) : "";
+  document.getElementById("profileName").innerHTML = loggedIn ? nickHTML({ nickname: p.nickname, style: p.style }) : "";
   document.getElementById("profileSub").textContent = loggedIn
     ? (p.source === "telegram" ? (p.username ? "@" + p.username : "Telegram-аккаунт") : ("Логин: " + (p.login || p.nickname)))
     : "Не выполнен вход";
