@@ -188,8 +188,8 @@ async function resetProfile() {
 }
 
 /* ник в топе: без префикса, перенос по словам, чтобы весь ник влезал */
-function topNickHTML(u) {
-  return nickHTML({ nickname: (u && u.nickname) || "Игрок", style: (u && (u.style || (u.raw && u.raw.style))) || {} });
+function topNickHTML(u, noPrefix) {
+  return nickHTML({ nickname: (u && u.nickname) || "Игрок", style: (u && (u.style || (u.raw && u.raw.style))) || {} }, { noPrefix: !!noPrefix });
 }
 
 function renderProfile() {
@@ -200,7 +200,7 @@ function renderProfile() {
   else if (loggedIn) avatar.textContent = initials(p.nickname);
   else avatar.innerHTML = ICON_LOCK;
 
-  document.getElementById("profileName").innerHTML = loggedIn ? nickHTML({ nickname: p.nickname, style: p.style }) : "";
+  document.getElementById("profileName").innerHTML = loggedIn ? nickHTML({ nickname: p.nickname, style: p.style }, { noPrefix: true }) : "";
   document.getElementById("profileSub").textContent = loggedIn
     ? (p.source === "telegram" ? (p.username ? "@" + p.username : "Telegram-аккаунт") : ("Логин: " + (p.login || p.nickname)))
     : "Не выполнен вход";
@@ -218,8 +218,8 @@ function renderProfile() {
     chip.classList.remove("guest");
     chip.classList.add("logged");
     chip.innerHTML = p.photo
-      ? `<span class="auth-chip-avatar"><img src="${p.photo}" alt=""></span><span>${topNickHTML(p)}</span>`
-      : `<span class="auth-chip-avatar">${initials(p.nickname)}</span><span>${topNickHTML(p)}</span>`;
+      ? `<span class="auth-chip-avatar"><img src="${p.photo}" alt=""></span><span>${topNickHTML(p, true)}</span>`
+      : `<span class="auth-chip-avatar">${initials(p.nickname)}</span><span>${topNickHTML(p, true)}</span>`;
   } else {
     chip.classList.add("guest");
     chip.classList.remove("logged");
@@ -329,7 +329,7 @@ function renderTopBalanceSlider() {
     return `<div class="top-card ${u.me ? "me" : ""} ${rank <= 3 ? "top" + rank : ""}" onclick="openTopUser(${i})" role="button">` +
       `<div class="top-rank">#${rank}${u.me ? " · вы" : ""}</div>` +
       `<div class="top-av">${av}</div>` +
-      `<div class="top-nick">${topNickHTML(u.raw || u)}</div>` +
+      `<div class="top-nick">${topNickHTML(u.raw || u, true)}</div>` +
       `<div class="top-bal">${fmt(u.balance)}</div>` +
       `</div>`;
   }).join("");
